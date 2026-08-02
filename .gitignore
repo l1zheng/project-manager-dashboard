@@ -1,0 +1,29 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+
+# Tests
+playwright-report/
+test-results/
+
+# Local configuration and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Local application data and backups
+data/
+backups/
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+
+# Editor and OS files
+.DS_Store
+.idea/
+.vscode/
