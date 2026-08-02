@@ -22,6 +22,7 @@ Last updated: 2026-08-03
 - Excel provides both editable multi-sheet and presentation single-sheet modes.
 - Presentation Excel uses a fine base grid and calculated merged spans.
 - The Phase 0A dashboard structure, database configuration flow, independent filtering, and Outlook/Excel preview direction are accepted as the production interaction baseline.
+- Model use follows a three-tier routing agreement; the assistant proactively recommends switching before tasks that materially benefit from a different tier.
 
 ## Active task
 
@@ -46,6 +47,7 @@ Last updated: 2026-08-03
 
 ## Verification log
 
+- 2026-08-03: Added the local three-tier model-routing agreement covering proactive upgrades, downgrades, and task examples.
 - 2026-08-03: User reviewed and accepted the Phase 0A interactive prototype without requested changes; its interaction direction is frozen as the production baseline.
 - 2026-08-02: Built the Phase 0A zero-dependency interactive web prototype with independent database schemas, per-block filtering, field configuration, block ordering, and Outlook/Excel report previews; verified JavaScript syntax and local HTTP availability.
 - 2026-08-02: Created the private GitHub repository `l1zheng/project-manager-dashboard` and pushed the initial `main` branch.

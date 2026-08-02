@@ -8,6 +8,7 @@ A local-first, single-user project-management workspace with independent custom 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Current project status](docs/PROJECT_STATUS.md)
+- [Model routing agreement](docs/MODEL_ROUTING.md)
 - [Agent working agreement](AGENTS.md)
 - [Interactive prototype](prototype/README.md)
 

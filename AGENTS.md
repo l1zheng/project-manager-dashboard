@@ -14,6 +14,7 @@ Read these files at the beginning of every substantial task:
 2. `docs/ARCHITECTURE.md` — chosen technical direction and constraints.
 3. `docs/IMPLEMENTATION_PLAN.md` — ordered delivery plan.
 4. `docs/PROJECT_STATUS.md` — current phase, active tasks, decisions, and blockers.
+5. `docs/MODEL_ROUTING.md` — model-tier routing and proactive switch protocol.
 
 If implementation and documentation disagree, stop and resolve the inconsistency. Product requirements take precedence over implementation-plan wording; explicit user instructions take precedence over all repository documents.
 
@@ -55,3 +56,13 @@ After material work:
 4. Update `docs/PRODUCT_REQUIREMENTS.md` only when the product requirement itself changes.
 
 Keep the status file concise. It is the handoff point for the next development session.
+
+## Model routing
+
+Follow `docs/MODEL_ROUTING.md`. Before a task that materially benefits from another tier, proactively recommend one of the project's three user-defined tiers:
+
+- High model, high reasoning.
+- Medium model, medium reasoning.
+- Mini model, medium reasoning.
+
+The user performs the actual switch. Prefer grouping similar work to reduce unnecessary tier changes.
