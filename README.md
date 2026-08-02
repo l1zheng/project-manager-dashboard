@@ -9,5 +9,6 @@ A local-first, single-user project-management workspace with independent custom 
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Current project status](docs/PROJECT_STATUS.md)
 - [Agent working agreement](AGENTS.md)
+- [Interactive prototype](prototype/README.md)
 
-The repository currently contains the agreed product plan. Implementation starts with Phase 0 in the implementation plan.
+The repository currently contains the agreed product plan and a zero-dependency interactive prototype for Phase 0A review. Production implementation starts only after the prototype direction is accepted.

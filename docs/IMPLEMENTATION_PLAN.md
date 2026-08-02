@@ -4,6 +4,26 @@
 
 Build a vertical slice early: create two different databases, place them on one dashboard, export the result, and verify it in real Excel and classic Outlook. Avoid completing a large generic database editor before validating the report workflow.
 
+## Phase 0A — Interactive product prototype
+
+Status: in progress — awaiting user review
+
+Tasks:
+
+- Build a local interactive web prototype with realistic requirement, key-matter, and risk data.
+- Demonstrate multiple independently shaped database views on one dashboard.
+- Demonstrate per-block filtering, sorting, collapsing, and export inclusion.
+- Demonstrate database creation and field configuration without persistence.
+- Demonstrate static Outlook report preview and Excel presentation-layout preview.
+- Review the prototype with the user and record requested changes.
+
+Exit criteria:
+
+- The user confirms the dashboard information architecture and density.
+- The user confirms the database/view configuration workflow.
+- The user confirms the intended Outlook and Excel presentation direction.
+- Any rejected interaction is documented before production implementation begins.
+
 ## Phase 0 — Repository and engineering foundation
 
 Status: next
@@ -154,8 +174,9 @@ Exit criteria:
 
 ## Milestone order
 
-1. `M1 — Structured data`: Phases 0–2.
-2. `M2 — Usable dashboard`: Phase 3.
-3. `M3 — Report pipeline`: Phases 4–5.
-4. `M4 — Outlook workflow`: Phase 6.
-5. `M5 — Personal release`: Phase 7.
+1. `M0 — Product direction`: Phase 0A.
+2. `M1 — Structured data`: Phases 0–2.
+3. `M2 — Usable dashboard`: Phase 3.
+4. `M3 — Report pipeline`: Phases 4–5.
+5. `M4 — Outlook workflow`: Phase 6.
+6. `M5 — Personal release`: Phase 7.

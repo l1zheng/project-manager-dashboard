@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="项目管理看板交互原型" />
+    <title>项目管理工作台 · 交互原型</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="工作区导航">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">PM</span>
+          <div>
+            <strong>项目管理工作台</strong>
+            <span>个人工作区</span>
+          </div>
+        </div>
+
+        <nav class="main-nav" aria-label="主要导航">
+          <button class="nav-item is-active" type="button">
+            <span class="nav-dot dashboard-dot" aria-hidden="true"></span>
+            项目看板
+          </button>
+          <button class="nav-item" type="button" id="weekly-report-nav">
+            <span class="nav-dot report-dot" aria-hidden="true"></span>
+            周报预览
+          </button>
+        </nav>
+
+        <div class="sidebar-section">
+          <div class="sidebar-heading">
+            <span>数据库</span>
+            <button class="icon-button" id="new-database-side" type="button" aria-label="新建数据库">＋</button>
+          </div>
+          <div id="database-nav" class="database-nav"></div>
+        </div>
+
+        <div class="sidebar-footer">
+          <span class="status-light" aria-hidden="true"></span>
+          <div>
+            <strong>本地原型</strong>
+            <span>演示数据不会保存</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <div class="eyebrow">研发交付项目组 / 2026 年第 31 周</div>
+            <h1>项目综合看板</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="button secondary" id="new-database-top" type="button">＋ 新建数据库</button>
+            <button class="button secondary" id="excel-preview-button" type="button">Excel 预览</button>
+            <button class="button primary" id="outlook-preview-button" type="button">Outlook 周报</button>
+          </div>
+        </header>
+
+        <section class="prototype-note" aria-label="原型说明">
+          <div>
+            <strong>交互原型</strong>
+            <span>请重点体验数据库是否足够自由、一个页面的信息密度，以及导出后的阅读效果。</span>
+          </div>
+          <span class="prototype-pill">Phase 0A</span>
+        </section>
+
+        <section class="summary-strip" aria-label="看板摘要">
+          <div class="summary-item">
+            <span>进行中需求</span>
+            <strong id="summary-requirements">0</strong>
+          </div>
+          <div class="summary-item">
+            <span>待闭环事务</span>
+            <strong id="summary-matters">0</strong>
+          </div>
+          <div class="summary-item attention">
+            <span>高等级风险</span>
+            <strong id="summary-risks">0</strong>
+          </div>
+          <div class="summary-item">
+            <span>本周最近更新</span>
+            <strong class="summary-date">8 月 2 日 17:40</strong>
+          </div>
+        </section>
+
+        <div class="section-heading-row">
+          <div>
+            <h2>当前关注</h2>
+            <p>每个区块都是独立数据库视图，可单独调整字段、筛选和列宽。</p>
+          </div>
+          <span class="drag-hint">拖动区块标题可调整顺序</span>
+        </div>
+
+        <section id="dashboard-blocks" class="dashboard-blocks" aria-live="polite"></section>
+      </main>
+    </div>
+
+    <dialog id="database-dialog" class="modal database-modal">
+      <form method="dialog" id="database-form">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow" id="database-dialog-eyebrow">自定义结构</span>
+            <h2 id="database-dialog-title">新建数据库</h2>
+          </div>
+          <button class="icon-button large" value="cancel" aria-label="关闭">×</button>
+        </div>
+        <div class="modal-body">
+          <label class="field-label" for="database-name">数据库名称</label>
+          <input id="database-name" class="text-input" name="database-name" placeholder="例如：上线检查清单" required />
+
+          <div class="field-editor-heading">
+            <div>
+              <strong>字段</strong>
+              <span>每个数据库都可以拥有完全不同的字段。</span>
+            </div>
+            <button class="button tertiary small" id="add-field-button" type="button">＋ 添加字段</button>
+          </div>
+          <div id="field-editor" class="field-editor"></div>
+        </div>
+        <div class="modal-footer">
+          <button class="button secondary" value="cancel">取消</button>
+          <button class="button primary" id="save-database-button" value="default">创建并加入看板</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="report-dialog" class="modal report-modal">
+      <div class="modal-header report-header">
+        <div>
+          <span class="eyebrow">静态导出效果</span>
+          <h2>周报输出预览</h2>
+        </div>
+        <button class="icon-button large" id="close-report-button" type="button" aria-label="关闭">×</button>
+      </div>
+      <div class="report-toolbar">
+        <div class="segmented" role="tablist" aria-label="预览格式">
+          <button id="outlook-tab" class="segment is-active" type="button" role="tab" aria-selected="true">Outlook 邮件</button>
+          <button id="excel-tab" class="segment" type="button" role="tab" aria-selected="false">Excel 汇报版</button>
+        </div>
+        <div class="report-actions">
+          <span id="report-description">已移除筛选和编辑控件，采用经典 Outlook 兼容排版。</span>
+          <button class="button primary small" id="simulate-export-button" type="button">创建 Outlook 草稿</button>
+        </div>
+      </div>
+      <div class="report-canvas-wrap">
+        <div id="outlook-preview" class="outlook-preview"></div>
+        <div id="excel-preview" class="excel-preview" hidden></div>
+      </div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
