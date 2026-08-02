@@ -1,10 +1,10 @@
 # Project Status
 
-Last updated: 2026-08-02
+Last updated: 2026-08-03
 
 ## Current state
 
-- Phase: Phase 0A interactive product prototype.
+- Phase: Phase 0 engineering foundation is next; Phase 0A prototype is accepted.
 - Implementation: interactive prototype available under `prototype/`; production source has not been initialized.
 - Repository: Git repository initialized on the `main` branch; implementation source has not been initialized.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
@@ -21,17 +21,18 @@ Last updated: 2026-08-02
 - Classic Outlook local automation is the primary integration, with rich-copy and HTML fallbacks.
 - Excel provides both editable multi-sheet and presentation single-sheet modes.
 - Presentation Excel uses a fine base grid and calculated merged spans.
+- The Phase 0A dashboard structure, database configuration flow, independent filtering, and Outlook/Excel preview direction are accepted as the production interaction baseline.
 
 ## Active task
 
-`P0A-02`: Review the interactive prototype and freeze the first-release interaction direction.
+`P0-01`: Initialize the TypeScript workspace and choose locked package versions while preserving the accepted prototype interaction direction.
 
 ## Next tasks
 
-1. `P0A-02` — Collect feedback and revise the interactive prototype.
-2. `P0A-03` — Record accepted/rejected interactions and freeze the first-release direction.
-3. `P0-01` — Initialize workspace, frontend, backend, shared domain, and export modules.
-4. `P0-02` — Add SQLite, migrations, and the local data-directory adapter.
+1. `P0-01` — Initialize workspace, frontend, backend, shared domain, and export modules.
+2. `P0-02` — Add SQLite, migrations, and the local data-directory adapter.
+3. `P0-03` — Add health page and automated test commands.
+4. `P1-01` — Implement database, field, and record domain types using the accepted prototype as the UI reference.
 
 ## Risks and validation items
 
@@ -45,6 +46,7 @@ Last updated: 2026-08-02
 
 ## Verification log
 
+- 2026-08-03: User reviewed and accepted the Phase 0A interactive prototype without requested changes; its interaction direction is frozen as the production baseline.
 - 2026-08-02: Built the Phase 0A zero-dependency interactive web prototype with independent database schemas, per-block filtering, field configuration, block ordering, and Outlook/Excel report previews; verified JavaScript syntax and local HTTP availability.
 - 2026-08-02: Created the private GitHub repository `l1zheng/project-manager-dashboard` and pushed the initial `main` branch.
 - 2026-08-02: Installed GitHub CLI, authenticated the `l1zheng` account, and selected a repository-local Git identity using the account's GitHub privacy email.
