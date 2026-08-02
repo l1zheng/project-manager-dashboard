@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export * from './filter.js';
+
 export const healthResponseSchema = z.object({
   status: z.literal('ok'),
   service: z.literal('project-manager-api'),

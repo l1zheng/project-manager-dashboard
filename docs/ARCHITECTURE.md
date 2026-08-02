@@ -115,6 +115,8 @@ This prevents the browser and exports from disagreeing about which records are v
 
 Filter expressions are structured data, not executable code. A view stores an expression tree of field IDs, operators, and typed values.
 
+The canonical operator, empty-value, nesting, and validation semantics are recorded in [ADR-0002](decisions/0002-shared-filter-semantics.md). This domain evaluator is the reference behavior for every presentation surface and any future SQLite optimization.
+
 ## 6. Report rendering
 
 ### 6.1 Canonical report model
