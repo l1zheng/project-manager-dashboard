@@ -7,6 +7,7 @@ Last updated: 2026-08-02
 - Phase: planning complete; Phase 0 is next.
 - Implementation: not started.
 - Repository: Git repository initialized on the `main` branch; implementation source has not been initialized.
+- GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
 - Target platform: Windows with classic Outlook.
 - Deployment: local web application with SQLite.
@@ -44,6 +45,7 @@ Last updated: 2026-08-02
 
 ## Verification log
 
+- 2026-08-02: Created the private GitHub repository `l1zheng/project-manager-dashboard` and pushed the initial `main` branch.
 - 2026-08-02: Installed GitHub CLI, authenticated the `l1zheng` account, and selected a repository-local Git identity using the account's GitHub privacy email.
 - 2026-08-02: Initialized the local Git repository with `main` as the default branch and added baseline ignores for Node build output, local configuration, SQLite data, and backups.
 - 2026-08-02: Product requirements, initial architecture, implementation phases, and agent handoff rules written to the repository.
