@@ -169,6 +169,43 @@ export class WorkspaceService {
     return { ...record, values, updatedAt };
   }
 
+  archiveDatabase(databaseId: string) {
+    const database = this.requireActiveDatabase(databaseId);
+    return this.setArchived(schema.databases, database.id, true);
+  }
+
+  restoreDatabase(databaseId: string) {
+    const database = this.persistence.db
+      .select()
+      .from(schema.databases)
+      .where(eq(schema.databases.id, databaseId))
+      .get();
+    if (!database) throw new ResourceNotFoundError('Database');
+    return this.setArchived(schema.databases, database.id, false);
+  }
+
+  archiveField(fieldId: string) {
+    const field = this.requireActiveField(fieldId);
+    return this.setArchived(schema.fields, field.id, true);
+  }
+
+  restoreField(fieldId: string) {
+    const field = this.requireField(fieldId);
+    this.requireActiveDatabase(field.databaseId);
+    return this.setArchived(schema.fields, field.id, false);
+  }
+
+  archiveRecord(recordId: string) {
+    const record = this.requireActiveRecord(recordId);
+    return this.setArchived(schema.records, record.id, true);
+  }
+
+  restoreRecord(recordId: string) {
+    const record = this.requireRecord(recordId);
+    this.requireActiveDatabase(record.databaseId);
+    return this.setArchived(schema.records, record.id, false);
+  }
+
   private insertRecord(databaseId: string, command: CreateRecordInput) {
     const database = this.requireActiveDatabase(databaseId);
     const fields = this.listActiveFields(database.id).map((field) => this.toValidationField(field));
@@ -259,6 +296,54 @@ export class WorkspaceService {
       throw new ResourceNotFoundError('Database');
     }
     return database;
+  }
+
+  private requireField(fieldId: string) {
+    const field = this.persistence.db
+      .select()
+      .from(schema.fields)
+      .where(eq(schema.fields.id, fieldId))
+      .get();
+    if (!field) throw new ResourceNotFoundError('Field');
+    return field;
+  }
+
+  private requireActiveField(fieldId: string) {
+    const field = this.requireField(fieldId);
+    if (field.archivedAt) throw new ResourceNotFoundError('Field');
+    this.requireActiveDatabase(field.databaseId);
+    return field;
+  }
+
+  private requireRecord(recordId: string) {
+    const record = this.persistence.db
+      .select()
+      .from(schema.records)
+      .where(eq(schema.records.id, recordId))
+      .get();
+    if (!record) throw new ResourceNotFoundError('Record');
+    return record;
+  }
+
+  private requireActiveRecord(recordId: string) {
+    const record = this.requireRecord(recordId);
+    if (record.archivedAt) throw new ResourceNotFoundError('Record');
+    this.requireActiveDatabase(record.databaseId);
+    return record;
+  }
+
+  private setArchived(
+    table: typeof schema.databases | typeof schema.fields | typeof schema.records,
+    id: string,
+    archived: boolean
+  ) {
+    const updatedAt = new Date();
+    this.persistence.db
+      .update(table)
+      .set({ archivedAt: archived ? updatedAt : null, updatedAt })
+      .where(eq(table.id, id))
+      .run();
+    return this.persistence.db.select().from(table).where(eq(table.id, id)).get();
   }
 
   private listActiveFields(databaseId: string) {

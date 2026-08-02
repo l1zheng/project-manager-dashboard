@@ -118,6 +118,20 @@ describe('workspace API', () => {
         [nameField.id]: '支持统一认证',
         [statusField.id]: 'in-progress'
       });
+
+      const archiveRecordResponse = await app.inject({
+        method: 'POST',
+        url: `/api/records/${firstRecordResponse.json().id as string}/archive`
+      });
+      expect(archiveRecordResponse.statusCode).toBe(200);
+      expect(
+        (await app.inject({ method: 'GET', url: `/api/databases/${database.id}` })).json().records
+      ).toHaveLength(1);
+      const restoreRecordResponse = await app.inject({
+        method: 'POST',
+        url: `/api/records/${firstRecordResponse.json().id as string}/restore`
+      });
+      expect(restoreRecordResponse.statusCode).toBe(200);
     } finally {
       await app.close();
     }

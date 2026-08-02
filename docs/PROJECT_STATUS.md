@@ -4,7 +4,7 @@ Last updated: 2026-08-03
 
 ## Current state
 
-- Phase: Phase 1 dynamic database foundation is in progress; Phase 0 engineering foundation and Phase 0A prototype are complete.
+- Phase: Phase 1 dynamic database foundation is complete; Phase 0 engineering foundation and Phase 0A prototype are complete.
 - Implementation: pnpm TypeScript workspace, React/Vite web schema editor, Fastify API, shared domain/export packages, version-controlled SQLite schema/migration, online pre-migration backup gate, demo data command, validated database/field/record API operations, tests, linting, and formatting are in place.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
@@ -29,12 +29,12 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P1-04`: Add archive and restore operations for databases, fields, and records.
+`P2-01`: Design the typed filter-expression tree and shared evaluator.
 
 ## Next tasks
 
-1. `P1-04` — Add archive and restore operations for databases, fields, and records.
-2. Add the first saved view definition after basic table editing is accepted.
+1. `P2-01` — Design the typed filter-expression tree and shared evaluator.
+2. Add the first saved view definition after the evaluator is accepted.
 3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
@@ -50,6 +50,7 @@ Last updated: 2026-08-03
 
 ## Verification log
 
+- 2026-08-03: Completed P1-04. Added archive/restore API operations for databases, fields, and records; active views exclude archived data; browser controls archive each resource and provide an immediate undo action. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P1-03. Added validated record updates through `PATCH /api/records/:recordId`, an editable browser table, new-record rows, and controls for all first-release field types including selects, multi-selects, dates, checkboxes, long text, and automatic sequence display. Browser-verified in isolated data: created a database/field, added `支持单点登录`, updated it to `支持统一认证`, and confirmed the saved value reloaded. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P1-02. Replaced the static web shell with a SQLite-backed database sidebar, database creation form, per-database schema editor covering all first-release field types, option configuration for select/multi-select/status fields, stable-ID field renaming, and read-only table preview. Browser-verified in an isolated temporary database: created independent `需求跟踪` and `关键风险` databases, configured their different field terms, renamed a field, saved a status field with options, switched between databases, and confirmed new field forms reset to the safe default text type. Verified web lint/build and formatting before the final full-suite check.
 - 2026-08-03: Completed P1-01. Added shared validation for field configuration and typed record values; local API operations for creating/listing databases, adding/updating fields, creating records, and reading database detail; default workspace initialization; transactional per-database sequence allocation; and API integration coverage proving an invalid status is rejected and a field rename preserves existing Chinese record values by stable field ID. Verified `pnpm test` (7 API + 3 domain tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.

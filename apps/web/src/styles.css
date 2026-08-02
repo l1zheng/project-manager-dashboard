@@ -386,6 +386,32 @@ select:focus {
   padding: 5px 9px;
   font-size: 11px;
 }
+.archive-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  color: #475569;
+  border: 1px solid #d7e2ff;
+  border-radius: 8px;
+  background: #f3f7ff;
+  font-size: 13px;
+}
+.archive-notice button {
+  border: 0;
+  background: transparent;
+  color: #315fce;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.danger {
+  color: #a23f3f;
+}
+.archive-database {
+  margin-top: 9px;
+}
 .table-actions {
   display: flex;
   align-items: center;

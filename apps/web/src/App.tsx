@@ -69,6 +69,9 @@ export function App() {
   const [recordValueDrafts, setRecordValueDrafts] = useState<
     Record<string, Record<string, EditableValue>>
   >({});
+  const [lastArchived, setLastArchived] = useState<
+    { kind: '数据库' | '字段' | '记录'; id: string } | undefined
+  >();
 
   const selectedDatabase = useMemo(
     () => databases.find((database) => database.id === selectedDatabaseId),
@@ -242,6 +245,46 @@ export function App() {
     }
   }
 
+  async function archiveItem(kind: '数据库' | '字段' | '记录', id: string) {
+    const resource = kind === '数据库' ? 'databases' : kind === '字段' ? 'fields' : 'records';
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      await request(`/${'api'}/${resource}/${id}/archive`, { method: 'POST' });
+      setLastArchived({ kind, id });
+      if (kind === '数据库') {
+        const databaseList = await request<DatabaseSummary[]>('/api/databases');
+        setDatabases(databaseList);
+        setSelectedDatabaseId(databaseList[0]?.id);
+      } else if (selectedDatabaseId) {
+        await loadDetail(selectedDatabaseId);
+      }
+    } catch (requestError) {
+      setError(readRequestError(requestError, `归档${kind}失败。`));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function restoreLastArchived() {
+    if (!lastArchived) return;
+    const { kind, id } = lastArchived;
+    const resource = kind === '数据库' ? 'databases' : kind === '字段' ? 'fields' : 'records';
+    setIsSaving(true);
+    try {
+      await request(`/${'api'}/${resource}/${id}/restore`, { method: 'POST' });
+      const databaseList = await request<DatabaseSummary[]>('/api/databases');
+      setDatabases(databaseList);
+      if (kind === '数据库') setSelectedDatabaseId(id);
+      else if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
+      setLastArchived(undefined);
+    } catch (requestError) {
+      setError(readRequestError(requestError, `恢复${kind}失败。`));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar" aria-label="工作区导航">
@@ -292,6 +335,16 @@ export function App() {
             <p className="subtitle">
               {selectedDatabase?.description ?? '每个数据库可使用自己的字段名称与业务语义。'}
             </p>
+            {selectedDatabase && (
+              <button
+                className="button tertiary small danger archive-database"
+                disabled={isSaving}
+                onClick={() => void archiveItem('数据库', selectedDatabase.id)}
+                type="button"
+              >
+                归档此数据库
+              </button>
+            )}
           </div>
           <div className={`health ${health.kind}`} aria-live="polite">
             <span className="health-dot" />
@@ -302,6 +355,14 @@ export function App() {
         </header>
 
         {error && <div className="error-banner">{error}</div>}
+        {lastArchived && (
+          <div className="archive-notice" role="status">
+            已归档{lastArchived.kind}。
+            <button disabled={isSaving} onClick={() => void restoreLastArchived()} type="button">
+              撤销
+            </button>
+          </div>
+        )}
 
         {isCreatingDatabase && (
           <section className="panel creation-panel">
@@ -406,6 +467,14 @@ export function App() {
                       type="button"
                     >
                       保存
+                    </button>
+                    <button
+                      className="button tertiary small danger"
+                      disabled={isSaving}
+                      onClick={() => void archiveItem('字段', field.id)}
+                      type="button"
+                    >
+                      归档
                     </button>
                   </div>
                 ))}
@@ -568,6 +637,14 @@ export function App() {
                                 type="button"
                               >
                                 {isSaving ? '保存中…' : '保存'}
+                              </button>
+                              <button
+                                className="button tertiary small danger"
+                                disabled={isSaving}
+                                onClick={() => void archiveItem('记录', record.id)}
+                                type="button"
+                              >
+                                归档
                               </button>
                             </td>
                           </tr>

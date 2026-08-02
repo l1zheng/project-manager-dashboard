@@ -38,6 +38,24 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
   app.patch('/api/records/:recordId', async (request) => {
     return service.updateRecord(recordParamsSchema.parse(request.params).recordId, request.body);
   });
+  app.post('/api/databases/:databaseId/archive', async (request) =>
+    service.archiveDatabase(databaseParamsSchema.parse(request.params).databaseId)
+  );
+  app.post('/api/databases/:databaseId/restore', async (request) =>
+    service.restoreDatabase(databaseParamsSchema.parse(request.params).databaseId)
+  );
+  app.post('/api/fields/:fieldId/archive', async (request) =>
+    service.archiveField(fieldParamsSchema.parse(request.params).fieldId)
+  );
+  app.post('/api/fields/:fieldId/restore', async (request) =>
+    service.restoreField(fieldParamsSchema.parse(request.params).fieldId)
+  );
+  app.post('/api/records/:recordId/archive', async (request) =>
+    service.archiveRecord(recordParamsSchema.parse(request.params).recordId)
+  );
+  app.post('/api/records/:recordId/restore', async (request) =>
+    service.restoreRecord(recordParamsSchema.parse(request.params).recordId)
+  );
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {
