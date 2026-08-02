@@ -1,64 +1,502 @@
-import { useEffect, useState } from 'react';
-import type { HealthResponse } from '@project-manager/domain';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import type { FieldType, HealthResponse } from '@project-manager/domain';
+
+type DatabaseSummary = {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+};
+
+type Field = {
+  id: string;
+  name: string;
+  type: FieldType;
+  description: string | null;
+  config: { version: 1; options?: Array<{ id: string; label: string; color?: string }> };
+};
+
+type RecordRow = {
+  id: string;
+  sequenceNumber: number;
+  values: Record<string, string | number | boolean | string[]>;
+};
+
+type DatabaseDetail = {
+  database: DatabaseSummary;
+  fields: Field[];
+  records: RecordRow[];
+};
 
 type HealthState =
   { kind: 'loading' } | { kind: 'ready'; response: HealthResponse } | { kind: 'error' };
 
-const blocks = [
-  { name: '需求跟踪', fields: ['需求号', '需求名称', '当前进展', '交付计划', '责任人', '状态'] },
-  { name: '关键事务', fields: ['事项', '进展', '计划闭环时间', '责任人', '状态'] },
-  { name: '关键风险', fields: ['风险描述', '影响程度', '风险消减措施', '责任人', '状态'] }
+const fieldTypes: Array<{ value: FieldType; label: string }> = [
+  { value: 'short_text', label: '单行文本' },
+  { value: 'long_text', label: '多行文本' },
+  { value: 'number', label: '数字' },
+  { value: 'date', label: '日期' },
+  { value: 'single_select', label: '单选' },
+  { value: 'multi_select', label: '多选' },
+  { value: 'status', label: '状态' },
+  { value: 'person', label: '人员' },
+  { value: 'checkbox', label: '复选框' },
+  { value: 'url', label: '链接' },
+  { value: 'sequence', label: '自动编号' }
 ];
+
+const optionFieldTypes = new Set<FieldType>(['single_select', 'multi_select', 'status']);
 
 export function App() {
   const [health, setHealth] = useState<HealthState>({ kind: 'loading' });
+  const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
+  const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>();
+  const [detail, setDetail] = useState<DatabaseDetail>();
+  const [isCreatingDatabase, setIsCreatingDatabase] = useState(false);
+  const [isAddingField, setIsAddingField] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string>();
+  const [databaseName, setDatabaseName] = useState('');
+  const [databaseDescription, setDatabaseDescription] = useState('');
+  const [fieldName, setFieldName] = useState('');
+  const [fieldType, setFieldType] = useState<FieldType>('short_text');
+  const [optionLabels, setOptionLabels] = useState('未开始, 进行中, 已完成');
+  const [fieldNameDrafts, setFieldNameDrafts] = useState<Record<string, string>>({});
+
+  const selectedDatabase = useMemo(
+    () => databases.find((database) => database.id === selectedDatabaseId),
+    [databases, selectedDatabaseId]
+  );
 
   useEffect(() => {
-    fetch('/api/health')
-      .then(async (response) => {
-        if (!response.ok) throw new Error('Health endpoint failed');
-        return (await response.json()) as HealthResponse;
-      })
-      .then((response) => setHealth({ kind: 'ready', response }))
-      .catch(() => setHealth({ kind: 'error' }));
+    void initialize();
   }, []);
 
+  useEffect(() => {
+    if (selectedDatabaseId) {
+      void loadDetail(selectedDatabaseId);
+    } else {
+      setDetail(undefined);
+    }
+  }, [selectedDatabaseId]);
+
+  async function initialize() {
+    try {
+      const [healthResponse, databaseList] = await Promise.all([
+        request<HealthResponse>('/api/health'),
+        request<DatabaseSummary[]>('/api/databases')
+      ]);
+      setHealth({ kind: 'ready', response: healthResponse });
+      setDatabases(databaseList);
+      setSelectedDatabaseId((current) => current ?? databaseList[0]?.id);
+    } catch {
+      setHealth({ kind: 'error' });
+      setError('无法连接本地服务。请确认 API 已启动。');
+    }
+  }
+
+  async function loadDetail(databaseId: string) {
+    try {
+      const nextDetail = await request<DatabaseDetail>(`/api/databases/${databaseId}`);
+      setDetail(nextDetail);
+      setFieldNameDrafts(
+        Object.fromEntries(nextDetail.fields.map((field) => [field.id, field.name]))
+      );
+    } catch {
+      setError('读取数据库结构失败。');
+    }
+  }
+
+  async function createDatabase(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!databaseName.trim()) return;
+
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      const database = await request<DatabaseSummary>('/api/databases', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: databaseName,
+          description: databaseDescription || null
+        })
+      });
+      setDatabases((current) => [...current, database]);
+      setSelectedDatabaseId(database.id);
+      setDatabaseName('');
+      setDatabaseDescription('');
+      setIsCreatingDatabase(false);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '创建数据库失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function createField(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedDatabaseId || !fieldName.trim()) return;
+
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      const config = optionFieldTypes.has(fieldType)
+        ? {
+            version: 1,
+            options: optionLabels
+              .split(',')
+              .map((label) => label.trim())
+              .filter(Boolean)
+              .map((label, index) => ({ id: `option-${index + 1}`, label }))
+          }
+        : { version: 1 };
+      await request<Field>(`/api/databases/${selectedDatabaseId}/fields`, {
+        method: 'POST',
+        body: JSON.stringify({ name: fieldName, type: fieldType, config })
+      });
+      setFieldName('');
+      setFieldType('short_text');
+      setOptionLabels('未开始, 进行中, 已完成');
+      setIsAddingField(false);
+      await loadDetail(selectedDatabaseId);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '添加字段失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveFieldName(field: Field) {
+    const nextName = fieldNameDrafts[field.id]?.trim();
+    if (!nextName || nextName === field.name) return;
+
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      await request<Field>(`/api/fields/${field.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: nextName })
+      });
+      if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '保存字段名称失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">本地优先 · 单人工作区</p>
-          <h1>项目管理工作台</h1>
-          <p className="subtitle">Phase 0 工程基础已启动，原型交互将逐步迁移为正式功能。</p>
+    <div className="app-shell">
+      <aside className="sidebar" aria-label="工作区导航">
+        <div className="brand">
+          <span className="brand-mark">PM</span>
+          <div>
+            <strong>项目管理工作台</strong>
+            <span>个人工作区</span>
+          </div>
         </div>
-        <div className={`health ${health.kind}`} aria-live="polite">
-          <span className="health-dot" />
-          {health.kind === 'loading' && '正在连接本地服务'}
-          {health.kind === 'ready' && `本地服务正常 · ${health.response.service}`}
-          {health.kind === 'error' && '本地服务暂不可用'}
+
+        <div className="nav-label">数据库</div>
+        <nav className="database-nav" aria-label="数据库列表">
+          {databases.map((database) => (
+            <button
+              className={`database-nav-item ${database.id === selectedDatabaseId ? 'is-active' : ''}`}
+              key={database.id}
+              onClick={() => setSelectedDatabaseId(database.id)}
+              type="button"
+            >
+              <span
+                className="database-dot"
+                style={{ backgroundColor: database.color ?? undefined }}
+              />
+              <span>{database.name}</span>
+            </button>
+          ))}
+        </nav>
+        <button
+          className="new-database-link"
+          onClick={() => setIsCreatingDatabase(true)}
+          type="button"
+        >
+          ＋ 新建数据库
+        </button>
+
+        <div className="sidebar-footer">
+          <span className={`status-light ${health.kind}`} />
+          <span>{health.kind === 'ready' ? '本地数据已连接' : '正在检查本地服务'}</span>
         </div>
-      </header>
+      </aside>
 
-      <section className="notice">
-        <strong>已确认的产品方向</strong>
-        <span>多个结构独立的数据库可以在一个看板中展示；筛选和导出将围绕保存视图实现。</span>
-      </section>
+      <main className="workspace">
+        <header className="topbar">
+          <div>
+            <p className="eyebrow">数据库结构配置 · Phase 1</p>
+            <h1>{selectedDatabase?.name ?? '创建你的第一个数据库'}</h1>
+            <p className="subtitle">
+              {selectedDatabase?.description ?? '每个数据库可使用自己的字段名称与业务语义。'}
+            </p>
+          </div>
+          <div className={`health ${health.kind}`} aria-live="polite">
+            <span className="health-dot" />
+            {health.kind === 'ready' && 'SQLite 已就绪'}
+            {health.kind === 'loading' && '正在连接'}
+            {health.kind === 'error' && '服务不可用'}
+          </div>
+        </header>
 
-      <section className="grid" aria-label="已确认的数据库结构">
-        {blocks.map((block) => (
-          <article className="card" key={block.name}>
-            <div className="card-heading">
-              <h2>{block.name}</h2>
-              <span>独立字段</span>
+        {error && <div className="error-banner">{error}</div>}
+
+        {isCreatingDatabase && (
+          <section className="panel creation-panel">
+            <div className="panel-heading">
+              <div>
+                <span className="section-kicker">自定义结构</span>
+                <h2>新建数据库</h2>
+              </div>
+              <button
+                className="icon-button"
+                onClick={() => setIsCreatingDatabase(false)}
+                type="button"
+              >
+                ×
+              </button>
             </div>
-            <ul>
-              {block.fields.map((field) => (
-                <li key={field}>{field}</li>
-              ))}
-            </ul>
-          </article>
-        ))}
-      </section>
-    </main>
+            <form className="form-grid" onSubmit={createDatabase}>
+              <label>
+                数据库名称
+                <input
+                  autoFocus
+                  value={databaseName}
+                  onChange={(event) => setDatabaseName(event.target.value)}
+                  placeholder="例如：需求跟踪、关键风险"
+                />
+              </label>
+              <label>
+                说明（可选）
+                <input
+                  value={databaseDescription}
+                  onChange={(event) => setDatabaseDescription(event.target.value)}
+                  placeholder="说明这个数据库管理什么"
+                />
+              </label>
+              <div className="form-actions">
+                <button
+                  className="button secondary"
+                  onClick={() => setIsCreatingDatabase(false)}
+                  type="button"
+                >
+                  取消
+                </button>
+                <button className="button primary" disabled={isSaving} type="submit">
+                  {isSaving ? '正在创建…' : '创建数据库'}
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+
+        {detail ? (
+          <>
+            <section className="panel schema-panel">
+              <div className="panel-heading">
+                <div>
+                  <span className="section-kicker">独立字段</span>
+                  <h2>字段结构</h2>
+                  <p>字段名称可直接改动；已有记录按稳定字段 ID 保存，不会丢失。</p>
+                </div>
+                <button
+                  className="button primary"
+                  onClick={() => {
+                    setFieldName('');
+                    setFieldType('short_text');
+                    setOptionLabels('未开始, 进行中, 已完成');
+                    setIsAddingField(true);
+                  }}
+                  type="button"
+                >
+                  ＋ 添加字段
+                </button>
+              </div>
+
+              <div className="field-list">
+                {detail.fields.length === 0 && (
+                  <div className="empty-state">
+                    <strong>还没有字段</strong>
+                    <span>先定义这个数据库自己的业务列，例如“需求名称”或“风险消减措施”。</span>
+                  </div>
+                )}
+                {detail.fields.map((field) => (
+                  <div className="field-row" key={field.id}>
+                    <span className="drag-placeholder">⠿</span>
+                    <span className="field-type-tag">
+                      {fieldTypes.find((item) => item.value === field.type)?.label}
+                    </span>
+                    <input
+                      aria-label={`${field.name}的字段名称`}
+                      value={fieldNameDrafts[field.id] ?? field.name}
+                      onChange={(event) =>
+                        setFieldNameDrafts((current) => ({
+                          ...current,
+                          [field.id]: event.target.value
+                        }))
+                      }
+                    />
+                    <span className="field-id">ID · {field.id.slice(0, 8)}</span>
+                    <button
+                      className="button tertiary small"
+                      disabled={isSaving || fieldNameDrafts[field.id]?.trim() === field.name}
+                      onClick={() => void saveFieldName(field)}
+                      type="button"
+                    >
+                      保存
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {isAddingField && (
+                <form className="add-field-form" onSubmit={createField}>
+                  <label>
+                    字段名称
+                    <input
+                      autoFocus
+                      value={fieldName}
+                      onChange={(event) => setFieldName(event.target.value)}
+                      placeholder="例如：风险消减措施"
+                    />
+                  </label>
+                  <label>
+                    字段类型
+                    <select
+                      value={fieldType}
+                      onChange={(event) => setFieldType(event.target.value as FieldType)}
+                    >
+                      {fieldTypes.map((type) => (
+                        <option key={type.value} value={type.value}>
+                          {type.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {optionFieldTypes.has(fieldType) && (
+                    <label className="options-input">
+                      选项（用逗号分隔）
+                      <input
+                        value={optionLabels}
+                        onChange={(event) => setOptionLabels(event.target.value)}
+                        placeholder="未开始, 进行中, 已完成"
+                      />
+                    </label>
+                  )}
+                  <div className="form-actions">
+                    <button
+                      className="button secondary"
+                      onClick={() => setIsAddingField(false)}
+                      type="button"
+                    >
+                      取消
+                    </button>
+                    <button className="button primary" disabled={isSaving} type="submit">
+                      {isSaving ? '正在添加…' : '添加字段'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </section>
+
+            <section className="panel preview-panel">
+              <div className="panel-heading">
+                <div>
+                  <span className="section-kicker">只读预览</span>
+                  <h2>数据表</h2>
+                  <p>记录编辑将在下一阶段接入；当前用于确认字段结构与已有数据的对应关系。</p>
+                </div>
+                <span className="record-count">{detail.records.length} 条记录</span>
+              </div>
+              {detail.fields.length > 0 ? (
+                <div className="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        {detail.fields.map((field) => (
+                          <th key={field.id}>{field.name}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.records.length === 0 ? (
+                        <tr>
+                          <td className="empty-cell" colSpan={detail.fields.length}>
+                            暂无记录。下一阶段将支持在这里直接添加和编辑。
+                          </td>
+                        </tr>
+                      ) : (
+                        detail.records.map((record) => (
+                          <tr key={record.id}>
+                            {detail.fields.map((field) => (
+                              <td key={field.id}>{displayValue(field, record)}</td>
+                            ))}
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>定义字段后显示数据预览</strong>
+                  <span>不同数据库可以拥有不同的字段数量和字段名称。</span>
+                </div>
+              )}
+            </section>
+          </>
+        ) : (
+          <section className="first-run">
+            <span className="first-run-icon">＋</span>
+            <h2>从一个业务数据库开始</h2>
+            <p>
+              例如“需求跟踪”可拥有需求名称、交付计划和责任人；“关键风险”则可拥有风险描述和风险消减措施。
+            </p>
+            <button
+              className="button primary"
+              onClick={() => setIsCreatingDatabase(true)}
+              type="button"
+            >
+              创建第一个数据库
+            </button>
+          </section>
+        )}
+      </main>
+    </div>
   );
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { 'content-type': 'application/json', ...init?.headers }
+  });
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => undefined)) as
+      { message?: string } | undefined;
+    throw new Error(payload?.message ?? `请求失败（${response.status}）`);
+  }
+  return (await response.json()) as T;
+}
+
+function readRequestError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function displayValue(field: Field, record: RecordRow): string {
+  if (field.type === 'sequence') return String(record.sequenceNumber);
+  const value = record.values[field.id];
+  if (value === undefined || value === null || value === '') return '—';
+  if (Array.isArray(value)) return value.map((item) => optionLabel(field, item)).join('、');
+  if (typeof value === 'boolean') return value ? '是' : '否';
+  return optionLabel(field, String(value));
+}
+
+function optionLabel(field: Field, value: string): string {
+  return field.config.options?.find((option) => option.id === value)?.label ?? value;
 }
