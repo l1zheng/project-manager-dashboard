@@ -1,0 +1,16 @@
+{
+  "name": "@project-manager/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "eslint src --max-warnings 0"
+  },
+  "dependencies": {
+    "@project-manager/domain": "workspace:*",
+    "fastify": "^5.5.0"
+  }
+}

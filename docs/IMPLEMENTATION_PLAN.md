@@ -26,7 +26,7 @@ Exit criteria:
 
 ## Phase 0 — Repository and engineering foundation
 
-Status: next
+Status: in progress — P0-01 completed on 2026-08-03
 
 Tasks:
 

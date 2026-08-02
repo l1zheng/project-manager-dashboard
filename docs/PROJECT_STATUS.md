@@ -4,8 +4,8 @@ Last updated: 2026-08-03
 
 ## Current state
 
-- Phase: Phase 0 engineering foundation is next; Phase 0A prototype is accepted.
-- Implementation: interactive prototype available under `prototype/`; production source has not been initialized.
+- Phase: Phase 0 engineering foundation is in progress; Phase 0A prototype is accepted.
+- Implementation: pnpm TypeScript workspace, React/Vite web app, Fastify API, shared domain/export packages, tests, linting, and formatting are in place. SQLite has not yet been added.
 - Repository: Git repository initialized on the `main` branch; implementation source has not been initialized.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -26,14 +26,14 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P0-01`: Initialize the TypeScript workspace and choose locked package versions while preserving the accepted prototype interaction direction.
+`P0-02`: Finalize the local SQLite persistence model and migration strategy before creating permanent tables.
 
 ## Next tasks
 
-1. `P0-01` — Initialize workspace, frontend, backend, shared domain, and export modules.
-2. `P0-02` — Add SQLite, migrations, and the local data-directory adapter.
-3. `P0-03` — Add health page and automated test commands.
-4. `P1-01` — Implement database, field, and record domain types using the accepted prototype as the UI reference.
+1. `P0-02` — Finalize the local SQLite persistence model, migrations, and local data-directory adapter.
+2. `P0-03` — Add an SQLite-backed health check, sample-data command, and a repeatable Windows verification checklist.
+3. `P1-01` — Implement database, field, and record domain types using the accepted prototype as the UI reference.
+4. `P1-02` — Build the database navigation and schema editor.
 
 ## Risks and validation items
 
@@ -47,6 +47,7 @@ Last updated: 2026-08-03
 
 ## Verification log
 
+- 2026-08-03: Completed P0-01. Created the pnpm TypeScript workspace, React/Vite web app, loopback-only Fastify health API, shared domain/export packages, linting, formatting, and unit tests. Verified `pnpm test`, `pnpm lint`, `pnpm format:check`, `pnpm build`, direct API health, and Vite proxy health.
 - 2026-08-03: Added the local three-tier model-routing agreement covering proactive upgrades, downgrades, and task examples.
 - 2026-08-03: User reviewed and accepted the Phase 0A interactive prototype without requested changes; its interaction direction is frozen as the production baseline.
 - 2026-08-02: Built the Phase 0A zero-dependency interactive web prototype with independent database schemas, per-block filtering, field configuration, block ordering, and Outlook/Excel report previews; verified JavaScript syntax and local HTTP availability.

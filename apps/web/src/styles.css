@@ -1,0 +1,151 @@
+:root {
+  font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+  color: #1f2937;
+  background: #f5f7fb;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  margin: 0;
+}
+
+.shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 64px 28px;
+}
+
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+.eyebrow {
+  margin: 0;
+  color: #526987;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+}
+h1 {
+  margin: 7px 0;
+  font-size: clamp(32px, 5vw, 48px);
+  letter-spacing: -0.04em;
+}
+.subtitle {
+  margin: 0;
+  color: #667085;
+}
+
+.health {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #d9e2ef;
+  border-radius: 999px;
+  background: #fff;
+  color: #596579;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.health-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f0a742;
+}
+.health.ready .health-dot {
+  background: #2d936c;
+}
+.health.error .health-dot {
+  background: #ca4c4c;
+}
+
+.notice {
+  display: grid;
+  gap: 5px;
+  margin-top: 42px;
+  padding: 18px 20px;
+  border: 1px solid #cfdcf6;
+  border-radius: 12px;
+  background: #edf3ff;
+}
+.notice strong {
+  color: #254e9b;
+}
+.notice span {
+  color: #526987;
+  line-height: 1.6;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.card {
+  min-height: 218px;
+  padding: 20px;
+  border: 1px solid #e1e7f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 4px 18px rgba(46, 65, 91, 0.04);
+}
+.card-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid #edf0f4;
+  padding-bottom: 14px;
+}
+h2 {
+  margin: 0;
+  font-size: 18px;
+}
+.card-heading span {
+  color: #4a67a4;
+  background: #edf3ff;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 650;
+}
+ul {
+  display: grid;
+  gap: 10px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  color: #5f6b7b;
+}
+li::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: #6d92e4;
+  vertical-align: middle;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    padding: 36px 18px;
+  }
+  .topbar {
+    flex-direction: column;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}

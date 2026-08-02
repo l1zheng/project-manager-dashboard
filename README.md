@@ -13,3 +13,15 @@ A local-first, single-user project-management workspace with independent custom 
 - [Interactive prototype](prototype/README.md)
 
 The repository currently contains the agreed product plan and a zero-dependency interactive prototype for Phase 0A review. Production implementation starts only after the prototype direction is accepted.
+
+## Development
+
+```bash
+pnpm install
+pnpm dev
+pnpm test
+pnpm lint
+pnpm build
+```
+
+The web app runs on `http://127.0.0.1:5173/` and proxies `/api` to the local Fastify service on `http://127.0.0.1:4300/`.
