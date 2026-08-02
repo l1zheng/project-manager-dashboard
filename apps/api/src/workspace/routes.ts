@@ -1,0 +1,48 @@
+import { z, ZodError } from 'zod';
+import type { FastifyInstance } from 'fastify';
+import type { Persistence } from '../persistence/database.js';
+import { ResourceNotFoundError, WorkspaceService } from './service.js';
+
+const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
+const fieldParamsSchema = z.object({ fieldId: z.string().trim().min(1).max(120) });
+
+export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persistence): void {
+  const service = new WorkspaceService(persistence);
+
+  app.get('/api/databases', async () => service.listDatabases());
+  app.post('/api/databases', async (request, reply) => {
+    const database = service.createDatabase(request.body);
+    return reply.code(201).send(database);
+  });
+  app.get('/api/databases/:databaseId', async (request) => {
+    return service.getDatabase(databaseParamsSchema.parse(request.params).databaseId);
+  });
+  app.post('/api/databases/:databaseId/fields', async (request, reply) => {
+    const field = service.createField(
+      databaseParamsSchema.parse(request.params).databaseId,
+      request.body
+    );
+    return reply.code(201).send(field);
+  });
+  app.patch('/api/fields/:fieldId', async (request) => {
+    return service.updateField(fieldParamsSchema.parse(request.params).fieldId, request.body);
+  });
+  app.post('/api/databases/:databaseId/records', async (request, reply) => {
+    const record = service.createRecord(
+      databaseParamsSchema.parse(request.params).databaseId,
+      request.body
+    );
+    return reply.code(201).send(record);
+  });
+
+  app.setErrorHandler((error, request, reply) => {
+    if (error instanceof ZodError) {
+      return reply.code(400).send({ error: 'validation_error', details: error.issues });
+    }
+    if (error instanceof ResourceNotFoundError) {
+      return reply.code(404).send({ error: 'not_found', message: error.message });
+    }
+    request.log.error(error);
+    return reply.code(500).send({ error: 'internal_error' });
+  });
+}
