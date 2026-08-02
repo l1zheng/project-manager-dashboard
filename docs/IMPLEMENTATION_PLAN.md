@@ -26,7 +26,7 @@ Exit criteria:
 
 ## Phase 0 — Repository and engineering foundation
 
-Status: in progress — P0-01 and the P0-02 persistence decision completed on 2026-08-03
+Status: implementation complete on 2026-08-03 — Windows Node 24 LTS verification remains a manual target-machine check
 
 Tasks:
 

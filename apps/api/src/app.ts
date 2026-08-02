@@ -1,14 +1,31 @@
 import Fastify from 'fastify';
 import { healthResponseSchema } from '@project-manager/domain';
+import type { Persistence } from './persistence/database.js';
 
-export function buildApp() {
+export interface BuildAppOptions {
+  persistence?: Persistence;
+}
+
+export function buildApp({ persistence }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true });
+
+  if (persistence) {
+    app.addHook('onClose', () => {
+      persistence.close();
+    });
+  }
 
   app.get('/api/health', async () => {
     return healthResponseSchema.parse({
       status: 'ok',
       service: 'project-manager-api',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      storage: persistence
+        ? {
+            engine: 'sqlite',
+            migration: persistence.migrationState
+          }
+        : undefined
     });
   });
 

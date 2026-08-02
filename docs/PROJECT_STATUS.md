@@ -4,8 +4,8 @@ Last updated: 2026-08-03
 
 ## Current state
 
-- Phase: Phase 0 engineering foundation is in progress; Phase 0A prototype is accepted.
-- Implementation: pnpm TypeScript workspace, React/Vite web app, Fastify API, shared domain/export packages, tests, linting, and formatting are in place. SQLite has not yet been added.
+- Phase: Phase 0 engineering foundation is complete in the development environment; Phase 1 dynamic database foundation is next. Phase 0A prototype is accepted.
+- Implementation: pnpm TypeScript workspace, React/Vite web app, Fastify API, shared domain/export packages, version-controlled SQLite schema/migration, online pre-migration backup gate, demo data command, tests, linting, and formatting are in place.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -29,14 +29,14 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P0-03`: Implement the accepted SQLite persistence foundation, backed health check, sample data, and Windows verification checklist.
+`P1-01`: Implement database, field, and record domain operations on the accepted persistence foundation.
 
 ## Next tasks
 
-1. `P0-03a` — Add the platform data-directory adapter, Drizzle schema, first generated migration, migration/backup coordinator, and integration tests.
-2. `P0-03b` — Add an SQLite-backed health check, sample-data command, and a repeatable Windows Node 24/native-driver verification checklist.
-3. `P1-01` — Implement database, field, and record domain types using the accepted prototype as the UI reference.
-4. `P1-02` — Build the database navigation and schema editor.
+1. `P1-01` — Implement database, field, and record domain operations using the accepted prototype as the UI reference.
+2. `P1-02` — Build the database navigation and schema editor.
+3. `P1-03` — Build the basic table view and inline record editing.
+4. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
 
@@ -51,6 +51,7 @@ Last updated: 2026-08-03
 
 ## Verification log
 
+- 2026-08-03: Completed P0-03. Added stable `better-sqlite3`/Drizzle dependencies, platform data paths, all nine initial persistent tables, generated and checked the first SQL migration, verified online pre-migration backups, SQLite-backed health reporting, an idempotent Chinese demo workspace command, and the Windows Node 24 LTS verification checklist. Verified `pnpm test` (6 API + 2 domain tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, `drizzle-kit check`, repeated demo seeding in an isolated directory, and a real compiled-API `/api/health` response. Windows target-machine validation remains manual.
 - 2026-08-03: Completed P0-02 architecture decision in `docs/decisions/0001-local-sqlite-persistence.md`. Selected Node.js 24 LTS, stable Drizzle with `better-sqlite3`, versioned field-ID-keyed JSON records, restrictive archive-first relationships, generated migrations, verified online pre-migration backups, and platform-specific local data directories.
 - 2026-08-03: Completed P0-01. Created the pnpm TypeScript workspace, React/Vite web app, loopback-only Fastify health API, shared domain/export packages, linting, formatting, and unit tests. Verified `pnpm test`, `pnpm lint`, `pnpm format:check`, `pnpm build`, direct API health, and Vite proxy health.
 - 2026-08-03: Added the local three-tier model-routing agreement covering proactive upgrades, downgrades, and task examples.
