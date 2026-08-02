@@ -386,6 +386,11 @@ select:focus {
   padding: 5px 9px;
   font-size: 11px;
 }
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .table-wrap {
   margin: 0 -20px;
   overflow-x: auto;
@@ -413,6 +418,52 @@ td {
   color: #364152;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+.record-editor-row {
+  background: #f5f8ff;
+}
+.record-editor-row td,
+.record-actions {
+  vertical-align: middle;
+}
+td > input:not([type='checkbox']),
+td > select,
+td > textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 118px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  background: #fff;
+  padding: 7px 8px;
+  color: #293548;
+  font: inherit;
+}
+td > textarea {
+  min-height: 64px;
+  resize: vertical;
+}
+td > select[multiple] {
+  min-height: 62px;
+}
+td > input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #315fce;
+}
+.record-actions {
+  display: flex;
+  min-width: 118px;
+  gap: 6px;
+}
+.record-action-heading {
+  min-width: 118px;
+}
+.sequence-value {
+  display: inline-block;
+  min-width: 2em;
+  color: #647084;
+  font-variant-numeric: tabular-nums;
 }
 .empty-cell {
   color: #8893a3;

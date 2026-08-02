@@ -46,7 +46,7 @@ Exit criteria:
 
 ## Phase 1 — Dynamic database foundation
 
-Status: in progress — P1-01 domain operations/local API and P1-02 web schema editor completed on 2026-08-03
+Status: in progress — P1-01 API, P1-02 schema editor, and P1-03 inline record editing completed on 2026-08-03
 
 Tasks:
 
@@ -54,7 +54,7 @@ Tasks:
 - Implement supported first-release field types. Initial write validation completed in P1-01.
 - Implement record persistence keyed by field ID. Completed in P1-01.
 - Build database navigation and schema editor. Completed in P1-02.
-- Build basic table viewing and inline editing.
+- Build basic table viewing and inline editing. Completed in P1-03.
 - Add archive/recovery behavior.
 
 Exit criteria:

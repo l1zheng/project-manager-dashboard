@@ -144,6 +144,31 @@ export class WorkspaceService {
     return insertRecord();
   }
 
+  updateRecord(recordId: string, input: unknown) {
+    const command = createRecordInputSchema.parse(input);
+    const record = this.persistence.db
+      .select()
+      .from(schema.records)
+      .where(and(eq(schema.records.id, recordId), isNull(schema.records.archivedAt)))
+      .get();
+
+    if (!record) {
+      throw new ResourceNotFoundError('Record');
+    }
+
+    const database = this.requireActiveDatabase(record.databaseId);
+    const fields = this.listActiveFields(database.id).map((field) => this.toValidationField(field));
+    const values = validateRecordValues(fields, command.values);
+    const updatedAt = new Date();
+    this.persistence.db
+      .update(schema.records)
+      .set({ valuesJson: JSON.stringify(values), updatedAt })
+      .where(eq(schema.records.id, record.id))
+      .run();
+
+    return { ...record, values, updatedAt };
+  }
+
   private insertRecord(databaseId: string, command: CreateRecordInput) {
     const database = this.requireActiveDatabase(databaseId);
     const fields = this.listActiveFields(database.id).map((field) => this.toValidationField(field));

@@ -92,6 +92,10 @@ export const createRecordInputSchema = z.object({
 
 export type CreateRecordInput = z.infer<typeof createRecordInputSchema>;
 
+export const updateRecordInputSchema = createRecordInputSchema;
+
+export type UpdateRecordInput = z.infer<typeof updateRecordInputSchema>;
+
 export interface FieldDefinitionForValidation {
   id: string;
   type: FieldType;

@@ -76,6 +76,22 @@ describe('workspace API', () => {
       });
       expect(secondRecordResponse.json()).toMatchObject({ sequenceNumber: 2 });
 
+      const updatedRecordResponse = await app.inject({
+        method: 'PATCH',
+        url: `/api/records/${firstRecordResponse.json().id as string}`,
+        payload: {
+          values: {
+            [nameField.id]: '支持统一认证',
+            [statusField.id]: 'in-progress'
+          }
+        }
+      });
+      expect(updatedRecordResponse.statusCode).toBe(200);
+      expect(updatedRecordResponse.json()).toMatchObject({
+        sequenceNumber: 1,
+        values: { [nameField.id]: '支持统一认证', [statusField.id]: 'in-progress' }
+      });
+
       const renamedFieldResponse = await app.inject({
         method: 'PATCH',
         url: `/api/fields/${nameField.id}`,
@@ -99,7 +115,7 @@ describe('workspace API', () => {
         name: '需求标题'
       });
       expect(detail.records[0]?.values).toEqual({
-        [nameField.id]: '支持单点登录',
+        [nameField.id]: '支持统一认证',
         [statusField.id]: 'in-progress'
       });
     } finally {

@@ -5,6 +5,7 @@ import { ResourceNotFoundError, WorkspaceService } from './service.js';
 
 const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
 const fieldParamsSchema = z.object({ fieldId: z.string().trim().min(1).max(120) });
+const recordParamsSchema = z.object({ recordId: z.string().trim().min(1).max(120) });
 
 export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persistence): void {
   const service = new WorkspaceService(persistence);
@@ -33,6 +34,9 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
       request.body
     );
     return reply.code(201).send(record);
+  });
+  app.patch('/api/records/:recordId', async (request) => {
+    return service.updateRecord(recordParamsSchema.parse(request.params).recordId, request.body);
   });
 
   app.setErrorHandler((error, request, reply) => {

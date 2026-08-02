@@ -22,6 +22,8 @@ type RecordRow = {
   values: Record<string, string | number | boolean | string[]>;
 };
 
+type EditableValue = string | boolean | string[];
+
 type DatabaseDetail = {
   database: DatabaseSummary;
   fields: Field[];
@@ -54,6 +56,7 @@ export function App() {
   const [detail, setDetail] = useState<DatabaseDetail>();
   const [isCreatingDatabase, setIsCreatingDatabase] = useState(false);
   const [isAddingField, setIsAddingField] = useState(false);
+  const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>();
   const [databaseName, setDatabaseName] = useState('');
@@ -62,6 +65,10 @@ export function App() {
   const [fieldType, setFieldType] = useState<FieldType>('short_text');
   const [optionLabels, setOptionLabels] = useState('未开始, 进行中, 已完成');
   const [fieldNameDrafts, setFieldNameDrafts] = useState<Record<string, string>>({});
+  const [newRecordValues, setNewRecordValues] = useState<Record<string, EditableValue>>({});
+  const [recordValueDrafts, setRecordValueDrafts] = useState<
+    Record<string, Record<string, EditableValue>>
+  >({});
 
   const selectedDatabase = useMemo(
     () => databases.find((database) => database.id === selectedDatabaseId),
@@ -101,6 +108,16 @@ export function App() {
       setDetail(nextDetail);
       setFieldNameDrafts(
         Object.fromEntries(nextDetail.fields.map((field) => [field.id, field.name]))
+      );
+      setRecordValueDrafts(
+        Object.fromEntries(
+          nextDetail.records.map((record) => [
+            record.id,
+            Object.fromEntries(
+              nextDetail.fields.map((field) => [field.id, toEditableValue(field, record)])
+            )
+          ])
+        )
       );
     } catch {
       setError('读取数据库结构失败。');
@@ -180,6 +197,46 @@ export function App() {
       if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
     } catch (requestError) {
       setError(readRequestError(requestError, '保存字段名称失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function createRecord() {
+    if (!selectedDatabaseId || !detail) return;
+
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      await request<RecordRow>(`/api/databases/${selectedDatabaseId}/records`, {
+        method: 'POST',
+        body: JSON.stringify({ values: serializeRecordValues(detail.fields, newRecordValues) })
+      });
+      setNewRecordValues({});
+      setIsAddingRecord(false);
+      await loadDetail(selectedDatabaseId);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '新增记录失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function updateRecord(record: RecordRow) {
+    if (!detail) return;
+
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      await request<RecordRow>(`/api/records/${record.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          values: serializeRecordValues(detail.fields, recordValueDrafts[record.id] ?? {})
+        })
+      });
+      if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '保存记录失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -407,11 +464,24 @@ export function App() {
             <section className="panel preview-panel">
               <div className="panel-heading">
                 <div>
-                  <span className="section-kicker">只读预览</span>
+                  <span className="section-kicker">可编辑数据</span>
                   <h2>数据表</h2>
-                  <p>记录编辑将在下一阶段接入；当前用于确认字段结构与已有数据的对应关系。</p>
+                  <p>直接在表格中编辑；自动编号由系统分配。</p>
                 </div>
-                <span className="record-count">{detail.records.length} 条记录</span>
+                <div className="table-actions">
+                  <span className="record-count">{detail.records.length} 条记录</span>
+                  <button
+                    className="button primary small"
+                    disabled={isSaving}
+                    onClick={() => {
+                      setNewRecordValues({});
+                      setIsAddingRecord(true);
+                    }}
+                    type="button"
+                  >
+                    ＋ 新建记录
+                  </button>
+                </div>
               </div>
               {detail.fields.length > 0 ? (
                 <div className="table-wrap">
@@ -421,21 +491,85 @@ export function App() {
                         {detail.fields.map((field) => (
                           <th key={field.id}>{field.name}</th>
                         ))}
+                        <th className="record-action-heading">操作</th>
                       </tr>
                     </thead>
                     <tbody>
+                      {isAddingRecord && (
+                        <tr className="record-editor-row">
+                          {detail.fields.map((field) => (
+                            <td key={field.id}>
+                              <RecordValueInput
+                                field={field}
+                                value={newRecordValues[field.id] ?? defaultEditableValue(field)}
+                                onChange={(value) =>
+                                  setNewRecordValues((current) => ({
+                                    ...current,
+                                    [field.id]: value
+                                  }))
+                                }
+                              />
+                            </td>
+                          ))}
+                          <td className="record-actions">
+                            <button
+                              className="button primary small"
+                              disabled={isSaving}
+                              onClick={() => void createRecord()}
+                              type="button"
+                            >
+                              {isSaving ? '保存中…' : '创建'}
+                            </button>
+                            <button
+                              className="button tertiary small"
+                              disabled={isSaving}
+                              onClick={() => setIsAddingRecord(false)}
+                              type="button"
+                            >
+                              取消
+                            </button>
+                          </td>
+                        </tr>
+                      )}
                       {detail.records.length === 0 ? (
                         <tr>
-                          <td className="empty-cell" colSpan={detail.fields.length}>
-                            暂无记录。下一阶段将支持在这里直接添加和编辑。
+                          <td className="empty-cell" colSpan={detail.fields.length + 1}>
+                            暂无记录。点击“新建记录”开始填写。
                           </td>
                         </tr>
                       ) : (
                         detail.records.map((record) => (
                           <tr key={record.id}>
                             {detail.fields.map((field) => (
-                              <td key={field.id}>{displayValue(field, record)}</td>
+                              <td key={field.id}>
+                                <RecordValueInput
+                                  field={field}
+                                  value={
+                                    recordValueDrafts[record.id]?.[field.id] ??
+                                    toEditableValue(field, record)
+                                  }
+                                  onChange={(value) =>
+                                    setRecordValueDrafts((current) => ({
+                                      ...current,
+                                      [record.id]: {
+                                        ...current[record.id],
+                                        [field.id]: value
+                                      }
+                                    }))
+                                  }
+                                />
+                              </td>
                             ))}
+                            <td className="record-actions">
+                              <button
+                                className="button tertiary small"
+                                disabled={isSaving}
+                                onClick={() => void updateRecord(record)}
+                                type="button"
+                              >
+                                {isSaving ? '保存中…' : '保存'}
+                              </button>
+                            </td>
                           </tr>
                         ))
                       )}
@@ -488,15 +622,106 @@ function readRequestError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-function displayValue(field: Field, record: RecordRow): string {
-  if (field.type === 'sequence') return String(record.sequenceNumber);
-  const value = record.values[field.id];
-  if (value === undefined || value === null || value === '') return '—';
-  if (Array.isArray(value)) return value.map((item) => optionLabel(field, item)).join('、');
-  if (typeof value === 'boolean') return value ? '是' : '否';
-  return optionLabel(field, String(value));
+function defaultEditableValue(field: Field): EditableValue {
+  if (field.type === 'checkbox') return false;
+  if (field.type === 'multi_select') return [];
+  return '';
 }
 
-function optionLabel(field: Field, value: string): string {
-  return field.config.options?.find((option) => option.id === value)?.label ?? value;
+function toEditableValue(field: Field, record: RecordRow): EditableValue {
+  if (field.type === 'sequence') return String(record.sequenceNumber);
+  const value = record.values[field.id];
+  if (value === undefined || value === null) return defaultEditableValue(field);
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'boolean') return value;
+  return String(value);
+}
+
+function serializeRecordValues(
+  fields: Field[],
+  drafts: Record<string, EditableValue>
+): Record<string, unknown> {
+  const entries: Array<[string, unknown]> = [];
+  for (const field of fields) {
+    if (field.type === 'sequence') continue;
+    const value = drafts[field.id] ?? defaultEditableValue(field);
+    if (value === '' || (Array.isArray(value) && value.length === 0)) continue;
+    entries.push([field.id, field.type === 'number' ? Number(value) : value]);
+  }
+  return Object.fromEntries(entries);
+}
+
+function RecordValueInput({
+  field,
+  value,
+  onChange
+}: {
+  field: Field;
+  value: EditableValue;
+  onChange: (value: EditableValue) => void;
+}) {
+  if (field.type === 'sequence') {
+    return <span className="sequence-value">{value || '自动'}</span>;
+  }
+  if (field.type === 'checkbox') {
+    return (
+      <input
+        aria-label={field.name}
+        checked={value === true}
+        onChange={(event) => onChange(event.target.checked)}
+        type="checkbox"
+      />
+    );
+  }
+  if (field.type === 'multi_select') {
+    return (
+      <select
+        aria-label={field.name}
+        multiple
+        onChange={(event) =>
+          onChange(Array.from(event.target.selectedOptions, (option) => option.value))
+        }
+        value={Array.isArray(value) ? value : []}
+      >
+        {field.config.options?.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (field.type === 'single_select' || field.type === 'status') {
+    return (
+      <select
+        aria-label={field.name}
+        onChange={(event) => onChange(event.target.value)}
+        value={String(value)}
+      >
+        <option value="">未选择</option>
+        {field.config.options?.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  if (field.type === 'long_text') {
+    return (
+      <textarea
+        aria-label={field.name}
+        onChange={(event) => onChange(event.target.value)}
+        value={String(value)}
+      />
+    );
+  }
+  return (
+    <input
+      aria-label={field.name}
+      onChange={(event) => onChange(event.target.value)}
+      type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : 'text'}
+      value={String(value)}
+    />
+  );
 }
