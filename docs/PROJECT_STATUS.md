@@ -6,7 +6,7 @@ Last updated: 2026-08-03
 
 - Phase: Phase 0 engineering foundation is in progress; Phase 0A prototype is accepted.
 - Implementation: pnpm TypeScript workspace, React/Vite web app, Fastify API, shared domain/export packages, tests, linting, and formatting are in place. SQLite has not yet been added.
-- Repository: Git repository initialized on the `main` branch; implementation source has not been initialized.
+- Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
 - Target platform: Windows with classic Outlook.
@@ -23,15 +23,18 @@ Last updated: 2026-08-03
 - Presentation Excel uses a fine base grid and calculated merged spans.
 - The Phase 0A dashboard structure, database configuration flow, independent filtering, and Outlook/Excel preview direction are accepted as the production interaction baseline.
 - Model use follows a three-tier routing agreement; the assistant proactively recommends switching before tasks that materially benefit from a different tier.
+- Persistence targets Node.js 24 LTS with stable Drizzle ORM and `better-sqlite3`; built-in `node:sqlite` is deferred until stable in both the target runtime and Drizzle adapter.
+- Record values use versioned JSON keyed by stable field ID; field, option, and view semantics use stable IDs so labels can change without rewriting data.
+- Drizzle-generated SQL migrations are committed and embedded. Pending migrations and destructive imports require a verified online backup; `drizzle-kit push` is forbidden for user databases.
 
 ## Active task
 
-`P0-02`: Finalize the local SQLite persistence model and migration strategy before creating permanent tables.
+`P0-03`: Implement the accepted SQLite persistence foundation, backed health check, sample data, and Windows verification checklist.
 
 ## Next tasks
 
-1. `P0-02` — Finalize the local SQLite persistence model, migrations, and local data-directory adapter.
-2. `P0-03` — Add an SQLite-backed health check, sample-data command, and a repeatable Windows verification checklist.
+1. `P0-03a` — Add the platform data-directory adapter, Drizzle schema, first generated migration, migration/backup coordinator, and integration tests.
+2. `P0-03b` — Add an SQLite-backed health check, sample-data command, and a repeatable Windows Node 24/native-driver verification checklist.
 3. `P1-01` — Implement database, field, and record domain types using the accepted prototype as the UI reference.
 4. `P1-02` — Build the database navigation and schema editor.
 
@@ -44,9 +47,11 @@ Last updated: 2026-08-03
 | Excel merged layout | Rounding or extreme field counts may create unusable spans. | Pure layout tests plus golden workbooks during Phase 5. |
 | Dynamic filters | JSON-backed records may become slow at higher volumes. | Benchmark representative data before optimizing into SQLite JSON queries. |
 | Packaging | A raw Node installation may be undesirable on the work PC. | Evaluate bundled Windows distribution in Phase 7. |
+| Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
 
 ## Verification log
 
+- 2026-08-03: Completed P0-02 architecture decision in `docs/decisions/0001-local-sqlite-persistence.md`. Selected Node.js 24 LTS, stable Drizzle with `better-sqlite3`, versioned field-ID-keyed JSON records, restrictive archive-first relationships, generated migrations, verified online pre-migration backups, and platform-specific local data directories.
 - 2026-08-03: Completed P0-01. Created the pnpm TypeScript workspace, React/Vite web app, loopback-only Fastify health API, shared domain/export packages, linting, formatting, and unit tests. Verified `pnpm test`, `pnpm lint`, `pnpm format:check`, `pnpm build`, direct API health, and Vite proxy health.
 - 2026-08-03: Added the local three-tier model-routing agreement covering proactive upgrades, downgrades, and task examples.
 - 2026-08-03: User reviewed and accepted the Phase 0A interactive prototype without requested changes; its interaction direction is frozen as the production baseline.

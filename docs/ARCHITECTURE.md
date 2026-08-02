@@ -37,9 +37,9 @@ The server must listen on `127.0.0.1`, not all interfaces, unless LAN access is 
 | Frontend | React + Vite | Mature component ecosystem and fast local development. |
 | Table engine | TanStack Table | Headless control over dynamic fields, filters, and widths. |
 | Drag/reorder | dnd-kit | Dashboard and field ordering without a fixed visual framework. |
-| Backend | Node.js + Fastify | Small local API, good TypeScript support, easy streaming downloads. |
+| Backend | Node.js 24 LTS + Fastify | Supported production runtime, small local API, good TypeScript support, easy streaming downloads. |
 | Validation | Zod | Runtime validation of dynamic schemas and API input. |
-| Storage | SQLite + Drizzle ORM | Local, portable, migration-friendly, low operational cost. |
+| Storage | SQLite + stable Drizzle ORM + `better-sqlite3` | Local, portable, migration-friendly; avoids release-candidate persistence dependencies. |
 | Excel | ExcelJS | Supports styles, widths, merges, print settings, and `.xlsx`. |
 | Tests | Vitest + Playwright | Unit tests for domain/export logic and browser journey tests. |
 | Outlook bridge | PowerShell/COM adapter invoked by backend | Works with Windows classic Outlook without Microsoft Graph consent. |
@@ -61,7 +61,8 @@ Initial persistent entities:
 - `dashboard_blocks`
 - `report_templates`
 - `app_settings`
-- `migration_history`
+
+Drizzle owns its internal applied-migration ledger; the product does not maintain a second `migration_history` table. The complete persistence decision, table responsibilities, JSON contracts, and alternatives are recorded in [ADR-0001](decisions/0001-local-sqlite-persistence.md).
 
 ### 4.2 Dynamic records
 
@@ -80,6 +81,18 @@ Example:
 This is appropriate for the first-release scale and preserves schema flexibility. Filtering and sorting use a shared domain evaluator first; selected high-value filters may later be pushed into SQLite JSON queries if performance requires it.
 
 Never use field names as storage keys. A rename must be metadata-only.
+
+Select, multi-select, and status values also use stable option IDs rather than mutable labels. Automatic sequence numbers are allocated transactionally per database and stored on the record rather than duplicated in dynamic JSON.
+
+All JSON payload types are versioned and validated at the persistence boundary. Normal user deletion is archival. Foreign keys are restrictive by default, and permanent purge is an explicit ordered transaction.
+
+### 4.3 Connection and migration policy
+
+- Use one long-lived application writer connection with foreign keys enabled, a 5-second busy timeout, WAL mode, and `synchronous = FULL`.
+- Generate version-controlled SQL migrations from the Drizzle schema and run the embedded migrator before normal API traffic.
+- Never apply `drizzle-kit push` to a user's database.
+- Before applying pending migrations to an existing workspace, create and verify an online SQLite backup.
+- Refuse writable startup after integrity-check or migration failure; do not overwrite the database with an automatic rollback.
 
 ## 5. Shared query pipeline
 
@@ -171,14 +184,16 @@ The layout engine must be a pure tested function. Workbook generation consumes i
 
 ## 8. Backup and portability
 
-- Store the workspace database and backups under the user's application-data directory on Windows.
+- Store `workspace.sqlite` and backup/export/log subdirectories under `%LOCALAPPDATA%\ProjectManagerDashboard` on Windows. Use a platform adapter and `PM_DATA_DIR` override for development and tests.
 - Provide a full workspace export containing the SQLite database plus a manifest.
-- Create a backup before migrations and imports.
+- Create a verified online backup before pending migrations and destructive imports; do not copy a live WAL database file directly.
+- Keep the 10 newest automatic pre-migration backups without deleting manual backups.
 - Keep path resolution behind a platform adapter so development can run on macOS while Windows remains the deployment target.
 
 ## 9. Architecture decisions still to validate
 
 - Whether the local application is distributed as a Node runtime bundle, a Windows installer, or later wrapped with Electron.
+- Clean Windows installation and packaging of the pinned `better-sqlite3` native binary under Node.js 24 LTS.
 - The most reliable clipboard HTML implementation across supported Windows browsers.
 - Classic Outlook rendering of nested tables, Chinese fonts, long text, and status backgrounds.
 - Performance threshold at which filter evaluation should move from memory to SQLite JSON queries.
