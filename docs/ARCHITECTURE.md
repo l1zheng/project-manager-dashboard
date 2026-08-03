@@ -168,6 +168,8 @@ The Microsoft Outlook Object Model supports creating an item through `Applicatio
 
 Editable export maps each view to a normal worksheet table.
 
+The editable adapter consumes the canonical report model and creates one worksheet for each included, non-empty report section. It never merges data cells. Headers are frozen and filtered; date fields are written as UTC date-only values with `yyyy-mm-dd` formatting, numeric/sequence fields remain numeric, and other values are literal text. User-controlled strings strip invalid XML control characters and gain a leading apostrophe when they begin with `=`, `+`, `-`, or `@`, preventing Excel formula injection. Saved view widths map to bounded worksheet widths, while field type supplies a readable fallback.
+
 Presentation export uses a base grid. The initial algorithm:
 
 1. Assign a preferred weight from field type.

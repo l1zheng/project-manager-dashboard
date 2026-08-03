@@ -4,8 +4,8 @@ Last updated: 2026-08-03
 
 ## Current state
 
-- Phase: Phases 0 through 4 are complete; Phase 5 Excel exports is starting.
-- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, and report display options.
+- Phase: Phases 0 through 4 are complete; Phase 5 Excel exports is in progress.
+- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, and downloadable editable Excel workbooks.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -30,12 +30,12 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P5-02`: Build the editable multi-sheet Excel workbook adapter.
+`P5-03`: Connect the tested base-grid layout to the presentation Excel workbook adapter.
 
 ## Next tasks
 
-1. `P5-02` — Build the editable multi-sheet workbook adapter with typed cells, filters, frozen headers, wrapping, and safe text handling.
-2. `P5-03` — Connect the tested base-grid layout to the presentation workbook adapter.
+1. `P5-03` — Connect the tested base-grid layout to the presentation workbook adapter with merged section cells, print setup, and safe text handling.
+2. Add download action for presentation Excel and verify the generated workbook on Windows desktop Excel.
 3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
@@ -50,6 +50,8 @@ Last updated: 2026-08-03
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
 
 ## Verification log
+
+- 2026-08-04: Completed P5-02. Added ExcelJS-based editable workbook generation plus `GET /api/dashboards/:id/export/editable.xlsx` and the dashboard’s `下载可编辑 Excel` action. Each included report section becomes an independent unmerged worksheet with frozen headers, filters, saved/fallback widths, wrapping, typed numbers/dates, and formula-injection/XML-control protection. Export/API tests load the generated workbook and verify sheets, date types, auto-filters, frozen rows, no merges, and ZIP payload headers. An independent workbook render verified Chinese requirement/risk sheets and corrected a timezone regression so `2026-08-14` remains that date in the `.xlsx`; browser verification confirmed the button triggers the download endpoint.
 
 - 2026-08-03: Completed P5-01. Added a pure deterministic presentation-grid allocator that maps independently shaped report sections onto a 60-column logical grid. Allocation combines field-type profiles, CJK-aware heading/content samples, saved-view width preferences, readable baselines, and stable largest-remainder rounding. Dense schemas compress to a hard one-column minimum; more than 60 visible fields fail explicitly. Tests verify exact 60-column coverage, contiguous merge boundaries, text-vs-status sizing, width preferences, deterministic ties, compression, duplicate IDs, and impossible grids. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 

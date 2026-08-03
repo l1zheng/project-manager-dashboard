@@ -128,7 +128,7 @@ Status: in progress — P5-01 completed on 2026-08-03
 
 Tasks:
 
-- Implement editable multi-sheet workbook export.
+- Implement editable multi-sheet workbook export. Completed in P5-02 with typed cells, frozen/filtered headers, safe literal text, and browser download.
 - Implement pure base-grid span calculation. Completed in P5-01 with deterministic largest-remainder allocation, content/field-type/view-width weighting, and dense-layout handling.
 - Implement presentation workbook generation with merged spans.
 - Add styles, wrapping, row heights, print settings, and filenames.

@@ -409,6 +409,40 @@ export function App() {
     }
   }
 
+  async function downloadEditableWorkbook() {
+    if (!selectedDashboardId) return;
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      const query = new URLSearchParams();
+      if (reportTitle.trim()) query.set('title', reportTitle.trim());
+      if (reportPeriod.trim()) query.set('period', reportPeriod.trim());
+      query.set('density', reportDensity);
+      query.set('includeEmptySections', String(includeEmptySections));
+      query.set('includeCompleted', String(includeCompleted));
+      query.set('highlightStatus', String(highlightReportStatus));
+      const response = await fetch(
+        `/api/dashboards/${selectedDashboardId}/export/editable.xlsx?${query.toString()}`
+      );
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => undefined)) as
+          { message?: string } | undefined;
+        throw new Error(payload?.message ?? `下载失败（${response.status}）`);
+      }
+      const workbook = await response.blob();
+      const downloadUrl = URL.createObjectURL(workbook);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = `${reportTitle.trim() || dashboardDetail?.dashboard.name || '项目周报'}-可编辑数据.xlsx`;
+      anchor.click();
+      URL.revokeObjectURL(downloadUrl);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '下载可编辑 Excel 失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function loadDetail(databaseId: string) {
     try {
       const nextDetail = await request<DatabaseDetail>(`/api/databases/${databaseId}`);
@@ -1536,6 +1570,14 @@ export function App() {
                         type="button"
                       >
                         静态报告预览
+                      </button>
+                      <button
+                        className="button secondary small"
+                        disabled={isSaving}
+                        onClick={() => void downloadEditableWorkbook()}
+                        type="button"
+                      >
+                        下载可编辑 Excel
                       </button>
                     </>
                   )}

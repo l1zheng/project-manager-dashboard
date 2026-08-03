@@ -245,6 +245,17 @@ describe('workspace API', () => {
       expect(withoutCompletedResponse.json().model.includeCompleted).toBe(false);
       expect(withoutCompletedResponse.json().model.sections[1].rows).toHaveLength(1);
       expect(withoutCompletedResponse.json().html).not.toContain('已关闭需求');
+
+      const editableWorkbookResponse = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${dashboard.id}/export/editable.xlsx?includeCompleted=false`
+      });
+      expect(editableWorkbookResponse.statusCode).toBe(200);
+      expect(editableWorkbookResponse.headers['content-type']).toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      expect(editableWorkbookResponse.headers['content-disposition']).toContain('attachment');
+      expect(editableWorkbookResponse.rawPayload.subarray(0, 2).toString()).toBe('PK');
     } finally {
       await app.close();
     }

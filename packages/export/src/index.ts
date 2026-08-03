@@ -11,5 +11,6 @@ export interface ReportExportResult {
   contentType: string;
 }
 
+export * from './editable-workbook.js';
 export * from './layout.js';
 export * from './report.js';

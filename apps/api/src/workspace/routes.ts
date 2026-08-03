@@ -1,6 +1,6 @@
 import { z, ZodError } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { buildReportModel, renderReportHtml } from '@project-manager/export';
+import { buildEditableWorkbook, buildReportModel, renderReportHtml } from '@project-manager/export';
 import type { Persistence } from '../persistence/database.js';
 import { ResourceNotFoundError, WorkspaceService } from './service.js';
 
@@ -51,6 +51,26 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
       highlightStatus: query.highlightStatus
     });
     return { model, html: renderReportHtml(model) };
+  });
+  app.get('/api/dashboards/:dashboardId/export/editable.xlsx', async (request, reply) => {
+    const source = service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId);
+    const query = reportPreviewQuerySchema.parse(request.query);
+    const model = buildReportModel(source, {
+      title: query.title,
+      period: query.period ?? null,
+      density: query.density,
+      includeEmptySections: query.includeEmptySections,
+      includeCompleted: query.includeCompleted,
+      highlightStatus: query.highlightStatus
+    });
+    const workbook = await buildEditableWorkbook(model);
+    return reply
+      .header(
+        'content-disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(`${safeExportFilename(model.title)}-可编辑数据.xlsx`)}`
+      )
+      .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .send(Buffer.from(workbook));
   });
   app.patch('/api/dashboards/:dashboardId', async (request) =>
     service.updateDashboard(dashboardParamsSchema.parse(request.params).dashboardId, request.body)
@@ -150,4 +170,14 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
     request.log.error(error);
     return reply.code(500).send({ error: 'internal_error' });
   });
+}
+
+function safeExportFilename(title: string): string {
+  return (
+    Array.from(title)
+      .map((character) => ('\\/*?:[]"<>|'.includes(character) ? '-' : character))
+      .join('')
+      .trim()
+      .slice(0, 100) || '项目周报'
+  );
 }
