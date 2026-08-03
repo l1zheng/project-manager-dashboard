@@ -307,9 +307,13 @@ select:focus {
   gap: 8px;
   margin-top: 18px;
 }
+.field-item {
+  display: grid;
+  gap: 6px;
+}
 .field-row {
   display: grid;
-  grid-template-columns: 18px 96px minmax(150px, 1fr) minmax(80px, auto) auto;
+  grid-template-columns: 18px 96px minmax(150px, 1fr) minmax(80px, auto) auto auto;
   align-items: center;
   gap: 10px;
   min-height: 50px;
@@ -317,6 +321,24 @@ select:focus {
   border: 1px solid #e2e6ec;
   border-radius: 8px;
   background: #fcfcfd;
+}
+.completion-options,
+.new-completion-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  color: #5f6b7c;
+  font-size: 12px;
+}
+.completion-options {
+  padding: 2px 12px 8px 132px;
+}
+.completion-options em {
+  color: #8a94a5;
+}
+.new-completion-options {
+  grid-column: 1 / -1;
 }
 .field-row input {
   min-height: 32px;
@@ -722,7 +744,10 @@ td > input[type='checkbox'] {
     grid-column: auto;
   }
   .field-row {
-    grid-template-columns: 16px 82px minmax(120px, 1fr) auto;
+    grid-template-columns: 16px 82px minmax(120px, 1fr) auto auto;
+  }
+  .completion-options {
+    padding-left: 12px;
   }
   .field-id {
     display: none;

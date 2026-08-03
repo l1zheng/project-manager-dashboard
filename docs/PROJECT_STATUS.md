@@ -4,8 +4,8 @@ Last updated: 2026-08-03
 
 ## Current state
 
-- Phase: Phase 1 dynamic database foundation is complete; Phase 0 engineering foundation and Phase 0A prototype are complete.
-- Implementation: pnpm TypeScript workspace, React/Vite web schema editor, Fastify API, shared domain/export packages, version-controlled SQLite schema/migration, online pre-migration backup gate, demo data command, validated database/field/record API operations, tests, linting, and formatting are in place.
+- Phase: Phases 0 through 4 are complete; Phase 5 Excel exports is starting.
+- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, and report display options.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -26,15 +26,16 @@ Last updated: 2026-08-03
 - Persistence targets Node.js 24 LTS with stable Drizzle ORM and `better-sqlite3`; built-in `node:sqlite` is deferred until stable in both the target runtime and Drizzle adapter.
 - Record values use versioned JSON keyed by stable field ID; field, option, and view semantics use stable IDs so labels can change without rewriting data.
 - Drizzle-generated SQL migrations are committed and embedded. Pending migrations and destructive imports require a verified online backup; `drizzle-kit push` is forbidden for user databases.
+- Completion is configured explicitly on at most one status field per database using stable completed option IDs; status labels are never guessed.
 
 ## Active task
 
-`P4-04`: Decide and implement cross-database completed-row semantics.
+`P5-01`: Design and implement the pure 60-column Excel base-grid span allocator.
 
 ## Next tasks
 
-1. `P4-04` — Decide and implement cross-database completed-row semantics.
-2. Complete Phase 4 report options and begin Excel layout design.
+1. `P5-01` — Define field weights, minimum/maximum spans, width preferences, and deterministic 60-column normalization.
+2. `P5-02` — Build the editable multi-sheet workbook adapter.
 3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
@@ -49,6 +50,8 @@ Last updated: 2026-08-03
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
 
 ## Verification log
+
+- 2026-08-03: Completed P4-04 and Phase 4. Added explicit completion configuration to one status field per database using stable completed option IDs, browser controls to mark one or more options as completed, and the report-level `包含已完成事项` option. Reports can exclude completed rows even when the status field is hidden; the default remains inclusive for backward compatibility. Added domain, export, and API coverage for `open`/`closed`/`suspended`, fixed the workspace test command so report tests actually run, corrected demo-workspace selection, and synchronized dashboard blocks after record/view changes. Browser-verified the checked `已关闭` marker, exclusion of a closed requirement from static preview, and immediate dashboard refresh. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check` before the final documentation pass.
 
 - 2026-08-03: High-model review corrected P4-01 before downstream adapters were built: sequence columns now use record metadata, and select/multi-select/status option IDs resolve to business labels in the canonical model. Completed P4-02/P4-03 with a static sandboxed browser preview, report title/period, compact/comfortable density, empty-section policy, status highlighting, conservative inline HTML styles, and API integration coverage. Browser-verified `序号 1`, `状态 已完成`, Chinese description, absence of editing controls inside the preview, and custom title/period. Also corrected dashboard read-only cells to display sequence values and option labels. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P4-01. Added pure versioned report-model construction from dashboard view payloads and a conservative static HTML renderer with user-content escaping. The model preserves block order, titles, descriptions, export inclusion, saved field order/widths, and already evaluated rows; adapters do not query or re-filter storage. Added export unit coverage for projection and HTML escaping. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.

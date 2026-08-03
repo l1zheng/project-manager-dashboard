@@ -1,4 +1,4 @@
-import type { FieldType } from '@project-manager/domain';
+import { isRecordCompleted, type FieldConfig, type FieldType } from '@project-manager/domain';
 
 export type ReportCellValue = string | number | boolean | string[] | null;
 
@@ -24,6 +24,7 @@ export type ReportModel = {
   period: string | null;
   density: 'compact' | 'comfortable';
   includeEmptySections: boolean;
+  includeCompleted: boolean;
   highlightStatus: boolean;
   sections: ReportSection[];
 };
@@ -33,6 +34,7 @@ export type ReportBuildOptions = {
   period?: string | null;
   density?: 'compact' | 'comfortable';
   includeEmptySections?: boolean;
+  includeCompleted?: boolean;
   highlightStatus?: boolean;
 };
 
@@ -52,7 +54,7 @@ export type DashboardReportSource = {
         id: string;
         name: string;
         type: FieldType;
-        config: { options?: Array<{ id: string; label: string }> };
+        config: FieldConfig;
       }>;
       records: Array<{
         id: string;
@@ -73,6 +75,7 @@ export function buildReportModel(
     period: options?.period ?? null,
     density: options?.density ?? 'comfortable',
     includeEmptySections: options?.includeEmptySections ?? false,
+    includeCompleted: options?.includeCompleted ?? true,
     highlightStatus: options?.highlightStatus ?? true,
     sections: source.blocks.map((block) => {
       const fields = block.view.view.config.visibleFieldIds
@@ -84,7 +87,7 @@ export function buildReportModel(
             id: string;
             name: string;
             type: FieldType;
-            config: { options?: Array<{ id: string; label: string }> };
+            config: FieldConfig;
           } => field !== undefined
         )
         .map((field) => ({
@@ -99,16 +102,24 @@ export function buildReportModel(
         description: block.description,
         includeInExport: block.includeInExport,
         fields,
-        rows: block.view.records.map((record) => ({
-          recordId: record.id,
-          values: fields.map((field) => {
-            const sourceField = block.view.fields.find((candidate) => candidate.id === field.id)!;
-            return displayFieldValue(
-              sourceField,
-              field.type === 'sequence' ? record.sequenceNumber : (record.values[field.id] ?? null)
-            );
-          })
-        }))
+        rows: block.view.records
+          .filter(
+            (record) =>
+              (options?.includeCompleted ?? true) ||
+              !isRecordCompleted(block.view.fields, record.values)
+          )
+          .map((record) => ({
+            recordId: record.id,
+            values: fields.map((field) => {
+              const sourceField = block.view.fields.find((candidate) => candidate.id === field.id)!;
+              return displayFieldValue(
+                sourceField,
+                field.type === 'sequence'
+                  ? record.sequenceNumber
+                  : (record.values[field.id] ?? null)
+              );
+            })
+          }))
       };
     })
   };

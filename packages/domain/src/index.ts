@@ -47,10 +47,17 @@ export const selectOptionSchema = z.object({
   color: z.string().trim().max(40).optional()
 });
 
+export const completionConfigSchema = z
+  .object({
+    completedOptionIds: z.array(identifierSchema).min(1).max(100)
+  })
+  .strict();
+
 export const fieldConfigSchema = z
   .object({
     version: z.literal(1),
-    options: z.array(selectOptionSchema).min(1).max(100).optional()
+    options: z.array(selectOptionSchema).min(1).max(100).optional(),
+    completion: completionConfigSchema.optional()
   })
   .strict();
 
@@ -170,6 +177,16 @@ export function parseFieldConfig(type: FieldType, input: unknown): FieldConfig {
     ]);
   }
 
+  if (type !== 'status' && config.completion) {
+    throw new z.ZodError([
+      {
+        code: 'custom',
+        path: ['config', 'completion'],
+        message: `${type} fields do not support completion tracking.`
+      }
+    ]);
+  }
+
   const optionIds = config.options?.map((option) => option.id) ?? [];
   if (new Set(optionIds).size !== optionIds.length) {
     throw new z.ZodError([
@@ -181,7 +198,38 @@ export function parseFieldConfig(type: FieldType, input: unknown): FieldConfig {
     ]);
   }
 
+  const completedOptionIds = config.completion?.completedOptionIds ?? [];
+  if (new Set(completedOptionIds).size !== completedOptionIds.length) {
+    throw new z.ZodError([
+      {
+        code: 'custom',
+        path: ['config', 'completion', 'completedOptionIds'],
+        message: 'Completed option IDs must be unique within a field.'
+      }
+    ]);
+  }
+  if (completedOptionIds.some((optionId) => !optionIds.includes(optionId))) {
+    throw new z.ZodError([
+      {
+        code: 'custom',
+        path: ['config', 'completion', 'completedOptionIds'],
+        message: 'Completed option IDs must reference options in the same status field.'
+      }
+    ]);
+  }
+
   return config;
+}
+
+export function isRecordCompleted(
+  fields: FieldDefinitionForValidation[],
+  values: Record<string, unknown>
+): boolean {
+  return fields.some((field) => {
+    if (field.type !== 'status' || !field.config.completion) return false;
+    const value = values[field.id];
+    return typeof value === 'string' && field.config.completion.completedOptionIds.includes(value);
+  });
 }
 
 export function validateRecordValues(

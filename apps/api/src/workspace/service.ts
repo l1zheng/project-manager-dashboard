@@ -18,6 +18,7 @@ import {
   type FieldDefinitionForValidation
 } from '@project-manager/domain';
 import { and, asc, eq, isNull } from 'drizzle-orm';
+import { ZodError } from 'zod';
 import type { Persistence } from '../persistence/database.js';
 import * as schema from '../persistence/schema.js';
 
@@ -204,6 +205,7 @@ export class WorkspaceService {
     const database = this.requireActiveDatabase(databaseId);
     const now = new Date();
     const config = parseFieldConfig(command.type, command.config);
+    this.assertSingleCompletionField(database.id, undefined, config);
     const field = {
       id: randomUUID(),
       databaseId: database.id,
@@ -238,6 +240,7 @@ export class WorkspaceService {
       command.config === undefined
         ? parseFieldConfig(field.type, parseJsonObject(field.configJson))
         : parseFieldConfig(field.type, command.config);
+    this.assertSingleCompletionField(field.databaseId, field.id, nextConfig);
     const nextValues: Partial<typeof schema.fields.$inferInsert> = {
       updatedAt: new Date(),
       configVersion: nextConfig.version,
@@ -401,6 +404,11 @@ export class WorkspaceService {
   restoreField(fieldId: string) {
     const field = this.requireField(fieldId);
     this.requireActiveDatabase(field.databaseId);
+    this.assertSingleCompletionField(
+      field.databaseId,
+      field.id,
+      parseFieldConfig(field.type, parseJsonObject(field.configJson))
+    );
     return this.setArchived(schema.fields, field.id, false);
   }
 
@@ -649,6 +657,29 @@ export class WorkspaceService {
       type: field.type,
       config: parseFieldConfig(field.type, parseJsonObject(field.configJson))
     };
+  }
+
+  private assertSingleCompletionField(
+    databaseId: string,
+    currentFieldId: string | undefined,
+    config: FieldDefinitionForValidation['config']
+  ): void {
+    if (!config.completion) return;
+    const anotherCompletionField = this.listActiveFields(databaseId).find((field) => {
+      if (field.id === currentFieldId) return false;
+      return (
+        parseFieldConfig(field.type, parseJsonObject(field.configJson)).completion !== undefined
+      );
+    });
+    if (!anotherCompletionField) return;
+
+    throw new ZodError([
+      {
+        code: 'custom',
+        path: ['config', 'completion'],
+        message: 'A database can have only one status field used for completion tracking.'
+      }
+    ]);
   }
 
   private toFieldOutput(field: typeof schema.fields.$inferSelect) {

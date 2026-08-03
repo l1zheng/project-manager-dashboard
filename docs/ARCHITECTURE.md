@@ -136,6 +136,8 @@ The model is assembled only from the dashboard's evaluated view payloads: a bloc
 
 Automatic sequence values come from record metadata rather than dynamic values. Select, multi-select, and status option IDs are resolved to their current labels while building the report model, so no output adapter can accidentally expose persistence IDs. Report density, empty-section policy, and status highlighting are model options shared by every adapter.
 
+Completion is explicit metadata, never inferred from mutable labels such as `closed` or `已完成`. A database may have at most one active status field whose field configuration contains `completion.completedOptionIds`. The referenced values are stable option IDs; renaming either the field or an option does not change completion behavior. A database without this configuration has no completed records. When a report sets `includeCompleted` to false, the canonical report builder removes matching rows after the saved view has been evaluated, including when the completion status field is hidden from that view. The option defaults to true so existing reports do not silently lose rows.
+
 ### 6.2 Outlook HTML
 
 Classic Outlook has stricter rendering behavior than modern browsers. The email adapter therefore uses:

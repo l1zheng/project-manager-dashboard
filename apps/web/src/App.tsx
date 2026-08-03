@@ -20,7 +20,11 @@ type Field = {
   name: string;
   type: FieldType;
   description: string | null;
-  config: { version: 1; options?: Array<{ id: string; label: string; color?: string }> };
+  config: {
+    version: 1;
+    options?: Array<{ id: string; label: string; color?: string }>;
+    completion?: { completedOptionIds: string[] };
+  };
 };
 
 type RecordRow = {
@@ -83,6 +87,7 @@ export function App() {
   const [reportPeriod, setReportPeriod] = useState('');
   const [reportDensity, setReportDensity] = useState<'compact' | 'comfortable'>('comfortable');
   const [includeEmptySections, setIncludeEmptySections] = useState(false);
+  const [includeCompleted, setIncludeCompleted] = useState(true);
   const [highlightReportStatus, setHighlightReportStatus] = useState(true);
   const [reportPreviewHtml, setReportPreviewHtml] = useState('');
   const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>();
@@ -107,6 +112,7 @@ export function App() {
   const [fieldName, setFieldName] = useState('');
   const [fieldType, setFieldType] = useState<FieldType>('short_text');
   const [optionLabels, setOptionLabels] = useState('未开始, 进行中, 已完成');
+  const [completedOptionIds, setCompletedOptionIds] = useState<string[]>([]);
   const [fieldNameDrafts, setFieldNameDrafts] = useState<Record<string, string>>({});
   const [newRecordValues, setNewRecordValues] = useState<Record<string, EditableValue>>({});
   const [recordValueDrafts, setRecordValueDrafts] = useState<
@@ -202,6 +208,10 @@ export function App() {
     if (selectedViewId) await getViewRecords(selectedViewId);
   }
 
+  async function refreshDashboard() {
+    if (selectedDashboardId) await loadDashboard(selectedDashboardId);
+  }
+
   async function saveFilter() {
     if (!selectedViewId || !detail || !filterFieldId) return;
     const view = views.find((item) => item.id === selectedViewId);
@@ -219,6 +229,7 @@ export function App() {
       });
       await loadViews(detail.database.id);
       await refreshSelectedView();
+      await refreshDashboard();
     } catch (requestError) {
       setError(readRequestError(requestError, '保存筛选失败。'));
     } finally {
@@ -239,6 +250,7 @@ export function App() {
       });
       await loadViews(detail.database.id);
       await refreshSelectedView();
+      await refreshDashboard();
     } catch (requestError) {
       setError(readRequestError(requestError, '保存高级筛选失败。'));
     } finally {
@@ -261,6 +273,7 @@ export function App() {
       });
       await loadViews(detail.database.id);
       await refreshSelectedView();
+      await refreshDashboard();
     } catch (requestError) {
       setError(readRequestError(requestError, '保存视图配置失败。'));
     } finally {
@@ -383,6 +396,7 @@ export function App() {
       if (reportPeriod.trim()) query.set('period', reportPeriod.trim());
       query.set('density', reportDensity);
       query.set('includeEmptySections', String(includeEmptySections));
+      query.set('includeCompleted', String(includeCompleted));
       query.set('highlightStatus', String(highlightReportStatus));
       const preview = await request<{ html: string }>(
         `/api/dashboards/${selectedDashboardId}/report-preview?${query.toString()}`
@@ -450,14 +464,15 @@ export function App() {
     setIsSaving(true);
     setError(undefined);
     try {
+      const options = parseOptionDrafts(optionLabels);
       const config = optionFieldTypes.has(fieldType)
         ? {
             version: 1,
-            options: optionLabels
-              .split(',')
-              .map((label) => label.trim())
-              .filter(Boolean)
-              .map((label, index) => ({ id: `option-${index + 1}`, label }))
+            options,
+            completion:
+              fieldType === 'status' && completedOptionIds.length > 0
+                ? { completedOptionIds }
+                : undefined
           }
         : { version: 1 };
       await request<Field>(`/api/databases/${selectedDatabaseId}/fields`, {
@@ -467,6 +482,7 @@ export function App() {
       setFieldName('');
       setFieldType('short_text');
       setOptionLabels('未开始, 进行中, 已完成');
+      setCompletedOptionIds([]);
       setIsAddingField(false);
       await loadDetail(selectedDatabaseId);
     } catch (requestError) {
@@ -488,8 +504,36 @@ export function App() {
         body: JSON.stringify({ name: nextName })
       });
       if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
+      await refreshDashboard();
     } catch (requestError) {
       setError(readRequestError(requestError, '保存字段名称失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function toggleCompletedOption(field: Field, optionId: string) {
+    const currentOptionIds = field.config.completion?.completedOptionIds ?? [];
+    const nextOptionIds = currentOptionIds.includes(optionId)
+      ? currentOptionIds.filter((id) => id !== optionId)
+      : [...currentOptionIds, optionId];
+
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      await request<Field>(`/api/fields/${field.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          config: {
+            ...field.config,
+            completion: nextOptionIds.length > 0 ? { completedOptionIds: nextOptionIds } : undefined
+          }
+        })
+      });
+      if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
+      await refreshDashboard();
+    } catch (requestError) {
+      setError(readRequestError(requestError, '保存完成状态失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -509,6 +553,7 @@ export function App() {
       setIsAddingRecord(false);
       await loadDetail(selectedDatabaseId);
       await refreshSelectedView();
+      await refreshDashboard();
     } catch (requestError) {
       setError(readRequestError(requestError, '新增记录失败。'));
     } finally {
@@ -596,6 +641,7 @@ export function App() {
       });
       if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
       await refreshSelectedView();
+      await refreshDashboard();
     } catch (requestError) {
       setError(readRequestError(requestError, '保存记录失败。'));
     } finally {
@@ -626,6 +672,7 @@ export function App() {
       } else if (selectedDatabaseId) {
         await loadDetail(selectedDatabaseId);
         await refreshSelectedView();
+        await refreshDashboard();
       }
     } catch (requestError) {
       setError(readRequestError(requestError, `归档${kind}失败。`));
@@ -657,6 +704,7 @@ export function App() {
       } else if (selectedDatabaseId) {
         await loadDetail(selectedDatabaseId);
         await refreshSelectedView();
+        await refreshDashboard();
       }
       setLastArchived(undefined);
     } catch (requestError) {
@@ -809,6 +857,7 @@ export function App() {
                     setFieldName('');
                     setFieldType('short_text');
                     setOptionLabels('未开始, 进行中, 已完成');
+                    setCompletedOptionIds([]);
                     setIsAddingField(true);
                   }}
                   type="button"
@@ -825,38 +874,60 @@ export function App() {
                   </div>
                 )}
                 {detail.fields.map((field) => (
-                  <div className="field-row" key={field.id}>
-                    <span className="drag-placeholder">⠿</span>
-                    <span className="field-type-tag">
-                      {fieldTypes.find((item) => item.value === field.type)?.label}
-                    </span>
-                    <input
-                      aria-label={`${field.name}的字段名称`}
-                      value={fieldNameDrafts[field.id] ?? field.name}
-                      onChange={(event) =>
-                        setFieldNameDrafts((current) => ({
-                          ...current,
-                          [field.id]: event.target.value
-                        }))
-                      }
-                    />
-                    <span className="field-id">ID · {field.id.slice(0, 8)}</span>
-                    <button
-                      className="button tertiary small"
-                      disabled={isSaving || fieldNameDrafts[field.id]?.trim() === field.name}
-                      onClick={() => void saveFieldName(field)}
-                      type="button"
-                    >
-                      保存
-                    </button>
-                    <button
-                      className="button tertiary small danger"
-                      disabled={isSaving}
-                      onClick={() => void archiveItem('字段', field.id)}
-                      type="button"
-                    >
-                      归档
-                    </button>
+                  <div className="field-item" key={field.id}>
+                    <div className="field-row">
+                      <span className="drag-placeholder">⠿</span>
+                      <span className="field-type-tag">
+                        {fieldTypes.find((item) => item.value === field.type)?.label}
+                      </span>
+                      <input
+                        aria-label={`${field.name}的字段名称`}
+                        value={fieldNameDrafts[field.id] ?? field.name}
+                        onChange={(event) =>
+                          setFieldNameDrafts((current) => ({
+                            ...current,
+                            [field.id]: event.target.value
+                          }))
+                        }
+                      />
+                      <span className="field-id">ID · {field.id.slice(0, 8)}</span>
+                      <button
+                        className="button tertiary small"
+                        disabled={isSaving || fieldNameDrafts[field.id]?.trim() === field.name}
+                        onClick={() => void saveFieldName(field)}
+                        type="button"
+                      >
+                        保存
+                      </button>
+                      <button
+                        className="button tertiary small danger"
+                        disabled={isSaving}
+                        onClick={() => void archiveItem('字段', field.id)}
+                        type="button"
+                      >
+                        归档
+                      </button>
+                    </div>
+                    {field.type === 'status' && (
+                      <div className="completion-options">
+                        <span>标记代表“已完成”的状态：</span>
+                        {field.config.options?.map((option) => (
+                          <label className="inline-option" key={option.id}>
+                            <input
+                              checked={
+                                field.config.completion?.completedOptionIds.includes(option.id) ??
+                                false
+                              }
+                              disabled={isSaving}
+                              onChange={() => void toggleCompletedOption(field, option.id)}
+                              type="checkbox"
+                            />
+                            {option.label}
+                          </label>
+                        ))}
+                        {!field.config.completion && <em>尚未启用完成判断</em>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -890,10 +961,34 @@ export function App() {
                       选项（用逗号分隔）
                       <input
                         value={optionLabels}
-                        onChange={(event) => setOptionLabels(event.target.value)}
+                        onChange={(event) => {
+                          setOptionLabels(event.target.value);
+                          setCompletedOptionIds([]);
+                        }}
                         placeholder="未开始, 进行中, 已完成"
                       />
                     </label>
+                  )}
+                  {fieldType === 'status' && (
+                    <div className="new-completion-options">
+                      <span>哪些状态代表“已完成”？（可稍后设置）</span>
+                      {parseOptionDrafts(optionLabels).map((option) => (
+                        <label className="inline-option" key={option.id}>
+                          <input
+                            checked={completedOptionIds.includes(option.id)}
+                            onChange={(event) =>
+                              setCompletedOptionIds((current) =>
+                                event.target.checked
+                                  ? [...current, option.id]
+                                  : current.filter((id) => id !== option.id)
+                              )
+                            }
+                            type="checkbox"
+                          />
+                          {option.label}
+                        </label>
+                      ))}
+                    </div>
                   )}
                   <div className="form-actions">
                     <button
@@ -1420,6 +1515,14 @@ export function App() {
                       </label>
                       <label className="inline-option">
                         <input
+                          checked={includeCompleted}
+                          onChange={(event) => setIncludeCompleted(event.target.checked)}
+                          type="checkbox"
+                        />
+                        包含已完成事项
+                      </label>
+                      <label className="inline-option">
+                        <input
                           checked={highlightReportStatus}
                           onChange={(event) => setHighlightReportStatus(event.target.checked)}
                           type="checkbox"
@@ -1585,6 +1688,14 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 function readRequestError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+
+function parseOptionDrafts(value: string): Array<{ id: string; label: string }> {
+  return value
+    .split(',')
+    .map((label) => label.trim())
+    .filter(Boolean)
+    .map((label, index) => ({ id: `option-${index + 1}`, label }));
 }
 
 function defaultEditableValue(field: Field): EditableValue {

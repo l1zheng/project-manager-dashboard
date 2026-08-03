@@ -42,9 +42,28 @@ describe('workspace API', () => {
         type: 'status',
         config: {
           version: 1,
-          options: [{ id: 'in-progress', label: '进行中', color: 'blue' }]
+          options: [
+            { id: 'in-progress', label: '进行中', color: 'blue' },
+            { id: 'closed', label: '已关闭', color: 'green' }
+          ],
+          completion: { completedOptionIds: ['closed'] }
         }
       });
+      const duplicateCompletionFieldResponse = await app.inject({
+        method: 'POST',
+        url: `/api/databases/${database.id}/fields`,
+        payload: {
+          name: '另一完成状态',
+          type: 'status',
+          config: {
+            version: 1,
+            options: [{ id: 'done', label: '完成' }],
+            completion: { completedOptionIds: ['done'] }
+          }
+        }
+      });
+      expect(duplicateCompletionFieldResponse.statusCode).toBe(400);
+      expect(duplicateCompletionFieldResponse.json().message).toContain('only one status field');
 
       const invalidRecordResponse = await app.inject({
         method: 'POST',
@@ -158,6 +177,30 @@ describe('workspace API', () => {
       expect(viewResponse.statusCode).toBe(200);
       expect(viewResponse.json().records).toHaveLength(1);
 
+      await app.inject({
+        method: 'PATCH',
+        url: `/api/records/${secondRecordResponse.json().id as string}`,
+        payload: {
+          values: { [nameField.id]: '已关闭需求', [statusField.id]: 'closed' }
+        }
+      });
+      const allViewResponse = await app.inject({
+        method: 'POST',
+        url: `/api/databases/${database.id}/views`,
+        payload: {
+          name: '全部需求',
+          config: {
+            version: 1,
+            visibleFieldIds: [nameField.id],
+            filter: null,
+            sorts: [],
+            includeArchived: false
+          }
+        }
+      });
+      expect(allViewResponse.statusCode).toBe(201);
+      const allView = allViewResponse.json() as { id: string };
+
       const dashboardResponse = await app.inject({
         method: 'POST',
         url: '/api/dashboards',
@@ -174,15 +217,34 @@ describe('workspace API', () => {
           })
         ).statusCode
       ).toBe(201);
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `/api/dashboards/${dashboard.id}/blocks`,
+            payload: { viewId: allView.id }
+          })
+        ).statusCode
+      ).toBe(201);
       const previewResponse = await app.inject({
         method: 'GET',
         url: `/api/dashboards/${dashboard.id}/report-preview?title=第32周周报`
       });
       expect(previewResponse.statusCode).toBe(200);
       expect(previewResponse.json().model.sections[0].rows).toHaveLength(1);
+      expect(previewResponse.json().model.sections[1].rows).toHaveLength(2);
       expect(previewResponse.json().html).toContain('进行中');
       expect(previewResponse.json().html).toContain('&lt;重点需求&gt;');
       expect(previewResponse.json().html).not.toContain('in-progress');
+
+      const withoutCompletedResponse = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${dashboard.id}/report-preview?includeCompleted=false`
+      });
+      expect(withoutCompletedResponse.statusCode).toBe(200);
+      expect(withoutCompletedResponse.json().model.includeCompleted).toBe(false);
+      expect(withoutCompletedResponse.json().model.sections[1].rows).toHaveLength(1);
+      expect(withoutCompletedResponse.json().html).not.toContain('已关闭需求');
     } finally {
       await app.close();
     }

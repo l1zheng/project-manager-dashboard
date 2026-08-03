@@ -18,6 +18,10 @@ const reportPreviewQuerySchema = z.object({
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
     .optional(),
+  includeCompleted: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   highlightStatus: z
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
@@ -43,6 +47,7 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
       period: query.period ?? null,
       density: query.density,
       includeEmptySections: query.includeEmptySections,
+      includeCompleted: query.includeCompleted,
       highlightStatus: query.highlightStatus
     });
     return { model, html: renderReportHtml(model) };
@@ -133,7 +138,11 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ZodError) {
-      return reply.code(400).send({ error: 'validation_error', details: error.issues });
+      return reply.code(400).send({
+        error: 'validation_error',
+        message: error.issues[0]?.message ?? 'Validation failed.',
+        details: error.issues
+      });
     }
     if (error instanceof ResourceNotFoundError) {
       return reply.code(404).send({ error: 'not_found', message: error.message });

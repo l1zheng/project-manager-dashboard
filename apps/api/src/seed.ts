@@ -3,6 +3,7 @@ import * as schema from './persistence/schema.js';
 
 const demoWorkspaceId = 'demo-workspace';
 const demoDashboardId = 'demo-dashboard';
+const defaultWorkspaceSettingKey = 'default_workspace_id';
 
 export function seedDemoWorkspace(persistence: Persistence): void {
   const now = new Date();
@@ -13,6 +14,16 @@ export function seedDemoWorkspace(persistence: Persistence): void {
         id: demoWorkspaceId,
         name: '项目管理示例',
         createdAt: now,
+        updatedAt: now
+      })
+      .onConflictDoNothing()
+      .run();
+    persistence.db
+      .insert(schema.appSettings)
+      .values({
+        key: defaultWorkspaceSettingKey,
+        configVersion: 1,
+        valueJson: JSON.stringify({ workspaceId: demoWorkspaceId }),
         updatedAt: now
       })
       .onConflictDoNothing()
@@ -55,8 +66,10 @@ export function seedDemoWorkspace(persistence: Persistence): void {
           options: [
             { id: 'not-started', label: '未开始', color: 'gray' },
             { id: 'in-progress', label: '进行中', color: 'blue' },
-            { id: 'blocked', label: '受阻', color: 'red' }
-          ]
+            { id: 'blocked', label: '受阻', color: 'red' },
+            { id: 'closed', label: '已关闭', color: 'green' }
+          ],
+          completion: { completedOptionIds: ['closed'] }
         }),
         field('risk-description', 'demo-risks', '风险描述', 'long_text', 1000),
         field('risk-mitigation', 'demo-risks', '风险消减措施', 'long_text', 2000),
@@ -64,8 +77,10 @@ export function seedDemoWorkspace(persistence: Persistence): void {
         field('risk-status', 'demo-risks', '状态', 'status', 4000, {
           options: [
             { id: 'watching', label: '持续关注', color: 'orange' },
-            { id: 'controlled', label: '已受控', color: 'green' }
-          ]
+            { id: 'controlled', label: '已受控', color: 'green' },
+            { id: 'closed', label: '已关闭', color: 'gray' }
+          ],
+          completion: { completedOptionIds: ['closed'] }
         })
       ])
       .onConflictDoNothing()
@@ -164,7 +179,7 @@ export function seedDemoWorkspace(persistence: Persistence): void {
       name,
       type,
       sortOrder,
-      configJson: JSON.stringify(config),
+      configJson: JSON.stringify({ version: 1, ...config }),
       createdAt: now,
       updatedAt: now
     };
