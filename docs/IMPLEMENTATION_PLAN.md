@@ -86,6 +86,8 @@ Exit criteria:
 
 ## Phase 3 — Dashboard composition
 
+Status: completed — P3-01 through P3-03 completed on 2026-08-03
+
 Tasks:
 
 - Implement dashboard and dashboard-block entities.
@@ -93,6 +95,7 @@ Tasks:
 - Support block reorder, title, description, collapse, and export inclusion.
 - Preserve independent view configuration per block.
 - Add the initial vertically stacked responsive dashboard layout.
+- Add block title, collapse, export-inclusion, and order controls. Completed in P3-03.
 
 Exit criteria:
 

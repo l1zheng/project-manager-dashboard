@@ -375,6 +375,35 @@ select:focus {
   padding-bottom: 0;
   overflow: hidden;
 }
+.dashboard-blocks {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+.dashboard-block {
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid #e1e5eb;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+.dashboard-block-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 10px;
+}
+.dashboard-block h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.dashboard-block > input {
+  max-width: 280px;
+  min-height: 31px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
 .preview-panel .panel-heading {
   padding-bottom: 18px;
 }

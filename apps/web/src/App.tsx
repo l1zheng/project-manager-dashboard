@@ -44,6 +44,7 @@ type ViewSummary = {
 type DashboardSummary = { id: string; name: string; description: string | null };
 type DashboardBlock = {
   id: string;
+  sortOrder: number;
   titleOverride: string | null;
   description: string | null;
   isCollapsed: boolean;
@@ -345,6 +346,22 @@ export function App() {
       await loadDashboard(selectedDashboardId);
     } catch (requestError) {
       setError(readRequestError(requestError, '添加看板区块失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function updateDashboardBlock(blockId: string, input: Record<string, unknown>) {
+    if (!selectedDashboardId) return;
+    setIsSaving(true);
+    try {
+      await request(`/api/dashboard-blocks/${blockId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(input)
+      });
+      await loadDashboard(selectedDashboardId);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '保存看板区块失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -1345,9 +1362,60 @@ export function App() {
               </div>
               {dashboardDetail?.blocks.length ? (
                 <div className="dashboard-blocks">
-                  {dashboardDetail.blocks.map((block) => (
+                  {dashboardDetail.blocks.map((block, index) => (
                     <article className="dashboard-block" key={block.id}>
-                      <h3>{block.titleOverride ?? block.view.view.name}</h3>
+                      <div className="dashboard-block-heading">
+                        <h3>{block.titleOverride ?? block.view.view.name}</h3>
+                        <div className="table-actions">
+                          <button
+                            className="button tertiary small"
+                            disabled={isSaving}
+                            onClick={() =>
+                              void updateDashboardBlock(block.id, {
+                                isCollapsed: !block.isCollapsed
+                              })
+                            }
+                            type="button"
+                          >
+                            {block.isCollapsed ? '展开' : '折叠'}
+                          </button>
+                          <button
+                            className="button tertiary small"
+                            disabled={isSaving}
+                            onClick={() =>
+                              void updateDashboardBlock(block.id, {
+                                includeInExport: !block.includeInExport
+                              })
+                            }
+                            type="button"
+                          >
+                            {block.includeInExport ? '纳入导出' : '不纳入导出'}
+                          </button>
+                          <button
+                            className="button tertiary small"
+                            disabled={isSaving || index === 0}
+                            onClick={() =>
+                              void updateDashboardBlock(block.id, {
+                                sortOrder: dashboardDetail.blocks[index - 1]!.sortOrder - 1
+                              })
+                            }
+                            type="button"
+                          >
+                            上移
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        aria-label={`${block.view.view.name}区块标题`}
+                        defaultValue={block.titleOverride ?? ''}
+                        placeholder="自定义区块标题（可选）"
+                        onBlur={(event) => {
+                          if (event.target.value !== (block.titleOverride ?? ''))
+                            void updateDashboardBlock(block.id, {
+                              titleOverride: event.target.value
+                            });
+                        }}
+                      />
                       {block.description && <p>{block.description}</p>}
                       {!block.isCollapsed && (
                         <table>
