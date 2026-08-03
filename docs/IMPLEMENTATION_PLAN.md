@@ -124,12 +124,12 @@ Exit criteria:
 
 ## Phase 5 — Excel exports
 
-Status: in progress — P5-01 base-grid layout design is next
+Status: in progress — P5-01 completed on 2026-08-03
 
 Tasks:
 
 - Implement editable multi-sheet workbook export.
-- Implement pure base-grid span calculation.
+- Implement pure base-grid span calculation. Completed in P5-01 with deterministic largest-remainder allocation, content/field-type/view-width weighting, and dense-layout handling.
 - Implement presentation workbook generation with merged spans.
 - Add styles, wrapping, row heights, print settings, and filenames.
 - Add workbook validation tests and golden fixtures.

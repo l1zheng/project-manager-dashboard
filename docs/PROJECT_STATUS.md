@@ -30,12 +30,12 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P5-01`: Design and implement the pure 60-column Excel base-grid span allocator.
+`P5-02`: Build the editable multi-sheet Excel workbook adapter.
 
 ## Next tasks
 
-1. `P5-01` — Define field weights, minimum/maximum spans, width preferences, and deterministic 60-column normalization.
-2. `P5-02` — Build the editable multi-sheet workbook adapter.
+1. `P5-02` — Build the editable multi-sheet workbook adapter with typed cells, filters, frozen headers, wrapping, and safe text handling.
+2. `P5-03` — Connect the tested base-grid layout to the presentation workbook adapter.
 3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
@@ -50,6 +50,8 @@ Last updated: 2026-08-03
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
 
 ## Verification log
+
+- 2026-08-03: Completed P5-01. Added a pure deterministic presentation-grid allocator that maps independently shaped report sections onto a 60-column logical grid. Allocation combines field-type profiles, CJK-aware heading/content samples, saved-view width preferences, readable baselines, and stable largest-remainder rounding. Dense schemas compress to a hard one-column minimum; more than 60 visible fields fail explicitly. Tests verify exact 60-column coverage, contiguous merge boundaries, text-vs-status sizing, width preferences, deterministic ties, compression, duplicate IDs, and impossible grids. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 
 - 2026-08-03: Completed P4-04 and Phase 4. Added explicit completion configuration to one status field per database using stable completed option IDs, browser controls to mark one or more options as completed, and the report-level `包含已完成事项` option. Reports can exclude completed rows even when the status field is hidden; the default remains inclusive for backward compatibility. Added domain, export, and API coverage for `open`/`closed`/`suspended`, fixed the workspace test command so report tests actually run, corrected demo-workspace selection, and synchronized dashboard blocks after record/view changes. Browser-verified the checked `已关闭` marker, exclusion of a closed requirement from static preview, and immediate dashboard refresh. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check` before the final documentation pass.
 

@@ -180,6 +180,8 @@ Presentation export uses a base grid. The initial algorithm:
 
 The layout engine must be a pure tested function. Workbook generation consumes its span result but does not calculate layout itself.
 
+The implemented allocator uses 60 columns by default and returns one-based inclusive start/end columns for every visible field. Type-specific minimums and maximums are readability preferences rather than absolute constraints: normal layouts start from the preferred minimums, while schemas whose preferred minimums exceed the grid enter a deterministic compressed mode with a hard minimum of one column per field. Remaining columns are apportioned with the largest-remainder method using stable input order for ties. Preferred weight combines field type, heading length, the 80th-percentile display length from up to 50 sampled values, CJK/full-width character width, and an optional saved-view pixel width. A view with more visible fields than grid columns is rejected with an actionable error; editable Excel remains available for such schemas.
+
 ## 7. Security boundaries
 
 - Accept requests only from loopback by default.
