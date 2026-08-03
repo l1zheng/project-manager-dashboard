@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import {
   createDatabaseInputSchema,
+  createDashboardBlockInputSchema,
+  createDashboardInputSchema,
   createFieldInputSchema,
   createRecordInputSchema,
   createViewInputSchema,
@@ -8,6 +10,8 @@ import {
   parseFieldConfig,
   parseViewConfig,
   updateFieldInputSchema,
+  updateDashboardBlockInputSchema,
+  updateDashboardInputSchema,
   updateViewInputSchema,
   validateRecordValues,
   type CreateRecordInput,
@@ -41,6 +45,122 @@ export class WorkspaceService {
       )
       .orderBy(asc(schema.databases.sortOrder), asc(schema.databases.createdAt))
       .all();
+  }
+
+  listDashboards() {
+    const workspace = this.ensureDefaultWorkspace();
+    return this.persistence.db
+      .select()
+      .from(schema.dashboards)
+      .where(
+        and(eq(schema.dashboards.workspaceId, workspace.id), isNull(schema.dashboards.archivedAt))
+      )
+      .orderBy(asc(schema.dashboards.sortOrder), asc(schema.dashboards.createdAt))
+      .all();
+  }
+
+  createDashboard(input: unknown) {
+    const command = createDashboardInputSchema.parse(input);
+    const workspace = this.ensureDefaultWorkspace();
+    const now = new Date();
+    const dashboard = {
+      id: randomUUID(),
+      workspaceId: workspace.id,
+      name: command.name,
+      description: normalizeNullable(command.description),
+      sortOrder: this.nextSortOrder('dashboards', 'workspace_id', workspace.id),
+      createdAt: now,
+      updatedAt: now
+    };
+    this.persistence.db.insert(schema.dashboards).values(dashboard).run();
+    return dashboard;
+  }
+
+  getDashboard(dashboardId: string) {
+    const dashboard = this.requireActiveDashboard(dashboardId);
+    const blocks = this.persistence.db
+      .select()
+      .from(schema.dashboardBlocks)
+      .where(eq(schema.dashboardBlocks.dashboardId, dashboard.id))
+      .orderBy(asc(schema.dashboardBlocks.sortOrder))
+      .all()
+      .map((block) => ({ ...block, view: this.getView(block.viewId) }));
+    return { dashboard, blocks };
+  }
+
+  updateDashboard(dashboardId: string, input: unknown) {
+    const command = updateDashboardInputSchema.parse(input);
+    const dashboard = this.requireActiveDashboard(dashboardId);
+    const updatedAt = new Date();
+    this.persistence.db
+      .update(schema.dashboards)
+      .set({
+        name: command.name ?? dashboard.name,
+        description:
+          command.description === undefined
+            ? dashboard.description
+            : normalizeNullable(command.description),
+        updatedAt
+      })
+      .where(eq(schema.dashboards.id, dashboard.id))
+      .run();
+    return {
+      ...dashboard,
+      name: command.name ?? dashboard.name,
+      description:
+        command.description === undefined
+          ? dashboard.description
+          : normalizeNullable(command.description),
+      updatedAt
+    };
+  }
+
+  createDashboardBlock(dashboardId: string, input: unknown) {
+    const command = createDashboardBlockInputSchema.parse(input);
+    const dashboard = this.requireActiveDashboard(dashboardId);
+    const view = this.requireActiveView(command.viewId);
+    const now = new Date();
+    const block = {
+      id: randomUUID(),
+      dashboardId: dashboard.id,
+      viewId: view.id,
+      titleOverride: normalizeNullable(command.titleOverride),
+      description: normalizeNullable(command.description),
+      sortOrder: this.nextSortOrder('dashboard_blocks', 'dashboard_id', dashboard.id),
+      isCollapsed: command.isCollapsed ?? false,
+      includeInExport: command.includeInExport ?? true,
+      createdAt: now,
+      updatedAt: now
+    };
+    this.persistence.db.insert(schema.dashboardBlocks).values(block).run();
+    return block;
+  }
+
+  updateDashboardBlock(blockId: string, input: unknown) {
+    const command = updateDashboardBlockInputSchema.parse(input);
+    const block = this.requireDashboardBlock(blockId);
+    this.requireActiveDashboard(block.dashboardId);
+    const updatedAt = new Date();
+    const next = {
+      titleOverride:
+        command.titleOverride === undefined
+          ? block.titleOverride
+          : normalizeNullable(command.titleOverride),
+      description:
+        command.description === undefined
+          ? block.description
+          : normalizeNullable(command.description),
+      isCollapsed: command.isCollapsed ?? block.isCollapsed,
+      includeInExport: command.includeInExport ?? block.includeInExport,
+      sortOrder: command.sortOrder ?? block.sortOrder,
+      updatedAt
+    };
+    this.persistence.db
+      .update(schema.dashboardBlocks)
+      .set(next)
+      .where(eq(schema.dashboardBlocks.id, block.id))
+      .run();
+    return { ...block, ...next };
   }
 
   createDatabase(input: unknown) {
@@ -403,6 +523,33 @@ export class WorkspaceService {
     return database;
   }
 
+  private requireActiveDashboard(dashboardId: string) {
+    const workspace = this.ensureDefaultWorkspace();
+    const dashboard = this.persistence.db
+      .select()
+      .from(schema.dashboards)
+      .where(
+        and(
+          eq(schema.dashboards.id, dashboardId),
+          eq(schema.dashboards.workspaceId, workspace.id),
+          isNull(schema.dashboards.archivedAt)
+        )
+      )
+      .get();
+    if (!dashboard) throw new ResourceNotFoundError('Dashboard');
+    return dashboard;
+  }
+
+  private requireDashboardBlock(blockId: string) {
+    const block = this.persistence.db
+      .select()
+      .from(schema.dashboardBlocks)
+      .where(eq(schema.dashboardBlocks.id, blockId))
+      .get();
+    if (!block) throw new ResourceNotFoundError('Dashboard block');
+    return block;
+  }
+
   private requireField(fieldId: string) {
     const field = this.persistence.db
       .select()
@@ -484,7 +631,7 @@ export class WorkspaceService {
   }
 
   private nextSortOrder(
-    table: 'databases' | 'fields' | 'records' | 'views',
+    table: 'databases' | 'fields' | 'records' | 'views' | 'dashboards' | 'dashboard_blocks',
     column: string,
     value: string
   ) {

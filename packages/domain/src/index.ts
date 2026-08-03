@@ -108,6 +108,34 @@ export const updateViewInputSchema = z
     message: 'At least one view property must be supplied.'
   });
 
+export const createDashboardInputSchema = z.object({
+  name: displayNameSchema,
+  description: optionalDescriptionSchema
+});
+export const updateDashboardInputSchema = z
+  .object({ name: displayNameSchema.optional(), description: optionalDescriptionSchema })
+  .refine((input) => input.name !== undefined || input.description !== undefined, {
+    message: 'At least one dashboard property must be supplied.'
+  });
+export const createDashboardBlockInputSchema = z.object({
+  viewId: identifierSchema,
+  titleOverride: optionalDescriptionSchema,
+  description: optionalDescriptionSchema,
+  isCollapsed: z.boolean().optional(),
+  includeInExport: z.boolean().optional()
+});
+export const updateDashboardBlockInputSchema = z
+  .object({
+    titleOverride: optionalDescriptionSchema,
+    description: optionalDescriptionSchema,
+    isCollapsed: z.boolean().optional(),
+    includeInExport: z.boolean().optional(),
+    sortOrder: z.number().int().nonnegative().optional()
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    message: 'At least one dashboard block property must be supplied.'
+  });
+
 export const updateRecordInputSchema = createRecordInputSchema;
 
 export type UpdateRecordInput = z.infer<typeof updateRecordInputSchema>;

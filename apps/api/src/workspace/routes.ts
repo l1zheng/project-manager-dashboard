@@ -7,11 +7,36 @@ const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max
 const fieldParamsSchema = z.object({ fieldId: z.string().trim().min(1).max(120) });
 const recordParamsSchema = z.object({ recordId: z.string().trim().min(1).max(120) });
 const viewParamsSchema = z.object({ viewId: z.string().trim().min(1).max(120) });
+const dashboardParamsSchema = z.object({ dashboardId: z.string().trim().min(1).max(120) });
+const blockParamsSchema = z.object({ blockId: z.string().trim().min(1).max(120) });
 
 export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persistence): void {
   const service = new WorkspaceService(persistence);
 
   app.get('/api/databases', async () => service.listDatabases());
+  app.get('/api/dashboards', async () => service.listDashboards());
+  app.post('/api/dashboards', async (request, reply) =>
+    reply.code(201).send(service.createDashboard(request.body))
+  );
+  app.get('/api/dashboards/:dashboardId', async (request) =>
+    service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId)
+  );
+  app.patch('/api/dashboards/:dashboardId', async (request) =>
+    service.updateDashboard(dashboardParamsSchema.parse(request.params).dashboardId, request.body)
+  );
+  app.post('/api/dashboards/:dashboardId/blocks', async (request, reply) =>
+    reply
+      .code(201)
+      .send(
+        service.createDashboardBlock(
+          dashboardParamsSchema.parse(request.params).dashboardId,
+          request.body
+        )
+      )
+  );
+  app.patch('/api/dashboard-blocks/:blockId', async (request) =>
+    service.updateDashboardBlock(blockParamsSchema.parse(request.params).blockId, request.body)
+  );
   app.post('/api/databases', async (request, reply) => {
     const database = service.createDatabase(request.body);
     return reply.code(201).send(database);
