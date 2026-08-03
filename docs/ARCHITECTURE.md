@@ -132,6 +132,8 @@ The renderer first builds a format-neutral report model:
 
 HTML and Excel adapters consume this model. Neither adapter queries the database directly.
 
+The model is assembled only from the dashboard's evaluated view payloads: a block's saved visible-field order, widths, filtered/sorted rows, title override, description, and export-inclusion flag. Adapters receive no database IDs and must not re-evaluate filters. Every generated text value is escaped by the rendering adapter.
+
 ### 6.2 Outlook HTML
 
 Classic Outlook has stricter rendering behavior than modern browsers. The email adapter therefore uses:
