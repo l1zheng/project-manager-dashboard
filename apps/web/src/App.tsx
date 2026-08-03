@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import type {
   FilterCondition,
+  FilterExpression,
   FilterOperator,
   FieldType,
   HealthResponse,
@@ -69,9 +70,11 @@ export function App() {
   const [selectedViewId, setSelectedViewId] = useState<string>();
   const [viewRecords, setViewRecords] = useState<RecordRow[]>();
   const [viewName, setViewName] = useState('');
+  const [viewRenameDraft, setViewRenameDraft] = useState('');
   const [filterFieldId, setFilterFieldId] = useState('');
   const [filterOperator, setFilterOperator] = useState<FilterOperator>('contains');
   const [filterValue, setFilterValue] = useState('');
+  const [filterExpressionDraft, setFilterExpressionDraft] = useState<FilterExpression | null>(null);
   const [viewConfigDraft, setViewConfigDraft] = useState<ViewConfig>();
   const [isCreatingDatabase, setIsCreatingDatabase] = useState(false);
   const [isAddingField, setIsAddingField] = useState(false);
@@ -145,6 +148,14 @@ export function App() {
   }, [selectedViewId, views]);
 
   useEffect(() => {
+    setFilterExpressionDraft(selectedView?.config.filter ?? null);
+  }, [selectedView]);
+
+  useEffect(() => {
+    setViewRenameDraft(selectedView?.name ?? '');
+  }, [selectedView]);
+
+  useEffect(() => {
     setViewConfigDraft(selectedView ? structuredClone(selectedView.config) : undefined);
   }, [selectedView]);
 
@@ -184,6 +195,26 @@ export function App() {
       await refreshSelectedView();
     } catch (requestError) {
       setError(readRequestError(requestError, '保存筛选失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function saveAdvancedFilter() {
+    if (!selectedViewId || !detail || !selectedView) return;
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      await request(`/api/views/${selectedViewId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          config: { ...selectedView.config, filter: filterExpressionDraft }
+        })
+      });
+      await loadViews(detail.database.id);
+      await refreshSelectedView();
+    } catch (requestError) {
+      setError(readRequestError(requestError, '保存高级筛选失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -399,6 +430,44 @@ export function App() {
       setViewName('');
     } catch (requestError) {
       setError(readRequestError(requestError, '创建视图失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function renameView() {
+    if (!selectedView || !viewRenameDraft.trim() || viewRenameDraft.trim() === selectedView.name) {
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await request(`/api/views/${selectedView.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: viewRenameDraft.trim() })
+      });
+      if (detail) await loadViews(detail.database.id);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '重命名视图失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function duplicateView() {
+    if (!selectedView || !detail) return;
+    setIsSaving(true);
+    try {
+      const duplicate = await request<ViewSummary>(`/api/databases/${detail.database.id}/views`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: `${selectedView.name} 副本`,
+          config: selectedView.config
+        })
+      });
+      await loadViews(detail.database.id);
+      setSelectedViewId(duplicate.id);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '复制视图失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -735,6 +804,35 @@ export function App() {
                       ))}
                     </select>
                   )}
+                  {selectedView && (
+                    <>
+                      <input
+                        aria-label="视图名称"
+                        onChange={(event) => setViewRenameDraft(event.target.value)}
+                        value={viewRenameDraft}
+                      />
+                      <button
+                        className="button tertiary small"
+                        disabled={
+                          isSaving ||
+                          !viewRenameDraft.trim() ||
+                          viewRenameDraft === selectedView.name
+                        }
+                        onClick={() => void renameView()}
+                        type="button"
+                      >
+                        重命名
+                      </button>
+                      <button
+                        className="button tertiary small"
+                        disabled={isSaving}
+                        onClick={() => void duplicateView()}
+                        type="button"
+                      >
+                        复制视图
+                      </button>
+                    </>
+                  )}
                   <input
                     aria-label="新视图名称"
                     onChange={(event) => setViewName(event.target.value)}
@@ -807,6 +905,27 @@ export function App() {
                           : '清除筛选'}
                       </button>
                     </>
+                  )}
+                  {selectedView && (
+                    <details className="advanced-filter">
+                      <summary>高级筛选</summary>
+                      <div className="advanced-filter-popover">
+                        <strong>嵌套条件</strong>
+                        <FilterExpressionEditor
+                          expression={filterExpressionDraft}
+                          fields={detail.fields}
+                          onChange={setFilterExpressionDraft}
+                        />
+                        <button
+                          className="button primary small"
+                          disabled={isSaving}
+                          onClick={() => void saveAdvancedFilter()}
+                          type="button"
+                        >
+                          保存高级筛选
+                        </button>
+                      </div>
+                    </details>
                   )}
                   {selectedView && viewConfigDraft && (
                     <details className="view-config">
@@ -1297,6 +1416,182 @@ function FilterValueInput({
       }
       value={value}
     />
+  );
+}
+
+function newFilterCondition(fields: Field[]): FilterCondition {
+  const field = fields[0];
+  return {
+    kind: 'condition',
+    fieldId: field?.id ?? '',
+    operator: defaultFilterOperator(field?.type),
+    value: field?.type === 'number' || field?.type === 'sequence' ? 0 : ''
+  };
+}
+
+function FilterExpressionEditor({
+  expression,
+  fields,
+  onChange
+}: {
+  expression: FilterExpression | null;
+  fields: Field[];
+  onChange: (expression: FilterExpression | null) => void;
+}) {
+  if (!expression) {
+    return (
+      <div className="filter-empty-actions">
+        <button
+          className="button tertiary small"
+          onClick={() => onChange(newFilterCondition(fields))}
+          type="button"
+        >
+          ＋ 条件
+        </button>
+        <button
+          className="button tertiary small"
+          onClick={() =>
+            onChange({ kind: 'group', conjunction: 'and', children: [newFilterCondition(fields)] })
+          }
+          type="button"
+        >
+          ＋ 条件组
+        </button>
+      </div>
+    );
+  }
+  return (
+    <FilterExpressionNode
+      fields={fields}
+      node={expression}
+      onChange={onChange}
+      onRemove={() => onChange(null)}
+    />
+  );
+}
+
+function FilterExpressionNode({
+  node,
+  fields,
+  onChange,
+  onRemove
+}: {
+  node: FilterExpression;
+  fields: Field[];
+  onChange: (node: FilterExpression) => void;
+  onRemove: () => void;
+}) {
+  if (node.kind === 'group') {
+    return (
+      <div className="filter-group">
+        <div className="filter-group-heading">
+          <select
+            aria-label="条件组关系"
+            onChange={(event) =>
+              onChange({ ...node, conjunction: event.target.value as 'and' | 'or' })
+            }
+            value={node.conjunction}
+          >
+            <option value="and">同时满足（AND）</option>
+            <option value="or">满足任一（OR）</option>
+          </select>
+          <button className="button tertiary small danger" onClick={onRemove} type="button">
+            删除组
+          </button>
+        </div>
+        {node.children.map((child, index) => (
+          <FilterExpressionNode
+            fields={fields}
+            key={index}
+            node={child}
+            onChange={(next) =>
+              onChange({
+                ...node,
+                children: node.children.map((item, itemIndex) =>
+                  itemIndex === index ? next : item
+                )
+              })
+            }
+            onRemove={() =>
+              onChange({
+                ...node,
+                children: node.children.filter((_, itemIndex) => itemIndex !== index)
+              })
+            }
+          />
+        ))}
+        <div className="filter-empty-actions">
+          <button
+            className="button tertiary small"
+            onClick={() =>
+              onChange({ ...node, children: [...node.children, newFilterCondition(fields)] })
+            }
+            type="button"
+          >
+            ＋ 条件
+          </button>
+          <button
+            className="button tertiary small"
+            onClick={() =>
+              onChange({
+                ...node,
+                children: [
+                  ...node.children,
+                  { kind: 'group', conjunction: 'and', children: [newFilterCondition(fields)] }
+                ]
+              })
+            }
+            type="button"
+          >
+            ＋ 条件组
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const field = fields.find((item) => item.id === node.fieldId);
+  const value = Array.isArray(node.value) ? String(node.value[0] ?? '') : String(node.value ?? '');
+  return (
+    <div className="filter-condition">
+      <select
+        aria-label="高级筛选字段"
+        onChange={(event) => {
+          const nextField = fields.find((item) => item.id === event.target.value);
+          onChange(newFilterCondition(nextField ? [nextField] : []));
+        }}
+        value={node.fieldId}
+      >
+        {fields.map((item) => (
+          <option key={item.id} value={item.id}>
+            {item.name}
+          </option>
+        ))}
+      </select>
+      <select
+        aria-label="高级筛选条件"
+        onChange={(event) => onChange({ ...node, operator: event.target.value as FilterOperator })}
+        value={node.operator}
+      >
+        {filterOperatorsForField(field?.type).map((operator) => (
+          <option key={operator} value={operator}>
+            {filterOperatorLabels[operator]}
+          </option>
+        ))}
+      </select>
+      {!filterOperatorNeedsNoValue(node.operator) && (
+        <FilterValueInput
+          field={field}
+          value={value}
+          onChange={(rawValue) => {
+            const next = buildFilterCondition(node.fieldId, node.operator, rawValue);
+            if (next) onChange(next);
+          }}
+        />
+      )}
+      <button className="button tertiary small danger" onClick={onRemove} type="button">
+        删除
+      </button>
+    </div>
   );
 }
 

@@ -420,6 +420,57 @@ select:focus {
 .view-config {
   position: relative;
 }
+.advanced-filter {
+  position: relative;
+}
+.advanced-filter summary {
+  color: #315fce;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.advanced-filter-popover {
+  position: absolute;
+  z-index: 3;
+  top: calc(100% + 9px);
+  right: 0;
+  display: grid;
+  width: min(720px, calc(100vw - 48px));
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid #ced8e8;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(27, 42, 70, 0.18);
+}
+.filter-group {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #dbe4f2;
+  border-radius: 7px;
+  background: #f8faff;
+}
+.filter-group .filter-group {
+  background: #fff;
+}
+.filter-group-heading,
+.filter-condition,
+.filter-empty-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.filter-condition select,
+.filter-condition input,
+.filter-group-heading select {
+  min-width: 100px;
+  min-height: 31px;
+}
+.filter-condition input {
+  width: 140px;
+}
 .view-config summary {
   color: #315fce;
   cursor: pointer;
