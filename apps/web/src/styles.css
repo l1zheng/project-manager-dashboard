@@ -404,6 +404,20 @@ select:focus {
   margin-bottom: 10px;
   font-size: 12px;
 }
+.report-preview {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid #cbd8ef;
+  border-radius: 9px;
+  background: #f7f9fd;
+}
+.report-preview iframe {
+  width: 100%;
+  min-height: 520px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  background: #fff;
+}
 .preview-panel .panel-heading {
   padding-bottom: 18px;
 }
@@ -445,6 +459,19 @@ select:focus {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.inline-option {
+  display: inline-flex;
+  min-height: 34px;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.inline-option input {
+  width: 15px;
+  min-height: 15px;
+  padding: 0;
+  accent-color: #315fce;
 }
 .view-config {
   position: relative;

@@ -1,5 +1,6 @@
 import { z, ZodError } from 'zod';
 import type { FastifyInstance } from 'fastify';
+import { buildReportModel, renderReportHtml } from '@project-manager/export';
 import type { Persistence } from '../persistence/database.js';
 import { ResourceNotFoundError, WorkspaceService } from './service.js';
 
@@ -9,6 +10,19 @@ const recordParamsSchema = z.object({ recordId: z.string().trim().min(1).max(120
 const viewParamsSchema = z.object({ viewId: z.string().trim().min(1).max(120) });
 const dashboardParamsSchema = z.object({ dashboardId: z.string().trim().min(1).max(120) });
 const blockParamsSchema = z.object({ blockId: z.string().trim().min(1).max(120) });
+const reportPreviewQuerySchema = z.object({
+  title: z.string().trim().max(120).optional(),
+  period: z.string().trim().max(120).optional(),
+  density: z.enum(['compact', 'comfortable']).optional(),
+  includeEmptySections: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
+  highlightStatus: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional()
+});
 
 export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persistence): void {
   const service = new WorkspaceService(persistence);
@@ -21,6 +35,18 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
   app.get('/api/dashboards/:dashboardId', async (request) =>
     service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId)
   );
+  app.get('/api/dashboards/:dashboardId/report-preview', async (request) => {
+    const source = service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId);
+    const query = reportPreviewQuerySchema.parse(request.query);
+    const model = buildReportModel(source, {
+      title: query.title,
+      period: query.period ?? null,
+      density: query.density,
+      includeEmptySections: query.includeEmptySections,
+      highlightStatus: query.highlightStatus
+    });
+    return { model, html: renderReportHtml(model) };
+  });
   app.patch('/api/dashboards/:dashboardId', async (request) =>
     service.updateDashboard(dashboardParamsSchema.parse(request.params).dashboardId, request.body)
   );

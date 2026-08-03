@@ -134,6 +134,8 @@ HTML and Excel adapters consume this model. Neither adapter queries the database
 
 The model is assembled only from the dashboard's evaluated view payloads: a block's saved visible-field order, widths, filtered/sorted rows, title override, description, and export-inclusion flag. Adapters receive no database IDs and must not re-evaluate filters. Every generated text value is escaped by the rendering adapter.
 
+Automatic sequence values come from record metadata rather than dynamic values. Select, multi-select, and status option IDs are resolved to their current labels while building the report model, so no output adapter can accidentally expose persistence IDs. Report density, empty-section policy, and status highlighting are model options shared by every adapter.
+
 ### 6.2 Outlook HTML
 
 Classic Outlook has stricter rendering behavior than modern browsers. The email adapter therefore uses:

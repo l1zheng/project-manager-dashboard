@@ -79,6 +79,12 @@ export function App() {
   const [selectedDashboardId, setSelectedDashboardId] = useState<string>();
   const [dashboardDetail, setDashboardDetail] = useState<DashboardDetail>();
   const [dashboardName, setDashboardName] = useState('');
+  const [reportTitle, setReportTitle] = useState('');
+  const [reportPeriod, setReportPeriod] = useState('');
+  const [reportDensity, setReportDensity] = useState<'compact' | 'comfortable'>('comfortable');
+  const [includeEmptySections, setIncludeEmptySections] = useState(false);
+  const [highlightReportStatus, setHighlightReportStatus] = useState(true);
+  const [reportPreviewHtml, setReportPreviewHtml] = useState('');
   const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>();
   const [detail, setDetail] = useState<DatabaseDetail>();
   const [views, setViews] = useState<ViewSummary[]>([]);
@@ -362,6 +368,28 @@ export function App() {
       await loadDashboard(selectedDashboardId);
     } catch (requestError) {
       setError(readRequestError(requestError, '保存看板区块失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function previewReport() {
+    if (!selectedDashboardId) return;
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      const query = new URLSearchParams();
+      if (reportTitle.trim()) query.set('title', reportTitle.trim());
+      if (reportPeriod.trim()) query.set('period', reportPeriod.trim());
+      query.set('density', reportDensity);
+      query.set('includeEmptySections', String(includeEmptySections));
+      query.set('highlightStatus', String(highlightReportStatus));
+      const preview = await request<{ html: string }>(
+        `/api/dashboards/${selectedDashboardId}/report-preview?${query.toString()}`
+      );
+      setReportPreviewHtml(preview.html);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '生成报告预览失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -1358,6 +1386,56 @@ export function App() {
                   >
                     新建看板
                   </button>
+                  {selectedDashboardId && (
+                    <>
+                      <input
+                        aria-label="报告标题"
+                        onChange={(event) => setReportTitle(event.target.value)}
+                        placeholder="报告标题（默认看板名）"
+                        value={reportTitle}
+                      />
+                      <input
+                        aria-label="报告周期"
+                        onChange={(event) => setReportPeriod(event.target.value)}
+                        placeholder="例如：2026年第32周"
+                        value={reportPeriod}
+                      />
+                      <select
+                        aria-label="报告密度"
+                        onChange={(event) =>
+                          setReportDensity(event.target.value as 'compact' | 'comfortable')
+                        }
+                        value={reportDensity}
+                      >
+                        <option value="comfortable">舒适间距</option>
+                        <option value="compact">紧凑间距</option>
+                      </select>
+                      <label className="inline-option">
+                        <input
+                          checked={includeEmptySections}
+                          onChange={(event) => setIncludeEmptySections(event.target.checked)}
+                          type="checkbox"
+                        />
+                        包含空模块
+                      </label>
+                      <label className="inline-option">
+                        <input
+                          checked={highlightReportStatus}
+                          onChange={(event) => setHighlightReportStatus(event.target.checked)}
+                          type="checkbox"
+                        />
+                        高亮状态
+                      </label>
+                      <button
+                        className="button primary small"
+                        disabled={isSaving}
+                        onClick={() => void previewReport()}
+                        type="button"
+                      >
+                        静态报告预览
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
               {dashboardDetail?.blocks.length ? (
@@ -1438,7 +1516,7 @@ export function App() {
                                     block.view.view.config.visibleFieldIds.includes(field.id)
                                   )
                                   .map((field) => (
-                                    <td key={field.id}>{String(record.values[field.id] ?? '')}</td>
+                                    <td key={field.id}>{displayReadOnlyValue(field, record)}</td>
                                   ))}
                               </tr>
                             ))}
@@ -1452,6 +1530,21 @@ export function App() {
                 <div className="empty-state">
                   <strong>看板还没有区块</strong>
                   <span>选择一个保存视图后点击“加入看板”。</span>
+                </div>
+              )}
+              {reportPreviewHtml && (
+                <div className="report-preview">
+                  <div className="dashboard-block-heading">
+                    <h3>静态报告预览</h3>
+                    <button
+                      className="button tertiary small"
+                      onClick={() => setReportPreviewHtml('')}
+                      type="button"
+                    >
+                      关闭预览
+                    </button>
+                  </div>
+                  <iframe sandbox="" srcDoc={reportPreviewHtml} title="静态报告预览" />
                 </div>
               )}
             </section>
@@ -1506,6 +1599,25 @@ function toEditableValue(field: Field, record: RecordRow): EditableValue {
   if (value === undefined || value === null) return defaultEditableValue(field);
   if (Array.isArray(value)) return value;
   if (typeof value === 'boolean') return value;
+  return String(value);
+}
+
+function displayReadOnlyValue(field: Field, record: RecordRow): string {
+  if (field.type === 'sequence') return String(record.sequenceNumber);
+  const value = record.values[field.id];
+  if (value === undefined || value === null) return '';
+  if (field.type === 'single_select' || field.type === 'status') {
+    return field.config.options?.find((option) => option.id === value)?.label ?? String(value);
+  }
+  if (field.type === 'multi_select' && Array.isArray(value)) {
+    return value
+      .map(
+        (optionId) =>
+          field.config.options?.find((option) => option.id === optionId)?.label ?? optionId
+      )
+      .join(', ');
+  }
+  if (typeof value === 'boolean') return value ? '是' : '否';
   return String(value);
 }
 

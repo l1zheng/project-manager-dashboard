@@ -29,12 +29,12 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P4-02`: Connect the canonical report model to browser static HTML preview.
+`P4-04`: Decide and implement cross-database completed-row semantics.
 
 ## Next tasks
 
-1. `P4-02` — Connect the canonical report model to browser static HTML preview.
-2. Add report title, period, density, and empty-section options.
+1. `P4-04` — Decide and implement cross-database completed-row semantics.
+2. Complete Phase 4 report options and begin Excel layout design.
 3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
@@ -50,6 +50,7 @@ Last updated: 2026-08-03
 
 ## Verification log
 
+- 2026-08-03: High-model review corrected P4-01 before downstream adapters were built: sequence columns now use record metadata, and select/multi-select/status option IDs resolve to business labels in the canonical model. Completed P4-02/P4-03 with a static sandboxed browser preview, report title/period, compact/comfortable density, empty-section policy, status highlighting, conservative inline HTML styles, and API integration coverage. Browser-verified `序号 1`, `状态 已完成`, Chinese description, absence of editing controls inside the preview, and custom title/period. Also corrected dashboard read-only cells to display sequence values and option labels. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P4-01. Added pure versioned report-model construction from dashboard view payloads and a conservative static HTML renderer with user-content escaping. The model preserves block order, titles, descriptions, export inclusion, saved field order/widths, and already evaluated rows; adapters do not query or re-filter storage. Added export unit coverage for projection and HTML escaping. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P3-03 and Phase 3. Added per-block title overrides, collapse, export inclusion, and upward reorder controls, all persisted through the dashboard-block API. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P3-01 and P3-02. Added validated dashboard/dashboard-block persistence API and browser controls to create a dashboard, add a saved view as a block, and render blocks vertically with their independently configured fields and filtered rows. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.

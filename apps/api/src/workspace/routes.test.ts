@@ -157,6 +157,32 @@ describe('workspace API', () => {
       const viewResponse = await app.inject({ method: 'GET', url: `/api/views/${view.id}` });
       expect(viewResponse.statusCode).toBe(200);
       expect(viewResponse.json().records).toHaveLength(1);
+
+      const dashboardResponse = await app.inject({
+        method: 'POST',
+        url: '/api/dashboards',
+        payload: { name: '项目周报' }
+      });
+      expect(dashboardResponse.statusCode).toBe(201);
+      const dashboard = dashboardResponse.json() as { id: string };
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url: `/api/dashboards/${dashboard.id}/blocks`,
+            payload: { viewId: view.id, description: '<重点需求>' }
+          })
+        ).statusCode
+      ).toBe(201);
+      const previewResponse = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${dashboard.id}/report-preview?title=第32周周报`
+      });
+      expect(previewResponse.statusCode).toBe(200);
+      expect(previewResponse.json().model.sections[0].rows).toHaveLength(1);
+      expect(previewResponse.json().html).toContain('进行中');
+      expect(previewResponse.json().html).toContain('&lt;重点需求&gt;');
+      expect(previewResponse.json().html).not.toContain('in-progress');
     } finally {
       await app.close();
     }

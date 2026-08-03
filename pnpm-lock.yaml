@@ -53,6 +53,9 @@ importers:
       '@project-manager/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@project-manager/export':
+        specifier: workspace:*
+        version: link:../../packages/export
       better-sqlite3:
         specifier: ^13.0.2
         version: 13.0.2

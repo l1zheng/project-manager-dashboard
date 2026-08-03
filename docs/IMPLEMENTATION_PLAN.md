@@ -105,13 +105,15 @@ Exit criteria:
 
 ## Phase 4 — Canonical report and preview
 
+Status: in progress — P4-01 through P4-03 completed on 2026-08-03
+
 Tasks:
 
-- Implement the format-neutral report model.
-- Convert selected dashboard blocks into ordered report sections.
-- Add title, period, density, completed-row, and empty-section options.
-- Build static HTML report preview.
-- Implement content escaping and export sanitization tests.
+- Implement the format-neutral report model. Completed in P4-01 and hardened in P4-02.
+- Convert selected dashboard blocks into ordered report sections. Completed in P4-01.
+- Add title, period, density, status-highlight, and empty-section options. Completed in P4-03; completed-row semantics require an explicit product decision.
+- Build static HTML report preview. Completed in P4-02.
+- Implement content escaping and export sanitization tests. Initial escaping coverage completed in P4-01/P4-02.
 
 Exit criteria:
 
