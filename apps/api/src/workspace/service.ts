@@ -295,6 +295,22 @@ export class WorkspaceService {
     return this.setArchived(schema.records, record.id, false);
   }
 
+  archiveView(viewId: string) {
+    const view = this.requireActiveView(viewId);
+    return this.setArchived(schema.views, view.id, true);
+  }
+
+  restoreView(viewId: string) {
+    const view = this.persistence.db
+      .select()
+      .from(schema.views)
+      .where(eq(schema.views.id, viewId))
+      .get();
+    if (!view) throw new ResourceNotFoundError('View');
+    this.requireActiveDatabase(view.databaseId);
+    return this.setArchived(schema.views, view.id, false);
+  }
+
   private insertRecord(databaseId: string, command: CreateRecordInput) {
     const database = this.requireActiveDatabase(databaseId);
     const fields = this.listActiveFields(database.id).map((field) => this.toValidationField(field));
@@ -432,7 +448,8 @@ export class WorkspaceService {
   }
 
   private setArchived(
-    table: typeof schema.databases | typeof schema.fields | typeof schema.records,
+    table:
+      typeof schema.databases | typeof schema.fields | typeof schema.records | typeof schema.views,
     id: string,
     archived: boolean
   ) {

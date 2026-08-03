@@ -65,7 +65,7 @@ Exit criteria:
 
 ## Phase 2 — Views, filters, and sorting
 
-Status: in progress — P2-01 through P2-05 completed on 2026-08-03
+Status: completed — P2-01 through P2-06 completed on 2026-08-03
 
 Tasks:
 
@@ -76,6 +76,7 @@ Tasks:
 - Save visible fields, field order, widths, and a primary sort as a view. Completed in P2-04.
 - Add view duplication and rename. Completed in P2-05.
 - Add a browser editor for nested `AND`/`OR` conditions. Completed in P2-05; evaluator coverage was established in P2-01.
+- Add archive/restore behavior for saved views. Completed in P2-06.
 
 Exit criteria:
 

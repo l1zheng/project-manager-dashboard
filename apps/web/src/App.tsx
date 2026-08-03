@@ -92,7 +92,7 @@ export function App() {
     Record<string, Record<string, EditableValue>>
   >({});
   const [lastArchived, setLastArchived] = useState<
-    { kind: '数据库' | '字段' | '记录'; id: string } | undefined
+    { kind: '数据库' | '字段' | '记录' | '视图'; id: string } | undefined
   >();
 
   const selectedDatabase = useMemo(
@@ -494,8 +494,15 @@ export function App() {
     }
   }
 
-  async function archiveItem(kind: '数据库' | '字段' | '记录', id: string) {
-    const resource = kind === '数据库' ? 'databases' : kind === '字段' ? 'fields' : 'records';
+  async function archiveItem(kind: '数据库' | '字段' | '记录' | '视图', id: string) {
+    const resource =
+      kind === '数据库'
+        ? 'databases'
+        : kind === '字段'
+          ? 'fields'
+          : kind === '视图'
+            ? 'views'
+            : 'records';
     setIsSaving(true);
     setError(undefined);
     try {
@@ -505,6 +512,8 @@ export function App() {
         const databaseList = await request<DatabaseSummary[]>('/api/databases');
         setDatabases(databaseList);
         setSelectedDatabaseId(databaseList[0]?.id);
+      } else if (kind === '视图' && selectedDatabaseId) {
+        await loadViews(selectedDatabaseId);
       } else if (selectedDatabaseId) {
         await loadDetail(selectedDatabaseId);
         await refreshSelectedView();
@@ -519,14 +528,24 @@ export function App() {
   async function restoreLastArchived() {
     if (!lastArchived) return;
     const { kind, id } = lastArchived;
-    const resource = kind === '数据库' ? 'databases' : kind === '字段' ? 'fields' : 'records';
+    const resource =
+      kind === '数据库'
+        ? 'databases'
+        : kind === '字段'
+          ? 'fields'
+          : kind === '视图'
+            ? 'views'
+            : 'records';
     setIsSaving(true);
     try {
       await request(`/${'api'}/${resource}/${id}/restore`, { method: 'POST' });
       const databaseList = await request<DatabaseSummary[]>('/api/databases');
       setDatabases(databaseList);
       if (kind === '数据库') setSelectedDatabaseId(id);
-      else if (selectedDatabaseId) {
+      else if (kind === '视图' && selectedDatabaseId) {
+        await loadViews(selectedDatabaseId);
+        setSelectedViewId(id);
+      } else if (selectedDatabaseId) {
         await loadDetail(selectedDatabaseId);
         await refreshSelectedView();
       }
@@ -830,6 +849,14 @@ export function App() {
                         type="button"
                       >
                         复制视图
+                      </button>
+                      <button
+                        className="button tertiary small danger"
+                        disabled={isSaving}
+                        onClick={() => void archiveItem('视图', selectedView.id)}
+                        type="button"
+                      >
+                        归档视图
                       </button>
                     </>
                   )}

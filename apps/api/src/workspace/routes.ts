@@ -35,6 +35,12 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
   app.patch('/api/views/:viewId', async (request) =>
     service.updateView(viewParamsSchema.parse(request.params).viewId, request.body)
   );
+  app.post('/api/views/:viewId/archive', async (request) =>
+    service.archiveView(viewParamsSchema.parse(request.params).viewId)
+  );
+  app.post('/api/views/:viewId/restore', async (request) =>
+    service.restoreView(viewParamsSchema.parse(request.params).viewId)
+  );
   app.post('/api/databases/:databaseId/fields', async (request, reply) => {
     const field = service.createField(
       databaseParamsSchema.parse(request.params).databaseId,
