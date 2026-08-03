@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import type { FieldType, HealthResponse } from '@project-manager/domain';
+import type {
+  FilterCondition,
+  FilterOperator,
+  FieldType,
+  HealthResponse
+} from '@project-manager/domain';
 
 type DatabaseSummary = {
   id: string;
@@ -29,6 +34,18 @@ type DatabaseDetail = {
   fields: Field[];
   records: RecordRow[];
 };
+type ViewSummary = {
+  id: string;
+  name: string;
+  config: {
+    version: 1;
+    visibleFieldIds: string[];
+    fieldWidths: Record<string, number>;
+    filter: FilterCondition | { kind: 'group' } | null;
+    sorts: Array<{ fieldId: string; direction: 'ascending' | 'descending' }>;
+    includeArchived: boolean;
+  };
+};
 
 type HealthState =
   { kind: 'loading' } | { kind: 'ready'; response: HealthResponse } | { kind: 'error' };
@@ -54,6 +71,13 @@ export function App() {
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
   const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>();
   const [detail, setDetail] = useState<DatabaseDetail>();
+  const [views, setViews] = useState<ViewSummary[]>([]);
+  const [selectedViewId, setSelectedViewId] = useState<string>();
+  const [viewRecords, setViewRecords] = useState<RecordRow[]>();
+  const [viewName, setViewName] = useState('');
+  const [filterFieldId, setFilterFieldId] = useState('');
+  const [filterOperator, setFilterOperator] = useState<FilterOperator>('contains');
+  const [filterValue, setFilterValue] = useState('');
   const [isCreatingDatabase, setIsCreatingDatabase] = useState(false);
   const [isAddingField, setIsAddingField] = useState(false);
   const [isAddingRecord, setIsAddingRecord] = useState(false);
@@ -84,11 +108,77 @@ export function App() {
 
   useEffect(() => {
     if (selectedDatabaseId) {
+      setViewRecords(undefined);
       void loadDetail(selectedDatabaseId);
+      void loadViews(selectedDatabaseId);
     } else {
       setDetail(undefined);
     }
   }, [selectedDatabaseId]);
+
+  useEffect(() => {
+    if (!selectedViewId) {
+      setViewRecords(undefined);
+      return;
+    }
+    void getViewRecords(selectedViewId).catch(() => setError('读取视图失败。'));
+  }, [selectedViewId]);
+
+  useEffect(() => {
+    const filter = views.find((view) => view.id === selectedViewId)?.config.filter;
+    if (!filter || filter.kind !== 'condition') {
+      setFilterFieldId('');
+      setFilterOperator('contains');
+      setFilterValue('');
+      return;
+    }
+    setFilterFieldId(filter.fieldId);
+    setFilterOperator(filter.operator);
+    setFilterValue(
+      Array.isArray(filter.value) ? String(filter.value[0] ?? '') : String(filter.value ?? '')
+    );
+  }, [selectedViewId, views]);
+
+  async function loadViews(databaseId: string) {
+    const nextViews = await request<ViewSummary[]>(`/api/databases/${databaseId}/views`);
+    setViews(nextViews);
+    setSelectedViewId((current) =>
+      nextViews.some((view) => view.id === current) ? current : nextViews[0]?.id
+    );
+  }
+
+  async function getViewRecords(viewId: string) {
+    const view = await request<{ records: RecordRow[] }>(`/api/views/${viewId}`);
+    setViewRecords(view.records);
+  }
+
+  async function refreshSelectedView() {
+    if (selectedViewId) await getViewRecords(selectedViewId);
+  }
+
+  async function saveFilter() {
+    if (!selectedViewId || !detail || !filterFieldId) return;
+    const view = views.find((item) => item.id === selectedViewId);
+    if (!view) return;
+    setIsSaving(true);
+    try {
+      await request(`/api/views/${selectedViewId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          config: {
+            ...view.config,
+            filter: buildFilterCondition(filterFieldId, filterOperator, filterValue)
+          }
+        })
+      });
+      await loadViews(detail.database.id);
+      await refreshSelectedView();
+    } catch (requestError) {
+      setError(readRequestError(requestError, '保存筛选失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
 
   async function initialize() {
     try {
@@ -218,8 +308,37 @@ export function App() {
       setNewRecordValues({});
       setIsAddingRecord(false);
       await loadDetail(selectedDatabaseId);
+      await refreshSelectedView();
     } catch (requestError) {
       setError(readRequestError(requestError, '新增记录失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function createView() {
+    if (!selectedDatabaseId || !detail || !viewName.trim()) return;
+    setIsSaving(true);
+    try {
+      const view = await request<ViewSummary>(`/api/databases/${selectedDatabaseId}/views`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: viewName,
+          config: {
+            version: 1,
+            visibleFieldIds: detail.fields.map((field) => field.id),
+            filter: null,
+            sorts: [],
+            fieldWidths: {},
+            includeArchived: false
+          }
+        })
+      });
+      setViews((current) => [...current, view]);
+      setSelectedViewId(view.id);
+      setViewName('');
+    } catch (requestError) {
+      setError(readRequestError(requestError, '创建视图失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -238,6 +357,7 @@ export function App() {
         })
       });
       if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
+      await refreshSelectedView();
     } catch (requestError) {
       setError(readRequestError(requestError, '保存记录失败。'));
     } finally {
@@ -258,6 +378,7 @@ export function App() {
         setSelectedDatabaseId(databaseList[0]?.id);
       } else if (selectedDatabaseId) {
         await loadDetail(selectedDatabaseId);
+        await refreshSelectedView();
       }
     } catch (requestError) {
       setError(readRequestError(requestError, `归档${kind}失败。`));
@@ -276,7 +397,10 @@ export function App() {
       const databaseList = await request<DatabaseSummary[]>('/api/databases');
       setDatabases(databaseList);
       if (kind === '数据库') setSelectedDatabaseId(id);
-      else if (selectedDatabaseId) await loadDetail(selectedDatabaseId);
+      else if (selectedDatabaseId) {
+        await loadDetail(selectedDatabaseId);
+        await refreshSelectedView();
+      }
       setLastArchived(undefined);
     } catch (requestError) {
       setError(readRequestError(requestError, `恢复${kind}失败。`));
@@ -538,7 +662,95 @@ export function App() {
                   <p>直接在表格中编辑；自动编号由系统分配。</p>
                 </div>
                 <div className="table-actions">
-                  <span className="record-count">{detail.records.length} 条记录</span>
+                  {views.length > 0 && (
+                    <select
+                      aria-label="当前视图"
+                      onChange={(event) => setSelectedViewId(event.target.value)}
+                      value={selectedViewId ?? ''}
+                    >
+                      {views.map((view) => (
+                        <option key={view.id} value={view.id}>
+                          {view.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <input
+                    aria-label="新视图名称"
+                    onChange={(event) => setViewName(event.target.value)}
+                    placeholder="新建视图名称"
+                    value={viewName}
+                  />
+                  <button
+                    className="button tertiary small"
+                    disabled={isSaving || !viewName.trim()}
+                    onClick={() => void createView()}
+                    type="button"
+                  >
+                    保存为视图
+                  </button>
+                  {selectedViewId && (
+                    <>
+                      <select
+                        aria-label="筛选字段"
+                        onChange={(event) => {
+                          const nextField = detail.fields.find(
+                            (field) => field.id === event.target.value
+                          );
+                          setFilterFieldId(event.target.value);
+                          setFilterOperator(defaultFilterOperator(nextField?.type));
+                          setFilterValue('');
+                        }}
+                        value={filterFieldId}
+                      >
+                        <option value="">筛选字段</option>
+                        {detail.fields.map((field) => (
+                          <option key={field.id} value={field.id}>
+                            {field.name}
+                          </option>
+                        ))}
+                      </select>
+                      {filterFieldId && (
+                        <>
+                          <select
+                            aria-label="筛选条件"
+                            onChange={(event) =>
+                              setFilterOperator(event.target.value as FilterOperator)
+                            }
+                            value={filterOperator}
+                          >
+                            {filterOperatorsForField(
+                              detail.fields.find((field) => field.id === filterFieldId)?.type
+                            ).map((operator) => (
+                              <option key={operator} value={operator}>
+                                {filterOperatorLabels[operator]}
+                              </option>
+                            ))}
+                          </select>
+                          {!filterOperatorNeedsNoValue(filterOperator) && (
+                            <FilterValueInput
+                              field={detail.fields.find((field) => field.id === filterFieldId)}
+                              value={filterValue}
+                              onChange={setFilterValue}
+                            />
+                          )}
+                        </>
+                      )}
+                      <button
+                        className="button tertiary small"
+                        disabled={isSaving || !filterFieldId}
+                        onClick={() => void saveFilter()}
+                        type="button"
+                      >
+                        {filterOperatorNeedsNoValue(filterOperator) || filterValue
+                          ? '保存筛选'
+                          : '清除筛选'}
+                      </button>
+                    </>
+                  )}
+                  <span className="record-count">
+                    {(viewRecords ?? detail.records).length} 条记录
+                  </span>
                   <button
                     className="button primary small"
                     disabled={isSaving}
@@ -600,14 +812,14 @@ export function App() {
                           </td>
                         </tr>
                       )}
-                      {detail.records.length === 0 ? (
+                      {(viewRecords ?? detail.records).length === 0 ? (
                         <tr>
                           <td className="empty-cell" colSpan={detail.fields.length + 1}>
                             暂无记录。点击“新建记录”开始填写。
                           </td>
                         </tr>
                       ) : (
-                        detail.records.map((record) => (
+                        (viewRecords ?? detail.records).map((record) => (
                           <tr key={record.id}>
                             {detail.fields.map((field) => (
                               <td key={field.id}>
@@ -726,6 +938,152 @@ function serializeRecordValues(
     entries.push([field.id, field.type === 'number' ? Number(value) : value]);
   }
   return Object.fromEntries(entries);
+}
+
+const filterOperatorLabels: Record<FilterOperator, string> = {
+  equals: '等于',
+  not_equals: '不等于',
+  contains: '包含',
+  not_contains: '不包含',
+  greater_than: '大于',
+  greater_or_equal: '大于等于',
+  less_than: '小于',
+  less_or_equal: '小于等于',
+  before: '早于',
+  after: '晚于',
+  on_or_before: '不晚于',
+  on_or_after: '不早于',
+  between: '介于',
+  is_any_of: '是任一项',
+  is_none_of: '不是任一项',
+  contains_any: '包含任一项',
+  contains_all: '包含全部',
+  contains_none: '不包含任一项',
+  is_checked: '已勾选',
+  is_not_checked: '未勾选',
+  is_empty: '为空',
+  is_not_empty: '不为空'
+};
+
+function filterOperatorsForField(type: FieldType | undefined): FilterOperator[] {
+  switch (type) {
+    case 'short_text':
+    case 'long_text':
+    case 'person':
+    case 'url':
+      return ['contains', 'not_contains', 'equals', 'not_equals', 'is_empty', 'is_not_empty'];
+    case 'number':
+    case 'sequence':
+      return [
+        'equals',
+        'not_equals',
+        'greater_than',
+        'greater_or_equal',
+        'less_than',
+        'less_or_equal',
+        'is_empty',
+        'is_not_empty'
+      ];
+    case 'date':
+      return [
+        'equals',
+        'not_equals',
+        'before',
+        'after',
+        'on_or_before',
+        'on_or_after',
+        'is_empty',
+        'is_not_empty'
+      ];
+    case 'single_select':
+    case 'status':
+      return ['equals', 'not_equals', 'is_empty', 'is_not_empty'];
+    case 'multi_select':
+      return ['contains_any', 'contains_none', 'is_empty', 'is_not_empty'];
+    case 'checkbox':
+      return ['is_checked', 'is_not_checked'];
+    default:
+      return [];
+  }
+}
+
+function defaultFilterOperator(type: FieldType | undefined): FilterOperator {
+  return filterOperatorsForField(type)[0] ?? 'contains';
+}
+
+function filterOperatorNeedsNoValue(operator: FilterOperator): boolean {
+  return ['is_empty', 'is_not_empty', 'is_checked', 'is_not_checked'].includes(operator);
+}
+
+function buildFilterCondition(
+  fieldId: string,
+  operator: FilterOperator,
+  rawValue: string
+): FilterCondition | null {
+  if (!fieldId) return null;
+  if (filterOperatorNeedsNoValue(operator)) return { kind: 'condition', fieldId, operator };
+  if (!rawValue) return null;
+  const value = [
+    'is_any_of',
+    'is_none_of',
+    'contains_any',
+    'contains_all',
+    'contains_none'
+  ].includes(operator)
+    ? [rawValue]
+    : operator === 'greater_than' ||
+        operator === 'greater_or_equal' ||
+        operator === 'less_than' ||
+        operator === 'less_or_equal'
+      ? Number(rawValue)
+      : rawValue;
+  return { kind: 'condition', fieldId, operator, value };
+}
+
+function FilterValueInput({
+  field,
+  value,
+  onChange
+}: {
+  field: Field | undefined;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  if (
+    field?.type === 'single_select' ||
+    field?.type === 'status' ||
+    field?.type === 'multi_select'
+  ) {
+    return (
+      <select
+        aria-label="筛选内容"
+        onChange={(event) => onChange(event.target.value)}
+        value={value}
+      >
+        <option value="">选择值…</option>
+        {field.config.options?.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  return (
+    <input
+      aria-label="筛选内容"
+      onChange={(event) => onChange(event.target.value)}
+      placeholder="筛选值…"
+      type={
+        field?.type === 'number' || field?.type === 'sequence'
+          ? 'number'
+          : field?.type === 'date'
+            ? 'date'
+            : 'text'
+      }
+      value={value}
+    />
+  );
 }
 
 function RecordValueInput({
