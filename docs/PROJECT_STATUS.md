@@ -29,12 +29,12 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P2-02`: Define saved-view configuration, typed sorting, and persistence operations.
+`P2-03`: Build the browser filter editor and saved-view controls.
 
 ## Next tasks
 
-1. `P2-02` — Define saved-view configuration, typed sorting, and persistence operations.
-2. `P2-03` — Build the browser filter editor and saved-view controls.
+1. `P2-03` — Build the browser filter editor and saved-view controls.
+2. Add view duplication and archive/restore actions.
 3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
@@ -50,6 +50,7 @@ Last updated: 2026-08-03
 
 ## Verification log
 
+- 2026-08-03: Completed P2-02. Added versioned saved-view configuration (visible fields, per-view widths, filters, typed sorting, archived-record policy), deterministic view evaluation, and API endpoints to create/list/read/update views. Integration coverage verifies that a filtered, sorted saved view returns its evaluated rows. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P2-01 and accepted ADR-0002. Added a bounded nested `AND`/`OR` filter expression, field-type-specific operators, stable field/option ID validation, explicit empty semantics, locale-independent text matching, inclusive date ranges, and a pure shared record evaluator. Tests cover nested groups, text, number, date, select, multi-select, checkbox, sequence, invalid operators/fields/options/groups/ranges, and no-filter behavior. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P1-04. Added archive/restore API operations for databases, fields, and records; active views exclude archived data; browser controls archive each resource and provide an immediate undo action. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P1-03. Added validated record updates through `PATCH /api/records/:recordId`, an editable browser table, new-record rows, and controls for all first-release field types including selects, multi-selects, dates, checkboxes, long text, and automatic sequence display. Browser-verified in isolated data: created a database/field, added `支持单点登录`, updated it to `支持统一认证`, and confirmed the saved value reloaded. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.

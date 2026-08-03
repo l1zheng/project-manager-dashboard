@@ -3,8 +3,12 @@ import {
   createDatabaseInputSchema,
   createFieldInputSchema,
   createRecordInputSchema,
+  createViewInputSchema,
+  evaluateViewRecords,
   parseFieldConfig,
+  parseViewConfig,
   updateFieldInputSchema,
+  updateViewInputSchema,
   validateRecordValues,
   type CreateRecordInput,
   type FieldDefinitionForValidation
@@ -142,6 +146,91 @@ export class WorkspaceService {
     );
 
     return insertRecord();
+  }
+
+  listViews(databaseId: string) {
+    this.requireActiveDatabase(databaseId);
+    return this.persistence.db
+      .select()
+      .from(schema.views)
+      .where(and(eq(schema.views.databaseId, databaseId), isNull(schema.views.archivedAt)))
+      .orderBy(asc(schema.views.sortOrder))
+      .all()
+      .map((view) => this.toViewOutput(view));
+  }
+
+  createView(databaseId: string, input: unknown) {
+    const command = createViewInputSchema.parse(input);
+    this.requireActiveDatabase(databaseId);
+    const config = parseViewConfig(
+      command.config,
+      this.listActiveFields(databaseId).map((field) => this.toValidationField(field))
+    );
+    const now = new Date();
+    const view = {
+      id: randomUUID(),
+      databaseId,
+      name: command.name,
+      sortOrder: this.nextSortOrder('views', 'database_id', databaseId),
+      configVersion: config.version,
+      configJson: JSON.stringify(config),
+      createdAt: now,
+      updatedAt: now
+    };
+    this.persistence.db.insert(schema.views).values(view).run();
+    return { ...view, config };
+  }
+
+  getView(viewId: string) {
+    const view = this.requireActiveView(viewId);
+    const database = this.requireActiveDatabase(view.databaseId);
+    const rawFields = this.listActiveFields(database.id);
+    const validationFields = rawFields.map((field) => this.toValidationField(field));
+    const fields = rawFields.map((field) => this.toFieldOutput(field));
+    const config = parseViewConfig(parseJsonObject(view.configJson), validationFields);
+    const rows = this.persistence.db
+      .select()
+      .from(schema.records)
+      .where(
+        config.includeArchived
+          ? eq(schema.records.databaseId, database.id)
+          : and(eq(schema.records.databaseId, database.id), isNull(schema.records.archivedAt))
+      )
+      .all()
+      .map((record) => ({
+        ...record,
+        values: parseJsonObject(record.valuesJson) as Record<
+          string,
+          string | number | boolean | string[]
+        >
+      }));
+    return {
+      view: { ...view, config },
+      database,
+      fields,
+      records: evaluateViewRecords(rows, config, validationFields)
+    };
+  }
+
+  updateView(viewId: string, input: unknown) {
+    const command = updateViewInputSchema.parse(input);
+    const view = this.requireActiveView(viewId);
+    const fields = this.listActiveFields(view.databaseId).map((field) =>
+      this.toValidationField(field)
+    );
+    const config = parseViewConfig(command.config ?? parseJsonObject(view.configJson), fields);
+    const updatedAt = new Date();
+    this.persistence.db
+      .update(schema.views)
+      .set({
+        name: command.name ?? view.name,
+        configVersion: config.version,
+        configJson: JSON.stringify(config),
+        updatedAt
+      })
+      .where(eq(schema.views.id, view.id))
+      .run();
+    return { ...view, name: command.name ?? view.name, config, updatedAt };
   }
 
   updateRecord(recordId: string, input: unknown) {
@@ -332,6 +421,16 @@ export class WorkspaceService {
     return record;
   }
 
+  private requireActiveView(viewId: string) {
+    const view = this.persistence.db
+      .select()
+      .from(schema.views)
+      .where(and(eq(schema.views.id, viewId), isNull(schema.views.archivedAt)))
+      .get();
+    if (!view) throw new ResourceNotFoundError('View');
+    return view;
+  }
+
   private setArchived(
     table: typeof schema.databases | typeof schema.fields | typeof schema.records,
     id: string,
@@ -367,7 +466,11 @@ export class WorkspaceService {
     return this.nextSortOrder('records', 'database_id', databaseId);
   }
 
-  private nextSortOrder(table: 'databases' | 'fields' | 'records', column: string, value: string) {
+  private nextSortOrder(
+    table: 'databases' | 'fields' | 'records' | 'views',
+    column: string,
+    value: string
+  ) {
     const row = this.persistence.sqlite
       .prepare(`SELECT COALESCE(MAX(sort_order), 0) AS sortOrder FROM ${table} WHERE ${column} = ?`)
       .get(value) as { sortOrder: number };
@@ -388,6 +491,16 @@ export class WorkspaceService {
     return {
       ...field,
       config: parseFieldConfig(field.type, parseJsonObject(field.configJson))
+    };
+  }
+
+  private toViewOutput(view: typeof schema.views.$inferSelect) {
+    return {
+      ...view,
+      config: parseViewConfig(
+        parseJsonObject(view.configJson),
+        this.listActiveFields(view.databaseId).map((field) => this.toValidationField(field))
+      )
     };
   }
 }

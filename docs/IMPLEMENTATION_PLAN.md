@@ -65,12 +65,13 @@ Exit criteria:
 
 ## Phase 2 — Views, filters, and sorting
 
-Status: in progress — P2-01 shared typed filter semantics and evaluator completed on 2026-08-03
+Status: in progress — P2-01 evaluator and P2-02 saved-view persistence completed on 2026-08-03
 
 Tasks:
 
 - Define the typed filter expression tree. Completed in P2-01.
 - Implement the shared filter evaluator. Completed in P2-01; typed sorting follows with saved views.
+- Persist typed saved-view configuration and evaluate saved views. Completed in P2-02.
 - Build the filter editor.
 - Save visible fields, order, widths, filters, and sorts as a view.
 - Add view duplication and rename.

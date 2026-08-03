@@ -6,6 +6,7 @@ import { ResourceNotFoundError, WorkspaceService } from './service.js';
 const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
 const fieldParamsSchema = z.object({ fieldId: z.string().trim().min(1).max(120) });
 const recordParamsSchema = z.object({ recordId: z.string().trim().min(1).max(120) });
+const viewParamsSchema = z.object({ viewId: z.string().trim().min(1).max(120) });
 
 export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persistence): void {
   const service = new WorkspaceService(persistence);
@@ -18,6 +19,22 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
   app.get('/api/databases/:databaseId', async (request) => {
     return service.getDatabase(databaseParamsSchema.parse(request.params).databaseId);
   });
+  app.get('/api/databases/:databaseId/views', async (request) =>
+    service.listViews(databaseParamsSchema.parse(request.params).databaseId)
+  );
+  app.post('/api/databases/:databaseId/views', async (request, reply) => {
+    const view = service.createView(
+      databaseParamsSchema.parse(request.params).databaseId,
+      request.body
+    );
+    return reply.code(201).send(view);
+  });
+  app.get('/api/views/:viewId', async (request) =>
+    service.getView(viewParamsSchema.parse(request.params).viewId)
+  );
+  app.patch('/api/views/:viewId', async (request) =>
+    service.updateView(viewParamsSchema.parse(request.params).viewId, request.body)
+  );
   app.post('/api/databases/:databaseId/fields', async (request, reply) => {
     const field = service.createField(
       databaseParamsSchema.parse(request.params).databaseId,

@@ -132,6 +132,31 @@ describe('workspace API', () => {
         url: `/api/records/${firstRecordResponse.json().id as string}/restore`
       });
       expect(restoreRecordResponse.statusCode).toBe(200);
+
+      const createViewResponse = await app.inject({
+        method: 'POST',
+        url: `/api/databases/${database.id}/views`,
+        payload: {
+          name: '进行中需求',
+          config: {
+            version: 1,
+            visibleFieldIds: [nameField.id, statusField.id],
+            filter: {
+              kind: 'condition',
+              fieldId: statusField.id,
+              operator: 'equals',
+              value: 'in-progress'
+            },
+            sorts: [{ fieldId: nameField.id, direction: 'ascending' }],
+            includeArchived: false
+          }
+        }
+      });
+      expect(createViewResponse.statusCode).toBe(201);
+      const view = createViewResponse.json() as { id: string };
+      const viewResponse = await app.inject({ method: 'GET', url: `/api/views/${view.id}` });
+      expect(viewResponse.statusCode).toBe(200);
+      expect(viewResponse.json().records).toHaveLength(1);
     } finally {
       await app.close();
     }

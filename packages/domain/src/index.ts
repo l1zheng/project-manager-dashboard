@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export * from './filter.js';
+export * from './view.js';
 
 export const healthResponseSchema = z.object({
   status: z.literal('ok'),
@@ -93,6 +94,19 @@ export const createRecordInputSchema = z.object({
 });
 
 export type CreateRecordInput = z.infer<typeof createRecordInputSchema>;
+
+export const createViewInputSchema = z.object({
+  name: displayNameSchema,
+  config: z.unknown()
+});
+export const updateViewInputSchema = z
+  .object({
+    name: displayNameSchema.optional(),
+    config: z.unknown().optional()
+  })
+  .refine((input) => input.name !== undefined || input.config !== undefined, {
+    message: 'At least one view property must be supplied.'
+  });
 
 export const updateRecordInputSchema = createRecordInputSchema;
 
