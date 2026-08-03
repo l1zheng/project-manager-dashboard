@@ -256,6 +256,17 @@ describe('workspace API', () => {
       );
       expect(editableWorkbookResponse.headers['content-disposition']).toContain('attachment');
       expect(editableWorkbookResponse.rawPayload.subarray(0, 2).toString()).toBe('PK');
+
+      const presentationWorkbookResponse = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${dashboard.id}/export/presentation.xlsx?includeCompleted=false`
+      });
+      expect(presentationWorkbookResponse.statusCode).toBe(200);
+      expect(presentationWorkbookResponse.headers['content-type']).toContain(
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      );
+      expect(presentationWorkbookResponse.headers['content-disposition']).toContain('attachment');
+      expect(presentationWorkbookResponse.rawPayload.subarray(0, 2).toString()).toBe('PK');
     } finally {
       await app.close();
     }

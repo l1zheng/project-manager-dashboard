@@ -4,8 +4,8 @@ Last updated: 2026-08-03
 
 ## Current state
 
-- Phase: Phases 0 through 4 are complete; Phase 5 Excel exports is in progress.
-- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, and downloadable editable Excel workbooks.
+- Phase: Phases 0 through 5 are implementation-complete; Windows desktop Excel verification remains manual. Phase 6 Outlook integration is next.
+- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, and both editable and presentation Excel downloads.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -30,13 +30,13 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P5-03`: Connect the tested base-grid layout to the presentation Excel workbook adapter.
+`P6-01`: Finalize the safe Windows classic Outlook draft-automation boundary and fallback contract.
 
 ## Next tasks
 
-1. `P5-03` — Connect the tested base-grid layout to the presentation workbook adapter with merged section cells, print setup, and safe text handling.
-2. Add download action for presentation Excel and verify the generated workbook on Windows desktop Excel.
-3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
+1. `P6-01` — Record and review the Windows PowerShell/COM draft adapter boundary, including no-send guarantees and fallback behavior.
+2. `P6-02` — Implement availability detection, draft creation, and HTML download fallback from the accepted contract.
+3. Open both generated Excel files in desktop Excel on the target Windows machine and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
 
 ## Risks and validation items
 
@@ -50,6 +50,8 @@ Last updated: 2026-08-03
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
 
 ## Verification log
+
+- 2026-08-04: Completed P5-03 and the Phase 5 implementation. Added the presentation workbook adapter plus `GET /api/dashboards/:id/export/presentation.xlsx` and the dashboard’s `下载展示版 Excel` action. One landscape report sheet uses a 60-column base grid: title/period/module headings span the report; each module independently receives merged header and data spans from the tested allocator. It applies wrapping, row-height profiles, borders, print area, fit-to-width setup, typed date/number cells, status highlighting, and literal-text protection. Workbook reload tests verify one sheet, 60 columns, merged spans, print setup, typed dates, and formula protection; API tests verify the download payload. Independent rendering visually confirmed differently shaped 需求跟踪 and 关键风险 sections on one sheet, and an end-to-end local response downloaded as a valid Excel 2007+ file. Desktop Excel on the target Windows machine remains a manual release check.
 
 - 2026-08-04: Completed P5-02. Added ExcelJS-based editable workbook generation plus `GET /api/dashboards/:id/export/editable.xlsx` and the dashboard’s `下载可编辑 Excel` action. Each included report section becomes an independent unmerged worksheet with frozen headers, filters, saved/fallback widths, wrapping, typed numbers/dates, and formula-injection/XML-control protection. Export/API tests load the generated workbook and verify sheets, date types, auto-filters, frozen rows, no merges, and ZIP payload headers. An independent workbook render verified Chinese requirement/risk sheets and corrected a timezone regression so `2026-08-14` remains that date in the `.xlsx`; browser verification confirmed the button triggers the download endpoint.
 

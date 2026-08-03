@@ -124,15 +124,15 @@ Exit criteria:
 
 ## Phase 5 — Excel exports
 
-Status: in progress — P5-01 completed on 2026-08-03
+Status: implementation complete — P5-01 through P5-03 completed on 2026-08-04; Windows desktop Excel verification remains manual.
 
 Tasks:
 
 - Implement editable multi-sheet workbook export. Completed in P5-02 with typed cells, frozen/filtered headers, safe literal text, and browser download.
 - Implement pure base-grid span calculation. Completed in P5-01 with deterministic largest-remainder allocation, content/field-type/view-width weighting, and dense-layout handling.
-- Implement presentation workbook generation with merged spans.
-- Add styles, wrapping, row heights, print settings, and filenames.
-- Add workbook validation tests and golden fixtures.
+- Implement presentation workbook generation with merged spans. Completed in P5-03 with one 60-column report worksheet and independently allocated section spans.
+- Add styles, wrapping, row heights, print settings, and filenames. Completed in P5-03 for both download modes.
+- Add workbook validation tests and golden fixtures. Completed in P5-02/P5-03 with workbook reload tests and independent rendered workbook checks.
 - Open generated files in desktop Excel on Windows for manual verification.
 
 Exit criteria:

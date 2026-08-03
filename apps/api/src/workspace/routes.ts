@@ -1,6 +1,11 @@
 import { z, ZodError } from 'zod';
 import type { FastifyInstance } from 'fastify';
-import { buildEditableWorkbook, buildReportModel, renderReportHtml } from '@project-manager/export';
+import {
+  buildEditableWorkbook,
+  buildPresentationWorkbook,
+  buildReportModel,
+  renderReportHtml
+} from '@project-manager/export';
 import type { Persistence } from '../persistence/database.js';
 import { ResourceNotFoundError, WorkspaceService } from './service.js';
 
@@ -68,6 +73,26 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
       .header(
         'content-disposition',
         `attachment; filename*=UTF-8''${encodeURIComponent(`${safeExportFilename(model.title)}-可编辑数据.xlsx`)}`
+      )
+      .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+      .send(Buffer.from(workbook));
+  });
+  app.get('/api/dashboards/:dashboardId/export/presentation.xlsx', async (request, reply) => {
+    const source = service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId);
+    const query = reportPreviewQuerySchema.parse(request.query);
+    const model = buildReportModel(source, {
+      title: query.title,
+      period: query.period ?? null,
+      density: query.density,
+      includeEmptySections: query.includeEmptySections,
+      includeCompleted: query.includeCompleted,
+      highlightStatus: query.highlightStatus
+    });
+    const workbook = await buildPresentationWorkbook(model);
+    return reply
+      .header(
+        'content-disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(`${safeExportFilename(model.title)}-展示版.xlsx`)}`
       )
       .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .send(Buffer.from(workbook));

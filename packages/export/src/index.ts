@@ -13,4 +13,5 @@ export interface ReportExportResult {
 
 export * from './editable-workbook.js';
 export * from './layout.js';
+export * from './presentation-workbook.js';
 export * from './report.js';
