@@ -29,12 +29,12 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P3-01`: Implement dashboard and dashboard-block persistence.
+`P3-03`: Add dashboard block configuration, reordering, collapse, and export inclusion controls.
 
 ## Next tasks
 
-1. `P3-01` — Implement dashboard and dashboard-block persistence.
-2. Add views as vertically stacked dashboard blocks.
+1. `P3-03` — Add dashboard block configuration, reordering, collapse, and export inclusion controls.
+2. Begin canonical report-model design in Phase 4.
 3. Run [the Windows verification checklist](WINDOWS_VERIFICATION.md) on the target Node 24 LTS machine before declaring native-driver support complete.
 
 ## Risks and validation items
@@ -50,6 +50,7 @@ Last updated: 2026-08-03
 
 ## Verification log
 
+- 2026-08-03: Completed P3-01 and P3-02. Added validated dashboard/dashboard-block persistence API and browser controls to create a dashboard, add a saved view as a block, and render blocks vertically with their independently configured fields and filtered rows. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P2-06 and Phase 2. Added archived/restore API endpoints for views plus a browser archive action with the existing immediate undo notice. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P2-05. Added browser controls to rename and duplicate the active view without changing its source database, plus a recursive nested filter editor that stores the existing typed `AND`/`OR` expression tree. It uses the shared field-aware operators and sends the exact structured expression to the saved-view API. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 - 2026-08-03: Completed P2-04. Added per-view visible-column selection, column order controls, persisted widths, and primary sort direction in the browser. Browser-verified in an isolated workspace: hid `事项`, sorted by `优先级` ascending, saved, and confirmed that only the `优先级` column rendered in `1, 2` order both before and after a page reload. Verified `pnpm test`, `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.

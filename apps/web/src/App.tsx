@@ -41,6 +41,16 @@ type ViewSummary = {
   name: string;
   config: ViewConfig;
 };
+type DashboardSummary = { id: string; name: string; description: string | null };
+type DashboardBlock = {
+  id: string;
+  titleOverride: string | null;
+  description: string | null;
+  isCollapsed: boolean;
+  includeInExport: boolean;
+  view: { view: ViewSummary; fields: Field[]; records: RecordRow[] };
+};
+type DashboardDetail = { dashboard: DashboardSummary; blocks: DashboardBlock[] };
 
 type HealthState =
   { kind: 'loading' } | { kind: 'ready'; response: HealthResponse } | { kind: 'error' };
@@ -64,6 +74,10 @@ const optionFieldTypes = new Set<FieldType>(['single_select', 'multi_select', 's
 export function App() {
   const [health, setHealth] = useState<HealthState>({ kind: 'loading' });
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
+  const [dashboards, setDashboards] = useState<DashboardSummary[]>([]);
+  const [selectedDashboardId, setSelectedDashboardId] = useState<string>();
+  const [dashboardDetail, setDashboardDetail] = useState<DashboardDetail>();
+  const [dashboardName, setDashboardName] = useState('');
   const [selectedDatabaseId, setSelectedDatabaseId] = useState<string>();
   const [detail, setDetail] = useState<DatabaseDetail>();
   const [views, setViews] = useState<ViewSummary[]>([]);
@@ -123,6 +137,11 @@ export function App() {
       setDetail(undefined);
     }
   }, [selectedDatabaseId]);
+
+  useEffect(() => {
+    if (selectedDashboardId) void loadDashboard(selectedDashboardId);
+    else setDashboardDetail(undefined);
+  }, [selectedDashboardId]);
 
   useEffect(() => {
     if (!selectedViewId) {
@@ -273,16 +292,61 @@ export function App() {
 
   async function initialize() {
     try {
-      const [healthResponse, databaseList] = await Promise.all([
+      const [healthResponse, databaseList, dashboardList] = await Promise.all([
         request<HealthResponse>('/api/health'),
-        request<DatabaseSummary[]>('/api/databases')
+        request<DatabaseSummary[]>('/api/databases'),
+        request<DashboardSummary[]>('/api/dashboards')
       ]);
       setHealth({ kind: 'ready', response: healthResponse });
       setDatabases(databaseList);
+      setDashboards(dashboardList);
+      setSelectedDashboardId(dashboardList[0]?.id);
       setSelectedDatabaseId((current) => current ?? databaseList[0]?.id);
     } catch {
       setHealth({ kind: 'error' });
       setError('无法连接本地服务。请确认 API 已启动。');
+    }
+  }
+
+  async function loadDashboard(dashboardId: string) {
+    try {
+      setDashboardDetail(await request<DashboardDetail>(`/api/dashboards/${dashboardId}`));
+    } catch {
+      setError('读取看板失败。');
+    }
+  }
+
+  async function createDashboard() {
+    if (!dashboardName.trim()) return;
+    setIsSaving(true);
+    try {
+      const dashboard = await request<DashboardSummary>('/api/dashboards', {
+        method: 'POST',
+        body: JSON.stringify({ name: dashboardName })
+      });
+      setDashboards((current) => [...current, dashboard]);
+      setSelectedDashboardId(dashboard.id);
+      setDashboardName('');
+    } catch (requestError) {
+      setError(readRequestError(requestError, '创建看板失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function addViewToDashboard() {
+    if (!selectedDashboardId || !selectedViewId) return;
+    setIsSaving(true);
+    try {
+      await request(`/api/dashboards/${selectedDashboardId}/blocks`, {
+        method: 'POST',
+        body: JSON.stringify({ viewId: selectedViewId })
+      });
+      await loadDashboard(selectedDashboardId);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '添加看板区块失败。'));
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -1111,6 +1175,16 @@ export function App() {
                   >
                     ＋ 新建记录
                   </button>
+                  {selectedDashboardId && selectedViewId && (
+                    <button
+                      className="button tertiary small"
+                      disabled={isSaving}
+                      onClick={() => void addViewToDashboard()}
+                      type="button"
+                    >
+                      ＋ 加入看板
+                    </button>
+                  )}
                 </div>
               </div>
               {detail.fields.length > 0 ? (
@@ -1229,6 +1303,87 @@ export function App() {
                 <div className="empty-state">
                   <strong>定义字段后显示数据预览</strong>
                   <span>不同数据库可以拥有不同的字段数量和字段名称。</span>
+                </div>
+              )}
+            </section>
+            <section className="panel dashboard-panel">
+              <div className="panel-heading">
+                <div>
+                  <span className="section-kicker">纵向报告看板</span>
+                  <h2>{dashboardDetail?.dashboard.name ?? '新建看板'}</h2>
+                  <p>每个区块引用独立视图；更改一个视图不会改动其他区块。</p>
+                </div>
+                <div className="table-actions">
+                  {dashboards.length > 0 && (
+                    <select
+                      aria-label="当前看板"
+                      value={selectedDashboardId ?? ''}
+                      onChange={(event) => setSelectedDashboardId(event.target.value)}
+                    >
+                      {dashboards.map((dashboard) => (
+                        <option key={dashboard.id} value={dashboard.id}>
+                          {dashboard.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <input
+                    aria-label="新看板名称"
+                    placeholder="新看板名称"
+                    value={dashboardName}
+                    onChange={(event) => setDashboardName(event.target.value)}
+                  />
+                  <button
+                    className="button tertiary small"
+                    disabled={isSaving || !dashboardName.trim()}
+                    onClick={() => void createDashboard()}
+                    type="button"
+                  >
+                    新建看板
+                  </button>
+                </div>
+              </div>
+              {dashboardDetail?.blocks.length ? (
+                <div className="dashboard-blocks">
+                  {dashboardDetail.blocks.map((block) => (
+                    <article className="dashboard-block" key={block.id}>
+                      <h3>{block.titleOverride ?? block.view.view.name}</h3>
+                      {block.description && <p>{block.description}</p>}
+                      {!block.isCollapsed && (
+                        <table>
+                          <thead>
+                            <tr>
+                              {block.view.fields
+                                .filter((field) =>
+                                  block.view.view.config.visibleFieldIds.includes(field.id)
+                                )
+                                .map((field) => (
+                                  <th key={field.id}>{field.name}</th>
+                                ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {block.view.records.map((record) => (
+                              <tr key={record.id}>
+                                {block.view.fields
+                                  .filter((field) =>
+                                    block.view.view.config.visibleFieldIds.includes(field.id)
+                                  )
+                                  .map((field) => (
+                                    <td key={field.id}>{String(record.values[field.id] ?? '')}</td>
+                                  ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>看板还没有区块</strong>
+                  <span>选择一个保存视图后点击“加入看板”。</span>
                 </div>
               )}
             </section>
