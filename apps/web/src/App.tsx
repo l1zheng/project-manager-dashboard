@@ -3,7 +3,8 @@ import type {
   FilterCondition,
   FilterOperator,
   FieldType,
-  HealthResponse
+  HealthResponse,
+  ViewConfig
 } from '@project-manager/domain';
 
 type DatabaseSummary = {
@@ -37,14 +38,7 @@ type DatabaseDetail = {
 type ViewSummary = {
   id: string;
   name: string;
-  config: {
-    version: 1;
-    visibleFieldIds: string[];
-    fieldWidths: Record<string, number>;
-    filter: FilterCondition | { kind: 'group' } | null;
-    sorts: Array<{ fieldId: string; direction: 'ascending' | 'descending' }>;
-    includeArchived: boolean;
-  };
+  config: ViewConfig;
 };
 
 type HealthState =
@@ -78,6 +72,7 @@ export function App() {
   const [filterFieldId, setFilterFieldId] = useState('');
   const [filterOperator, setFilterOperator] = useState<FilterOperator>('contains');
   const [filterValue, setFilterValue] = useState('');
+  const [viewConfigDraft, setViewConfigDraft] = useState<ViewConfig>();
   const [isCreatingDatabase, setIsCreatingDatabase] = useState(false);
   const [isAddingField, setIsAddingField] = useState(false);
   const [isAddingRecord, setIsAddingRecord] = useState(false);
@@ -101,6 +96,16 @@ export function App() {
     () => databases.find((database) => database.id === selectedDatabaseId),
     [databases, selectedDatabaseId]
   );
+  const selectedView = useMemo(
+    () => views.find((view) => view.id === selectedViewId),
+    [selectedViewId, views]
+  );
+  const visibleFields = useMemo(() => {
+    if (!detail || !selectedView) return detail?.fields ?? [];
+    return selectedView.config.visibleFieldIds
+      .map((fieldId) => detail.fields.find((field) => field.id === fieldId))
+      .filter((field): field is Field => field !== undefined);
+  }, [detail, selectedView]);
 
   useEffect(() => {
     void initialize();
@@ -138,6 +143,10 @@ export function App() {
       Array.isArray(filter.value) ? String(filter.value[0] ?? '') : String(filter.value ?? '')
     );
   }, [selectedViewId, views]);
+
+  useEffect(() => {
+    setViewConfigDraft(selectedView ? structuredClone(selectedView.config) : undefined);
+  }, [selectedView]);
 
   async function loadViews(databaseId: string) {
     const nextViews = await request<ViewSummary[]>(`/api/databases/${databaseId}/views`);
@@ -178,6 +187,57 @@ export function App() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  async function saveViewConfiguration() {
+    if (!selectedViewId || !detail || !viewConfigDraft) return;
+    if (viewConfigDraft.visibleFieldIds.length === 0) {
+      setError('一个视图至少需要显示一个字段。');
+      return;
+    }
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      await request(`/api/views/${selectedViewId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ config: viewConfigDraft })
+      });
+      await loadViews(detail.database.id);
+      await refreshSelectedView();
+    } catch (requestError) {
+      setError(readRequestError(requestError, '保存视图配置失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function toggleVisibleField(fieldId: string, visible: boolean) {
+    setViewConfigDraft((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        visibleFieldIds: visible
+          ? [...current.visibleFieldIds, fieldId]
+          : current.visibleFieldIds.filter((id) => id !== fieldId)
+      };
+    });
+  }
+
+  function moveVisibleField(fieldId: string, offset: -1 | 1) {
+    setViewConfigDraft((current) => {
+      if (!current) return current;
+      const currentIndex = current.visibleFieldIds.indexOf(fieldId);
+      const nextIndex = currentIndex + offset;
+      if (currentIndex < 0 || nextIndex < 0 || nextIndex >= current.visibleFieldIds.length) {
+        return current;
+      }
+      const visibleFieldIds = [...current.visibleFieldIds];
+      [visibleFieldIds[currentIndex], visibleFieldIds[nextIndex]] = [
+        visibleFieldIds[nextIndex]!,
+        visibleFieldIds[currentIndex]!
+      ];
+      return { ...current, visibleFieldIds };
+    });
   }
 
   async function initialize() {
@@ -748,6 +808,149 @@ export function App() {
                       </button>
                     </>
                   )}
+                  {selectedView && viewConfigDraft && (
+                    <details className="view-config">
+                      <summary>配置视图</summary>
+                      <div className="view-config-popover">
+                        <strong>显示字段、顺序与宽度</strong>
+                        <div className="view-field-settings">
+                          {detail.fields.map((field) => {
+                            const visibleIndex = viewConfigDraft.visibleFieldIds.indexOf(field.id);
+                            const isVisible = visibleIndex >= 0;
+                            return (
+                              <div className="view-field-setting" key={field.id}>
+                                <label>
+                                  <input
+                                    checked={isVisible}
+                                    onChange={(event) =>
+                                      toggleVisibleField(field.id, event.target.checked)
+                                    }
+                                    type="checkbox"
+                                  />
+                                  {field.name}
+                                </label>
+                                {isVisible && (
+                                  <>
+                                    <input
+                                      aria-label={`${field.name}列宽`}
+                                      min="60"
+                                      onChange={(event) => {
+                                        const width = Number(event.target.value);
+                                        if (!Number.isFinite(width)) return;
+                                        setViewConfigDraft((current) =>
+                                          current
+                                            ? {
+                                                ...current,
+                                                fieldWidths: {
+                                                  ...current.fieldWidths,
+                                                  [field.id]: Math.max(60, Math.min(1200, width))
+                                                }
+                                              }
+                                            : current
+                                        );
+                                      }}
+                                      type="number"
+                                      value={viewConfigDraft.fieldWidths[field.id] ?? 160}
+                                    />
+                                    <button
+                                      aria-label={`上移${field.name}`}
+                                      className="icon-button"
+                                      disabled={visibleIndex === 0}
+                                      onClick={() => moveVisibleField(field.id, -1)}
+                                      type="button"
+                                    >
+                                      ↑
+                                    </button>
+                                    <button
+                                      aria-label={`下移${field.name}`}
+                                      className="icon-button"
+                                      disabled={
+                                        visibleIndex === viewConfigDraft.visibleFieldIds.length - 1
+                                      }
+                                      onClick={() => moveVisibleField(field.id, 1)}
+                                      type="button"
+                                    >
+                                      ↓
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="view-sort-settings">
+                          <label>
+                            排序字段
+                            <select
+                              aria-label="排序字段"
+                              onChange={(event) =>
+                                setViewConfigDraft((current) =>
+                                  current
+                                    ? {
+                                        ...current,
+                                        sorts: event.target.value
+                                          ? [
+                                              {
+                                                fieldId: event.target.value,
+                                                direction:
+                                                  current.sorts[0]?.direction ?? 'ascending'
+                                              }
+                                            ]
+                                          : []
+                                      }
+                                    : current
+                                )
+                              }
+                              value={viewConfigDraft.sorts[0]?.fieldId ?? ''}
+                            >
+                              <option value="">不排序</option>
+                              {detail.fields.map((field) => (
+                                <option key={field.id} value={field.id}>
+                                  {field.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {viewConfigDraft.sorts[0] && (
+                            <label>
+                              排序方向
+                              <select
+                                aria-label="排序方向"
+                                onChange={(event) =>
+                                  setViewConfigDraft((current) =>
+                                    current && current.sorts[0]
+                                      ? {
+                                          ...current,
+                                          sorts: [
+                                            {
+                                              ...current.sorts[0],
+                                              direction: event.target.value as
+                                                'ascending' | 'descending'
+                                            }
+                                          ]
+                                        }
+                                      : current
+                                  )
+                                }
+                                value={viewConfigDraft.sorts[0].direction}
+                              >
+                                <option value="ascending">升序</option>
+                                <option value="descending">降序</option>
+                              </select>
+                            </label>
+                          )}
+                          <button
+                            className="button primary small"
+                            disabled={isSaving}
+                            onClick={() => void saveViewConfiguration()}
+                            type="button"
+                          >
+                            保存视图配置
+                          </button>
+                        </div>
+                      </div>
+                    </details>
+                  )}
                   <span className="record-count">
                     {(viewRecords ?? detail.records).length} 条记录
                   </span>
@@ -769,8 +972,13 @@ export function App() {
                   <table>
                     <thead>
                       <tr>
-                        {detail.fields.map((field) => (
-                          <th key={field.id}>{field.name}</th>
+                        {visibleFields.map((field) => (
+                          <th
+                            key={field.id}
+                            style={{ width: selectedView?.config.fieldWidths[field.id] }}
+                          >
+                            {field.name}
+                          </th>
                         ))}
                         <th className="record-action-heading">操作</th>
                       </tr>
@@ -778,8 +986,11 @@ export function App() {
                     <tbody>
                       {isAddingRecord && (
                         <tr className="record-editor-row">
-                          {detail.fields.map((field) => (
-                            <td key={field.id}>
+                          {visibleFields.map((field) => (
+                            <td
+                              key={field.id}
+                              style={{ width: selectedView?.config.fieldWidths[field.id] }}
+                            >
                               <RecordValueInput
                                 field={field}
                                 value={newRecordValues[field.id] ?? defaultEditableValue(field)}
@@ -814,15 +1025,18 @@ export function App() {
                       )}
                       {(viewRecords ?? detail.records).length === 0 ? (
                         <tr>
-                          <td className="empty-cell" colSpan={detail.fields.length + 1}>
+                          <td className="empty-cell" colSpan={visibleFields.length + 1}>
                             暂无记录。点击“新建记录”开始填写。
                           </td>
                         </tr>
                       ) : (
                         (viewRecords ?? detail.records).map((record) => (
                           <tr key={record.id}>
-                            {detail.fields.map((field) => (
-                              <td key={field.id}>
+                            {visibleFields.map((field) => (
+                              <td
+                                key={field.id}
+                                style={{ width: selectedView?.config.fieldWidths[field.id] }}
+                              >
                                 <RecordValueInput
                                   field={field}
                                   value={
