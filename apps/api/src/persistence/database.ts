@@ -15,6 +15,13 @@ import {
   type MigrationState
 } from './migrations.js';
 import { ensureDataDirectories, resolveDataPaths, type DataPaths } from './paths.js';
+import {
+  activatePendingRestore,
+  finalizePendingRestore,
+  restoreFailureMessage,
+  rollbackPendingRestore,
+  type RestoreStartupResult
+} from './restore.js';
 import * as schema from './schema.js';
 
 const sqliteBusyTimeoutMilliseconds = 5_000;
@@ -23,8 +30,10 @@ export interface Persistence {
   sqlite: Database.Database;
   db: BetterSQLite3Database<typeof schema>;
   paths: DataPaths;
+  migrationsFolder: string;
   migrationState: MigrationState;
   backup: VerifiedBackup | undefined;
+  restoreResult: RestoreStartupResult | undefined;
   close(): void;
 }
 
@@ -55,6 +64,49 @@ export async function openPersistence(options: OpenPersistenceOptions = {}): Pro
   }
 
   await ensureDataDirectories(paths);
+  const activation = await activatePendingRestore(paths, migrationsFolder);
+
+  if (activation.kind === 'activated') {
+    let restoredPersistence: Persistence | undefined;
+    try {
+      restoredPersistence = await openDatabase(paths, migrationsFolder, runMigrations);
+      await finalizePendingRestore(activation.restore, paths);
+      return {
+        ...restoredPersistence,
+        restoreResult: {
+          status: 'restored',
+          restoreId: activation.restore.marker.restoreId,
+          preRestoreBackupPath: activation.restore.preRestoreBackupPath
+        }
+      };
+    } catch (error) {
+      restoredPersistence?.close();
+      await rollbackPendingRestore(activation.restore, error);
+      const persistence = await openDatabase(paths, migrationsFolder, runMigrations);
+      return {
+        ...persistence,
+        restoreResult: {
+          status: 'rolled_back',
+          restoreId: activation.restore.marker.restoreId,
+          message: restoreFailureMessage(error),
+          preRestoreBackupPath: activation.restore.preRestoreBackupPath
+        }
+      };
+    }
+  }
+
+  const persistence = await openDatabase(paths, migrationsFolder, runMigrations);
+  return {
+    ...persistence,
+    restoreResult: activation.kind === 'rolled_back' ? activation.result : undefined
+  };
+}
+
+async function openDatabase(
+  paths: DataPaths,
+  migrationsFolder: string,
+  runMigrations: NonNullable<OpenPersistenceOptions['runMigrations']>
+): Promise<Persistence> {
   const existingDatabase = existsSync(paths.databasePath);
   const sqlite = new Database(paths.databasePath, { timeout: sqliteBusyTimeoutMilliseconds });
   let backup: VerifiedBackup | undefined;
@@ -81,8 +133,10 @@ export async function openPersistence(options: OpenPersistenceOptions = {}): Pro
       sqlite,
       db,
       paths,
+      migrationsFolder,
       migrationState,
       backup,
+      restoreResult: undefined,
       close: () => sqlite.close()
     };
   } catch (error) {

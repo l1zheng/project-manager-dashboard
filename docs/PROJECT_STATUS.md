@@ -4,8 +4,8 @@ Last updated: 2026-08-04
 
 ## Current state
 
-- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 architecture is accepted and implementation has started. Windows desktop Excel verification also remains manual.
-- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, both Excel downloads, Outlook HTML/clipboard fallbacks, and a Windows classic Outlook draft bridge.
+- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 backup creation and controlled restore are complete through P7-03. Windows desktop Excel verification also remains manual.
+- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, both Excel downloads, Outlook HTML/clipboard fallbacks, a Windows classic Outlook draft bridge, and verified full-workspace backup/restore with startup rollback.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -32,12 +32,12 @@ Last updated: 2026-08-04
 
 ## Active task
 
-`P7-03`: Implement restore inspection followed by the controlled replacement and rollback workflow.
+`P7-04`: Generalize automatic backup retention for pre-restore backups and add adversarial retention tests.
 
 ## Next tasks
 
-1. `P7-03` — Implement restore inspection followed by the controlled replacement and rollback workflow.
-2. `P7-04` — Generalize automatic backup retention for pre-restore backups and add adversarial retention tests.
+1. `P7-04` — Generalize automatic backup retention for pre-restore backups and add adversarial retention tests.
+2. `P7-05` — Serve the production web build from Fastify and add first-run/data-directory diagnostics.
 3. On the target Windows machine, complete `P6-03`, open both generated Excel files, and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
 
 ## Risks and validation items
@@ -53,6 +53,8 @@ Last updated: 2026-08-04
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Build on the matching Windows architecture and run persistence tests from the final portable artifact. |
 
 ## Verification log
+
+- 2026-08-04: Completed P7-03. Added bounded `.pmdbackup` upload and inspection, strict two-entry ZIP validation, manifest/schema/digest/SQLite/foreign-key/migration-prefix checks, explicit replacement confirmation, a verified `pre-restore-*` online backup, and an atomic pending-restore marker. Startup now applies the staged database only before opening normal persistence, detects interrupted states, removes only exact SQLite sidecars, migrates and validates the candidate, and either finalizes or restores the verified prior workspace while preserving failure evidence. Once confirmation succeeds, mutation APIs return 409 and the browser blocks interaction until restart. Automated coverage proves successful replacement, injected-migration rollback, interrupted apply/rollback recovery, staged-candidate revalidation, divergent migration rejection, missing rollback-source safety, extra/duplicate ZIP rejection, checksum tamper rejection, API confirmation guards, and pending read-only behavior. A fully isolated browser run verified upload, inspection details, disabled unconfirmed action, restart lock, process restart, and the restored-success notice; no real workspace data was used. Verified `pnpm test` (45 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 
 - 2026-08-04: Completed P7-02. Added `GET /api/workspace/backup` and a global `备份整个工作区` browser action. Each download is a `.pmdbackup` ZIP-compatible container with only `manifest.json` and a SQLite online-backup snapshot. The versioned manifest records the application version, timestamp, workspace identity when available, migration counts, byte size, and SHA-256 digest. Before packaging, the snapshot must pass SQLite quick and foreign-key checks; staging files are removed after the response buffer is formed. Unit coverage reads the generated ZIP, validates exact entries/manifest/digest, and reopens the extracted Chinese workspace data; API coverage verifies download headers and payload. Browser verification on local Vite/Fastify confirmed the globally available control and its successful-download notice. Verified `pnpm test` (37 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 

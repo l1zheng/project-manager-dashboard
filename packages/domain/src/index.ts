@@ -14,7 +14,15 @@ export const healthResponseSchema = z.object({
         appliedCount: z.number().int().nonnegative(),
         pendingCount: z.number().int().nonnegative(),
         totalCount: z.number().int().nonnegative()
-      })
+      }),
+      restorePending: z.boolean().optional(),
+      restore: z
+        .object({
+          status: z.enum(['restored', 'rolled_back']),
+          restoreId: z.string(),
+          message: z.string().optional()
+        })
+        .optional()
     })
     .optional()
 });

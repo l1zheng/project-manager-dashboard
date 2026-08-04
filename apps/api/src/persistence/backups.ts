@@ -3,33 +3,21 @@ import { mkdtemp, readFile, readdir, rm, stat, unlink, writeFile } from 'node:fs
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import { ZipFile } from 'yazl';
+import {
+  workspaceBackupFormat,
+  workspaceBackupVersion,
+  type WorkspaceBackupManifest
+} from './backup-format.js';
 import type { MigrationState } from './migrations.js';
 import type { DataPaths } from './paths.js';
 
-const automaticBackupPrefix = 'pre-migration-';
 const automaticBackupSuffix = '.sqlite';
+export type AutomaticBackupKind = 'pre-migration' | 'pre-restore';
 
 export interface VerifiedBackup {
   databasePath: string;
   manifestPath: string;
   createdAt: string;
-}
-
-const workspaceBackupFormat = 'project-manager-workspace-backup';
-const workspaceBackupVersion = 1;
-
-export interface WorkspaceBackupManifest {
-  format: typeof workspaceBackupFormat;
-  version: typeof workspaceBackupVersion;
-  createdAt: string;
-  applicationVersion: string;
-  database: {
-    filename: 'workspace.sqlite';
-    bytes: number;
-    sha256: string;
-    migrations: Pick<MigrationState, 'appliedCount' | 'totalCount'>;
-  };
-  workspace: { id: string; name: string } | null;
 }
 
 export interface WorkspaceBackup {
@@ -48,10 +36,11 @@ export interface CreateWorkspaceBackupOptions {
 export async function createVerifiedBackup(
   sqlite: Database.Database,
   paths: DataPaths,
-  now = new Date()
+  now = new Date(),
+  kind: AutomaticBackupKind = 'pre-migration'
 ): Promise<VerifiedBackup> {
   const createdAt = now.toISOString();
-  const filename = `${automaticBackupPrefix}${createdAt.replaceAll(':', '-').replaceAll('.', '-')}${automaticBackupSuffix}`;
+  const filename = `${kind}-${createdAt.replaceAll(':', '-').replaceAll('.', '-')}-${randomUUID()}${automaticBackupSuffix}`;
   const databasePath = join(paths.backupsDirectory, filename);
   const manifestPath = `${databasePath}.manifest.json`;
 
@@ -69,7 +58,7 @@ export async function createVerifiedBackup(
 
   await writeFile(
     manifestPath,
-    `${JSON.stringify({ createdAt, databaseFilename: filename, kind: 'pre-migration' }, null, 2)}\n`,
+    `${JSON.stringify({ createdAt, databaseFilename: filename, kind }, null, 2)}\n`,
     'utf8'
   );
 
@@ -130,7 +119,7 @@ export async function pruneAutomaticBackups(paths: DataPaths, maximumCount = 10)
     .filter(
       (entry) =>
         entry.isFile() &&
-        entry.name.startsWith(automaticBackupPrefix) &&
+        entry.name.startsWith('pre-migration-') &&
         entry.name.endsWith(automaticBackupSuffix)
     )
     .map((entry) => entry.name)

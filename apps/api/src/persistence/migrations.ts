@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type Database from 'better-sqlite3';
+import { readMigrationFiles } from 'drizzle-orm/migrator';
 
 const migrationsTableName = '__drizzle_migrations';
 
@@ -46,6 +47,46 @@ export function inspectMigrationState(
     appliedCount,
     pendingCount: totalCount - appliedCount,
     totalCount
+  };
+}
+
+export function assertMigrationHistoryCompatible(
+  sqlite: Database.Database,
+  migrationsFolder: string
+): MigrationState {
+  const bundled = readMigrationFiles({ migrationsFolder });
+  const hasMigrationLedger = sqlite
+    .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+    .get(migrationsTableName);
+  const applied = hasMigrationLedger
+    ? (sqlite
+        .prepare(
+          `SELECT hash, created_at AS createdAt FROM ${migrationsTableName} ORDER BY created_at ASC, id ASC`
+        )
+        .all() as Array<{ hash: string; createdAt: number }>)
+    : [];
+
+  if (applied.length > bundled.length) {
+    throw new Error(
+      `Backup has ${applied.length} applied migrations, but this build contains only ${bundled.length}.`
+    );
+  }
+
+  for (const [index, migration] of applied.entries()) {
+    const expected = bundled[index];
+    if (
+      !expected ||
+      migration.hash !== expected.hash ||
+      Number(migration.createdAt) !== expected.folderMillis
+    ) {
+      throw new Error(`Backup migration history diverges at migration ${index + 1}.`);
+    }
+  }
+
+  return {
+    appliedCount: applied.length,
+    pendingCount: bundled.length - applied.length,
+    totalCount: bundled.length
   };
 }
 

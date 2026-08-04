@@ -323,6 +323,56 @@ describe('workspace API', () => {
       expect(createdDrafts[0]?.subject).toBe('项目周报');
       expect(createdDrafts[0]?.htmlFragment).toContain('支持统一认证');
       expect(createdDrafts[0]?.htmlFragment).not.toContain('已关闭需求');
+
+      const restoreInspectionResponse = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/restore/inspect',
+        headers: { 'content-type': 'application/vnd.project-manager.workspace-backup' },
+        payload: workspaceBackupResponse.rawPayload
+      });
+      expect(restoreInspectionResponse.statusCode).toBe(201);
+      expect(restoreInspectionResponse.json()).toMatchObject({
+        manifest: { format: 'project-manager-workspace-backup', version: 1 },
+        migration: { appliedCount: 1, pendingCount: 0, totalCount: 1 }
+      });
+      const restoreId = restoreInspectionResponse.json().restoreId as string;
+
+      const unconfirmedRestoreResponse = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/restore/confirm',
+        payload: { restoreId, confirmation: 'replace-workspace' }
+      });
+      expect(unconfirmedRestoreResponse.statusCode).toBe(403);
+
+      const confirmedRestoreResponse = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/restore/confirm',
+        headers: { 'x-project-manager-action': 'confirm-workspace-restore' },
+        payload: { restoreId, confirmation: 'replace-workspace' }
+      });
+      expect(confirmedRestoreResponse.statusCode).toBe(200);
+      expect(confirmedRestoreResponse.json()).toMatchObject({
+        status: 'restart_required',
+        restartRequired: true,
+        restoreId
+      });
+
+      const healthAfterConfirmation = await app.inject({ method: 'GET', url: '/api/health' });
+      expect(healthAfterConfirmation.statusCode).toBe(200);
+      expect(healthAfterConfirmation.json().storage.restorePending).toBe(true);
+
+      const blockedMutationResponse = await app.inject({
+        method: 'POST',
+        url: '/api/databases',
+        payload: { name: '不应写入' }
+      });
+      expect(blockedMutationResponse.statusCode).toBe(409);
+      expect(blockedMutationResponse.json()).toMatchObject({
+        error: 'workspace_restore_restart_required'
+      });
+
+      const readWhilePendingResponse = await app.inject({ method: 'GET', url: '/api/databases' });
+      expect(readWhilePendingResponse.statusCode).toBe(200);
     } finally {
       await app.close();
     }

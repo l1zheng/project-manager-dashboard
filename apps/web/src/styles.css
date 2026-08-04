@@ -471,6 +471,32 @@ select:focus {
   font-weight: 700;
   cursor: pointer;
 }
+.restore-restart-lock {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(15 23 42 / 56%);
+  backdrop-filter: blur(3px);
+}
+.restore-restart-card {
+  width: min(520px, 100%);
+  padding: 28px;
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+}
+.restore-restart-card h2 {
+  margin: 8px 0 12px;
+}
+.restore-restart-card p {
+  margin: 0;
+  color: #475569;
+  line-height: 1.7;
+}
 .danger {
   color: #a23f3f;
 }

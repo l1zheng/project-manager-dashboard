@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
   FilterCondition,
   FilterExpression,
@@ -56,6 +56,17 @@ type DashboardBlock = {
   view: { view: ViewSummary; fields: Field[]; records: RecordRow[] };
 };
 type DashboardDetail = { dashboard: DashboardSummary; blocks: DashboardBlock[] };
+type RestoreInspection = {
+  restoreId: string;
+  inspectedAt: string;
+  manifest: {
+    createdAt: string;
+    applicationVersion: string;
+    database: { bytes: number; migrations: { appliedCount: number; totalCount: number } };
+    workspace: { id: string; name: string } | null;
+  };
+  migration: { appliedCount: number; pendingCount: number; totalCount: number };
+};
 
 type HealthState =
   { kind: 'loading' } | { kind: 'ready'; response: HealthResponse } | { kind: 'error' };
@@ -77,6 +88,7 @@ const fieldTypes: Array<{ value: FieldType; label: string }> = [
 const optionFieldTypes = new Set<FieldType>(['single_select', 'multi_select', 'status']);
 
 export function App() {
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
   const [health, setHealth] = useState<HealthState>({ kind: 'loading' });
   const [databases, setDatabases] = useState<DatabaseSummary[]>([]);
   const [dashboards, setDashboards] = useState<DashboardSummary[]>([]);
@@ -108,6 +120,10 @@ export function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>();
   const [exportNotice, setExportNotice] = useState<string>();
+  const [restoreInspection, setRestoreInspection] = useState<RestoreInspection>();
+  const [restoreFileName, setRestoreFileName] = useState('');
+  const [restoreReplacementConfirmed, setRestoreReplacementConfirmed] = useState(false);
+  const [restoreRestartRequired, setRestoreRestartRequired] = useState(false);
   const [databaseName, setDatabaseName] = useState('');
   const [databaseDescription, setDatabaseDescription] = useState('');
   const [fieldName, setFieldName] = useState('');
@@ -319,6 +335,14 @@ export function App() {
         request<DashboardSummary[]>('/api/dashboards')
       ]);
       setHealth({ kind: 'ready', response: healthResponse });
+      setRestoreRestartRequired(healthResponse.storage?.restorePending === true);
+      if (healthResponse.storage?.restore?.status === 'restored') {
+        setExportNotice('工作区恢复已完成，当前数据来自所选备份。');
+      } else if (healthResponse.storage?.restore?.status === 'rolled_back') {
+        setError(
+          `工作区恢复未能完成，系统已自动回滚到恢复前数据。${healthResponse.storage.restore.message ? ` 原因：${healthResponse.storage.restore.message}` : ''}`
+        );
+      }
       setDatabases(databaseList);
       setDashboards(dashboardList);
       setSelectedDashboardId(dashboardList[0]?.id);
@@ -499,6 +523,97 @@ export function App() {
       setExportNotice('工作区备份已下载。请将 .pmdbackup 文件保存到受保护的位置。');
     } catch (requestError) {
       setError(readRequestError(requestError, '下载工作区备份失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function inspectWorkspaceRestore(file: File) {
+    if (!file.name.toLowerCase().endsWith('.pmdbackup')) {
+      setError('请选择 .pmdbackup 工作区备份文件。');
+      return;
+    }
+    if (file.size === 0 || file.size > 128 * 1024 * 1024) {
+      setError('备份文件必须大于 0 且不超过 128 MB。');
+      return;
+    }
+
+    setIsSaving(true);
+    setError(undefined);
+    setExportNotice(undefined);
+    try {
+      const response = await fetch('/api/workspace/restore/inspect', {
+        method: 'POST',
+        headers: { 'content-type': 'application/vnd.project-manager.workspace-backup' },
+        body: file
+      });
+      const payload = (await response.json().catch(() => undefined)) as
+        RestoreInspection | { message?: string } | undefined;
+      if (!response.ok) {
+        throw new Error(
+          payload && 'message' in payload
+            ? (payload.message ?? `检查失败（${response.status}）`)
+            : `检查失败（${response.status}）`
+        );
+      }
+      setRestoreInspection(payload as RestoreInspection);
+      setRestoreFileName(file.name);
+      setRestoreReplacementConfirmed(false);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '检查工作区备份失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function cancelWorkspaceRestore() {
+    const restoreId = restoreInspection?.restoreId;
+    if (!restoreId) return;
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      const response = await fetch(`/api/workspace/restore/${restoreId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error(`取消失败（${response.status}）`);
+      setRestoreInspection(undefined);
+      setRestoreFileName('');
+      setRestoreReplacementConfirmed(false);
+    } catch (requestError) {
+      setError(readRequestError(requestError, '清理暂存的恢复文件失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function confirmWorkspaceRestore() {
+    if (!restoreInspection || !restoreReplacementConfirmed) return;
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      const response = await fetch('/api/workspace/restore/confirm', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-project-manager-action': 'confirm-workspace-restore'
+        },
+        body: JSON.stringify({
+          restoreId: restoreInspection.restoreId,
+          confirmation: 'replace-workspace'
+        })
+      });
+      const payload = (await response.json().catch(() => undefined)) as
+        { message?: string; restartRequired?: boolean } | undefined;
+      if (!response.ok || !payload?.restartRequired) {
+        throw new Error(payload?.message ?? `准备恢复失败（${response.status}）`);
+      }
+      setRestoreInspection(undefined);
+      setRestoreFileName('');
+      setRestoreReplacementConfirmed(false);
+      setRestoreRestartRequired(true);
+      setExportNotice(
+        '恢复任务已安全暂存，并已创建当前工作区的恢复前备份。请关闭并重新启动应用以完成恢复。'
+      );
+    } catch (requestError) {
+      setError(readRequestError(requestError, '准备工作区恢复失败。'));
     } finally {
       setIsSaving(false);
     }
@@ -907,6 +1022,7 @@ export function App() {
         </nav>
         <button
           className="new-database-link"
+          disabled={restoreRestartRequired}
           onClick={() => setIsCreatingDatabase(true)}
           type="button"
         >
@@ -914,11 +1030,41 @@ export function App() {
         </button>
         <button
           className="new-database-link"
-          disabled={isSaving || health.kind !== 'ready'}
+          disabled={
+            isSaving ||
+            health.kind !== 'ready' ||
+            restoreRestartRequired ||
+            Boolean(restoreInspection)
+          }
           onClick={() => void downloadWorkspaceBackup()}
           type="button"
         >
           ⇩ 备份整个工作区
+        </button>
+        <input
+          accept=".pmdbackup,application/zip"
+          aria-label="选择工作区备份文件"
+          hidden
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            event.target.value = '';
+            if (file) void inspectWorkspaceRestore(file);
+          }}
+          ref={restoreFileInputRef}
+          type="file"
+        />
+        <button
+          className="new-database-link"
+          disabled={
+            isSaving ||
+            health.kind !== 'ready' ||
+            restoreRestartRequired ||
+            Boolean(restoreInspection)
+          }
+          onClick={() => restoreFileInputRef.current?.click()}
+          type="button"
+        >
+          ⇧ 从备份恢复
         </button>
 
         <div className="sidebar-footer">
@@ -954,11 +1100,81 @@ export function App() {
           </div>
         </header>
 
+        {restoreRestartRequired && (
+          <div className="restore-restart-lock" role="alertdialog" aria-modal="true">
+            <section className="restore-restart-card">
+              <span className="section-kicker">恢复已安全准备</span>
+              <h2>请关闭并重新启动应用</h2>
+              <p>
+                当前工作区已切换为只读。重新启动后，系统会应用所选备份；若启动验证失败，会自动恢复到确认前的数据。
+              </p>
+            </section>
+          </div>
+        )}
+
         {error && <div className="error-banner">{error}</div>}
         {exportNotice && (
           <div className="archive-notice" role="status">
             {exportNotice}
           </div>
+        )}
+        {restoreInspection && (
+          <section className="panel creation-panel" aria-label="确认恢复工作区">
+            <div className="panel-heading">
+              <div>
+                <span className="section-kicker">恢复检查已通过</span>
+                <h2>确认替换当前工作区</h2>
+                <p>{restoreFileName}</p>
+              </div>
+            </div>
+            <div className="form-grid">
+              <div>
+                <strong>备份工作区：</strong>
+                {restoreInspection.manifest.workspace?.name ?? '空工作区'}
+              </div>
+              <div>
+                <strong>创建时间：</strong>
+                {new Date(restoreInspection.manifest.createdAt).toLocaleString('zh-CN')}
+              </div>
+              <div>
+                <strong>应用版本：</strong>
+                {restoreInspection.manifest.applicationVersion}
+              </div>
+              <div>
+                <strong>数据库大小：</strong>
+                {(restoreInspection.manifest.database.bytes / 1024 / 1024).toFixed(2)} MB
+              </div>
+              <div className="error-banner">
+                恢复将在重启时完整替换当前工作区。确认前，系统会自动创建一份当前工作区备份；若恢复启动失败，将自动回滚。
+              </div>
+              <label className="inline-option">
+                <input
+                  checked={restoreReplacementConfirmed}
+                  onChange={(event) => setRestoreReplacementConfirmed(event.target.checked)}
+                  type="checkbox"
+                />
+                我已确认备份信息，并理解当前工作区将被完整替换
+              </label>
+              <div className="form-actions">
+                <button
+                  className="button secondary"
+                  disabled={isSaving}
+                  onClick={() => void cancelWorkspaceRestore()}
+                  type="button"
+                >
+                  取消恢复
+                </button>
+                <button
+                  className="button primary"
+                  disabled={isSaving || !restoreReplacementConfirmed}
+                  onClick={() => void confirmWorkspaceRestore()}
+                  type="button"
+                >
+                  {isSaving ? '正在准备…' : '确认并准备重启'}
+                </button>
+              </div>
+            </div>
+          </section>
         )}
         {lastArchived && (
           <div className="archive-notice" role="status">

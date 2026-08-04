@@ -14,6 +14,14 @@ import {
   type MailDraftAdapter
 } from '../outlook/adapter.js';
 import { createWorkspaceBackup } from '../persistence/backups.js';
+import {
+  confirmWorkspaceRestore,
+  discardStagedRestore,
+  inspectWorkspaceBackup,
+  isWorkspaceRestorePending,
+  maximumRestoreArchiveBytes,
+  RestoreValidationError
+} from '../persistence/restore.js';
 import { ResourceNotFoundError, WorkspaceService } from './service.js';
 
 const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
@@ -22,6 +30,12 @@ const recordParamsSchema = z.object({ recordId: z.string().trim().min(1).max(120
 const viewParamsSchema = z.object({ viewId: z.string().trim().min(1).max(120) });
 const dashboardParamsSchema = z.object({ dashboardId: z.string().trim().min(1).max(120) });
 const blockParamsSchema = z.object({ blockId: z.string().trim().min(1).max(120) });
+const confirmRestoreSchema = z
+  .object({
+    restoreId: z.uuid(),
+    confirmation: z.literal('replace-workspace')
+  })
+  .strict();
 const reportPreviewQuerySchema = z.object({
   title: z.string().trim().max(120).optional(),
   period: z.string().trim().max(120).optional(),
@@ -48,6 +62,21 @@ export function registerWorkspaceRoutes(
   const service = new WorkspaceService(persistence);
   const mailDraftAdapter = options.mailDraftAdapter ?? createDefaultMailDraftAdapter();
 
+  app.addContentTypeParser(
+    'application/vnd.project-manager.workspace-backup',
+    { parseAs: 'buffer' },
+    (_request, body, done) => done(null, body)
+  );
+
+  app.addHook('preHandler', async (request, reply) => {
+    if (!isWorkspaceMutation(request.method, request.url)) return;
+    if (!(await isWorkspaceRestorePending(persistence.paths))) return;
+    return reply.code(409).send({
+      error: 'workspace_restore_restart_required',
+      message: '工作区恢复已经准备完成。请重启应用后再修改数据。'
+    });
+  });
+
   app.get('/api/databases', async () => service.listDatabases());
   app.get('/api/workspace/backup', async (_request, reply) => {
     const workspace = persistence.sqlite
@@ -66,6 +95,41 @@ export function registerWorkspaceRoutes(
       .header('x-content-type-options', 'nosniff')
       .type('application/zip')
       .send(backup.archive);
+  });
+  app.post(
+    '/api/workspace/restore/inspect',
+    { bodyLimit: maximumRestoreArchiveBytes },
+    async (request, reply) => {
+      if (!Buffer.isBuffer(request.body)) {
+        throw new RestoreValidationError('archive_body_required', '请选择 .pmdbackup 备份文件。');
+      }
+      const inspection = await inspectWorkspaceBackup(
+        request.body,
+        persistence.paths,
+        persistence.migrationsFolder
+      );
+      return reply.code(201).send(inspection);
+    }
+  );
+  app.post('/api/workspace/restore/confirm', async (request, reply) => {
+    if (request.headers['x-project-manager-action'] !== 'confirm-workspace-restore') {
+      return reply.code(403).send({
+        error: 'action_confirmation_required',
+        message: '替换当前工作区需要来自本应用的明确确认。'
+      });
+    }
+    const command = confirmRestoreSchema.parse(request.body);
+    return confirmWorkspaceRestore(
+      command.restoreId,
+      persistence.sqlite,
+      persistence.paths,
+      persistence.migrationsFolder
+    );
+  });
+  app.delete('/api/workspace/restore/:restoreId', async (request, reply) => {
+    const restoreId = z.object({ restoreId: z.uuid() }).parse(request.params).restoreId;
+    await discardStagedRestore(persistence.paths, restoreId);
+    return reply.code(204).send();
   });
   app.get('/api/dashboards', async () => service.listDashboards());
   app.post('/api/dashboards', async (request, reply) =>
@@ -231,6 +295,9 @@ export function registerWorkspaceRoutes(
         fallbacks: ['clipboard', 'html_download']
       });
     }
+    if (error instanceof RestoreValidationError) {
+      return reply.code(400).send({ error: error.code, message: error.message });
+    }
     request.log.error(error);
     return reply.code(500).send({ error: 'internal_error' });
   });
@@ -260,4 +327,12 @@ function safeExportFilename(title: string): string {
       .trim()
       .slice(0, 100) || '项目周报'
   );
+}
+
+function isWorkspaceMutation(method: string, url: string): boolean {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return false;
+  const pathname = url.split('?', 1)[0] ?? url;
+  if (pathname.endsWith('/export/outlook-draft')) return false;
+  if (method === 'DELETE' && pathname.startsWith('/api/workspace/restore/')) return false;
+  return true;
 }

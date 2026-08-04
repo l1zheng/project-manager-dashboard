@@ -10,6 +10,8 @@ export interface DataPaths {
   backupsDirectory: string;
   exportsDirectory: string;
   logsDirectory: string;
+  restoreStagingDirectory: string;
+  pendingRestorePath: string;
 }
 
 export interface ResolveDataPathsOptions {
@@ -33,7 +35,9 @@ export function resolveDataPaths({
     databasePath: join(rootDirectory, 'workspace.sqlite'),
     backupsDirectory: join(rootDirectory, 'backups'),
     exportsDirectory: join(rootDirectory, 'exports'),
-    logsDirectory: join(rootDirectory, 'logs')
+    logsDirectory: join(rootDirectory, 'logs'),
+    restoreStagingDirectory: join(rootDirectory, 'restore-staging'),
+    pendingRestorePath: join(rootDirectory, 'pending-restore.json')
   };
 }
 
@@ -42,7 +46,8 @@ export async function ensureDataDirectories(paths: DataPaths): Promise<void> {
     mkdir(paths.rootDirectory, { recursive: true }),
     mkdir(paths.backupsDirectory, { recursive: true }),
     mkdir(paths.exportsDirectory, { recursive: true }),
-    mkdir(paths.logsDirectory, { recursive: true })
+    mkdir(paths.logsDirectory, { recursive: true }),
+    mkdir(paths.restoreStagingDirectory, { recursive: true })
   ]);
 }
 
