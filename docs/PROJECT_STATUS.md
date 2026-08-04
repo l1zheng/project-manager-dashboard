@@ -4,7 +4,7 @@ Last updated: 2026-08-04
 
 ## Current state
 
-- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification. Windows desktop Excel verification also remains manual.
+- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 architecture is accepted and implementation has started. Windows desktop Excel verification also remains manual.
 - Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, both Excel downloads, Outlook HTML/clipboard fallbacks, and a Windows classic Outlook draft bridge.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
@@ -27,16 +27,18 @@ Last updated: 2026-08-04
 - Record values use versioned JSON keyed by stable field ID; field, option, and view semantics use stable IDs so labels can change without rewriting data.
 - Drizzle-generated SQL migrations are committed and embedded. Pending migrations and destructive imports require a verified online backup; `drizzle-kit push` is forbidden for user databases.
 - Completion is configured explicitly on at most one status field per database using stable completed option IDs; status labels are never guessed.
+- Manual workspace backups use one versioned `.pmdbackup` container containing a checksummed, verified SQLite snapshot. Restore is staged and validated as untrusted input, creates a pre-restore backup, and switches databases only during controlled startup with rollback.
+- The first Windows release is an offline, architecture-specific portable directory with a pinned Node.js 24 LTS runtime and Windows-built native dependencies. Electron and Node single-executable packaging are deferred; mutable data remains under `%LOCALAPPDATA%`.
 
 ## Active task
 
-`P6-03`: Verify Outlook signature retention and rendering on the target Windows classic Outlook installation.
+`P7-02`: Implement verified `.pmdbackup` full-workspace creation and download.
 
 ## Next tasks
 
-1. `P6-03` — Verify the PowerShell/COM bridge and configured Outlook signature on the target Windows classic Outlook installation.
-2. Open both generated Excel files in desktop Excel on the target Windows machine and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
-3. Start Phase 7: manual workspace backup and restore, automatic backup retention, and Windows packaging.
+1. `P7-02` — Implement and test `.pmdbackup` creation and download using the accepted manifest and verification boundary.
+2. `P7-03` — Implement restore inspection followed by the controlled replacement and rollback workflow.
+3. On the target Windows machine, complete `P6-03`, open both generated Excel files, and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
 
 ## Risks and validation items
 
@@ -46,10 +48,13 @@ Last updated: 2026-08-04
 | Outlook COM availability | Corporate policy may restrict PowerShell or automation. | Add availability detection and validate on the target PC before Phase 6 is considered complete. |
 | Excel merged layout | Rounding or extreme field counts may create unusable spans. | Pure layout tests plus golden workbooks during Phase 5. |
 | Dynamic filters | JSON-backed records may become slow at higher volumes. | Benchmark representative data before optimizing into SQLite JSON queries. |
-| Packaging | A raw Node installation may be undesirable on the work PC. | Evaluate bundled Windows distribution in Phase 7. |
-| Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
+| Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | Enforce ADR-0004 staging, compatibility, pre-restore backup, startup-only swap, injected-failure rollback, and adversarial archive tests. |
+| Packaging | Corporate Windows policy may reject an unsigned portable launcher. | Validate the canonical portable bundle first, then add a signed thin installer/launcher only if the target policy requires it. |
+| Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Build on the matching Windows architecture and run persistence tests from the final portable artifact. |
 
 ## Verification log
+
+- 2026-08-04: Completed P7-01 and accepted ADR-0004. Manual backups will be single `.pmdbackup` ZIP-compatible containers with exactly a versioned manifest and a verified/checksummed SQLite online-backup snapshot. Restore input is bounded and treated as untrusted, must match a bundled migration prefix, creates a verified pre-restore backup, and is applied only during controlled startup with deterministic rollback. The first Windows release will be an offline architecture-specific portable directory built on matching Windows with an embedded Node 24 LTS runtime, production dependencies, browser/API assets, migrations, Outlook script, and integrity manifest. Electron and Node single-executable packaging are deferred because they add an unnecessary browser runtime or native-addon extraction risk. Documentation-only architecture validation completed with formatting and diff checks; implementation begins at P7-02.
 
 - 2026-08-04: Completed P6-02. Added a canonical Outlook renderer (escaped table/inline-style HTML fragment, UTF-8 full HTML, plain text, and normalized subject), `创建 Outlook 草稿`, `复制邮件内容`, and `下载 Outlook HTML` dashboard actions. Added a Windows-only PowerShell/COM adapter packaged alongside the API: it probes Outlook registration, passes report data only through a bounded temporary JSON file, uses `shell: false`, displays a new mail inspector before inserting the report before the initialized signature, and maps timeout/policy/platform failures to fallbacks. Tests verify escaping, text fallback, subject normalization, JSON-not-command invocation, output limits, no-send/no-recipient/no-save script restrictions, API header guard, and fake-adapter draft flow. On this macOS machine, an isolated end-to-end run verified a valid UTF-8 HTML download (200) and the expected 501 `platform_unsupported` draft response with clipboard/HTML fallbacks. Actual COM and signature behavior remains a Windows classic Outlook acceptance gate.
 

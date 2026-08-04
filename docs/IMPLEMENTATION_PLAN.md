@@ -163,14 +163,18 @@ Exit criteria:
 
 ## Phase 7 — Backup, packaging, and release hardening
 
+Status: in progress — P7-01 backup/recovery and Windows packaging architecture accepted on 2026-08-04 in ADR-0004.
+
 Tasks:
 
-- Add manual full-workspace backup and restore.
-- Add automatic pre-migration backups.
-- Package the local application for Windows.
-- Add first-run setup and data-directory diagnostics.
-- Test offline operation and upgrade migrations.
-- Write user documentation and recovery instructions.
+- Define the backup container, restore transaction, rollback, retention, and Windows release shape. Completed in P7-01.
+- Add verified `.pmdbackup` full-workspace creation and download. P7-02.
+- Add bounded restore inspection, explicit confirmation, pre-restore backup, controlled restart, startup replacement, and rollback. P7-03.
+- Generalize and test automatic pre-migration and pre-restore retention. P7-04; pre-migration creation and retention already exist from P0-03.
+- Serve the production web build from the loopback API and add first-run/data-directory diagnostics. P7-05.
+- Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies. P7-06.
+- Test clean-machine installation, offline operation, upgrade migrations, and injected restore failure. P7-07.
+- Write user documentation and recovery instructions. P7-08.
 
 Exit criteria:
 

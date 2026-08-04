@@ -201,15 +201,20 @@ The implemented allocator uses 60 columns by default and returns one-based inclu
 ## 8. Backup and portability
 
 - Store `workspace.sqlite` and backup/export/log subdirectories under `%LOCALAPPDATA%\ProjectManagerDashboard` on Windows. Use a platform adapter and `PM_DATA_DIR` override for development and tests.
-- Provide a full workspace export containing the SQLite database plus a manifest.
+- Provide a single `.pmdbackup` workspace export containing a verified SQLite online-backup snapshot and a versioned, checksummed manifest.
 - Create a verified online backup before pending migrations and destructive imports; do not copy a live WAL database file directly.
-- Keep the 10 newest automatic pre-migration backups without deleting manual backups.
+- Validate restore archives as untrusted input, create a verified pre-restore backup, and apply replacement only during controlled startup before the normal database connection opens. Failed restore or forward migration returns to the pre-restore snapshot.
+- Keep the 10 newest automatic pre-migration backups and the 10 newest automatic pre-restore backups without deleting manual backups.
 - Keep path resolution behind a platform adapter so development can run on macOS while Windows remains the deployment target.
+
+The first Windows release is an architecture-specific portable directory containing a pinned Node.js 24 LTS runtime, the isolated production dependency tree, built browser/API assets, migrations, Outlook bridge, and a release-integrity manifest. It is built on the matching Windows architecture so the packaged `better-sqlite3` binary is valid. Mutable data remains outside the application directory. Electron and Node single-executable packaging are not used in the first release.
+
+The complete container, restore transaction, rollback, retention, packaging, and release-validation decisions are recorded in [ADR-0004](decisions/0004-backup-restore-and-windows-packaging.md).
 
 ## 9. Architecture decisions still to validate
 
-- Whether the local application is distributed as a Node runtime bundle, a Windows installer, or later wrapped with Electron.
-- Clean Windows installation and packaging of the pinned `better-sqlite3` native binary under Node.js 24 LTS.
+- Clean Windows execution of the portable runtime bundle and its pinned `better-sqlite3` native binary under Node.js 24 LTS.
+- Whether the accepted portable artifact needs a signed thin installer or console-free launcher for the target work computer's application policy.
 - The most reliable clipboard HTML implementation across supported Windows browsers.
 - Classic Outlook rendering of nested tables, Chinese fonts, long text, and status backgrounds.
 - Performance threshold at which filter evaluation should move from memory to SQLite JSON queries.
