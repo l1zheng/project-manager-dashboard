@@ -143,8 +143,11 @@ Exit criteria:
 
 ## Phase 6 — Classic Outlook draft integration
 
+Status: in progress — P6-01 security and compatibility boundary accepted on 2026-08-04 in ADR-0003.
+
 Tasks:
 
+- Finalize the local process, signature preservation, no-send, and fallback contract. Completed in P6-01.
 - Finalize conservative Outlook-compatible HTML templates.
 - Implement rich-HTML clipboard fallback.
 - Implement the Windows PowerShell/COM draft adapter.

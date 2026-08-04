@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-08-03
+Last updated: 2026-08-04
 
 ## Current state
 
@@ -30,12 +30,12 @@ Last updated: 2026-08-03
 
 ## Active task
 
-`P6-01`: Finalize the safe Windows classic Outlook draft-automation boundary and fallback contract.
+`P6-02`: Implement Outlook HTML/plain-text rendering, HTML download, and the accepted PowerShell/COM adapter contract.
 
 ## Next tasks
 
-1. `P6-01` — Record and review the Windows PowerShell/COM draft adapter boundary, including no-send guarantees and fallback behavior.
-2. `P6-02` — Implement availability detection, draft creation, and HTML download fallback from the accepted contract.
+1. `P6-02` — Implement availability detection, signature-preserving draft creation, rich clipboard data, and HTML download fallback from ADR-0003.
+2. Verify the PowerShell/COM bridge and configured Outlook signature on the target Windows classic Outlook installation.
 3. Open both generated Excel files in desktop Excel on the target Windows machine and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
 
 ## Risks and validation items
@@ -50,6 +50,8 @@ Last updated: 2026-08-03
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
 
 ## Verification log
+
+- 2026-08-04: Completed P6-01 and accepted ADR-0003. The Windows bridge will pass a bounded server-generated report fragment through a temporary UTF-8 JSON file to a committed PowerShell script invoked without a shell or execution-policy bypass. Draft creation displays a new HTML mail item first, then inserts the report after the existing body tag to preserve Outlook's initialized signature. The API accepts no recipients, attachments, arbitrary HTML, commands, or script paths; the shipped script contains no Save/Send path. Availability and automation failures map to rich-copy and HTML-download fallbacks, with final COM/signature behavior retained as a Windows acceptance gate.
 
 - 2026-08-04: Completed P5-03 and the Phase 5 implementation. Added the presentation workbook adapter plus `GET /api/dashboards/:id/export/presentation.xlsx` and the dashboard’s `下载展示版 Excel` action. One landscape report sheet uses a 60-column base grid: title/period/module headings span the report; each module independently receives merged header and data spans from the tested allocator. It applies wrapping, row-height profiles, borders, print area, fit-to-width setup, typed date/number cells, status highlighting, and literal-text protection. Workbook reload tests verify one sheet, 60 columns, merged spans, print setup, typed dates, and formula protection; API tests verify the download payload. Independent rendering visually confirmed differently shaped 需求跟踪 and 关键风险 sections on one sheet, and an end-to-end local response downloaded as a valid Excel 2007+ file. Desktop Excel on the target Windows machine remains a manual release check.
 

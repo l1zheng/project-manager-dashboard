@@ -155,14 +155,16 @@ Outlook automation is isolated behind an interface:
 
 ```ts
 interface MailDraftAdapter {
-  isAvailable(): Promise<boolean>;
-  createDraft(input: { subject: string; html: string; text: string }): Promise<void>;
+  probe(): Promise<{ available: boolean; reason?: string }>;
+  createDraft(input: { subject: string; htmlFragment: string }): Promise<{ status: 'displayed' }>;
 }
 ```
 
-The Windows implementation invokes a narrowly scoped PowerShell script that creates a classic Outlook `MailItem`, assigns `HTMLBody`, and calls `Display`. It never calls `Send`.
+The Windows implementation invokes a committed, narrowly scoped PowerShell script using a fixed executable, `shell: false`, and a temporary UTF-8 JSON request. User content never appears in a command string or command-line argument. The script creates a classic Outlook `MailItem`, calls `Display(false)` so Outlook initializes the compose editor and configured signature, then inserts the escaped report fragment immediately after the existing opening `<body>` tag. It never accepts recipients or calls `Save` or `Send`.
 
 The Microsoft Outlook Object Model supports creating an item through `Application.CreateItem`, setting the HTML body, and displaying the item. This is the compatibility basis for the first-release integration.
+
+The full process, signature, timeout, error-mapping, endpoint, fallback, and no-send decisions are recorded in [ADR-0003](decisions/0003-classic-outlook-draft-boundary.md).
 
 ### 6.3 Excel layout engine
 
@@ -193,7 +195,7 @@ The implemented allocator uses 60 columns by default and returns one-based inclu
 - Escape all user content in report HTML.
 - Do not execute formulas or user-authored scripts.
 - Prefix potentially dangerous Excel values that begin with `=`, `+`, `-`, or `@` when exporting user text unless the field is explicitly a formula-capable type in a future release.
-- Outlook integration receives generated HTML through a controlled temporary file or standard input; it must not execute arbitrary command text.
+- Outlook integration receives a bounded generated fragment through a unique temporary JSON file; it must not execute arbitrary command text or accept client-authored HTML, recipients, attachments, or script paths.
 - Never automate the final Send action.
 
 ## 8. Backup and portability
