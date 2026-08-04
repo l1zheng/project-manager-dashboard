@@ -168,7 +168,7 @@ Status: in progress — P7-01 backup/recovery and Windows packaging architecture
 Tasks:
 
 - Define the backup container, restore transaction, rollback, retention, and Windows release shape. Completed in P7-01.
-- Add verified `.pmdbackup` full-workspace creation and download. P7-02.
+- Add verified `.pmdbackup` full-workspace creation and download. Completed in P7-02.
 - Add bounded restore inspection, explicit confirmation, pre-restore backup, controlled restart, startup replacement, and rollback. P7-03.
 - Generalize and test automatic pre-migration and pre-restore retention. P7-04; pre-migration creation and retention already exist from P0-03.
 - Serve the production web build from the loopback API and add first-run/data-directory diagnostics. P7-05.

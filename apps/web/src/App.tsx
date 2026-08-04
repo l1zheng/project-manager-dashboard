@@ -479,6 +479,31 @@ export function App() {
     anchor.click();
   }
 
+  async function downloadWorkspaceBackup() {
+    setIsSaving(true);
+    setError(undefined);
+    try {
+      const response = await fetch('/api/workspace/backup');
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => undefined)) as
+          { message?: string } | undefined;
+        throw new Error(payload?.message ?? `备份失败（${response.status}）`);
+      }
+      const backup = await response.blob();
+      const downloadUrl = URL.createObjectURL(backup);
+      const anchor = document.createElement('a');
+      anchor.href = downloadUrl;
+      anchor.download = 'ProjectManagerWorkspace.pmdbackup';
+      anchor.click();
+      URL.revokeObjectURL(downloadUrl);
+      setExportNotice('工作区备份已下载。请将 .pmdbackup 文件保存到受保护的位置。');
+    } catch (requestError) {
+      setError(readRequestError(requestError, '下载工作区备份失败。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
   async function downloadEditableWorkbook() {
     if (!selectedDashboardId) return;
     setIsSaving(true);
@@ -886,6 +911,14 @@ export function App() {
           type="button"
         >
           ＋ 新建数据库
+        </button>
+        <button
+          className="new-database-link"
+          disabled={isSaving || health.kind !== 'ready'}
+          onClick={() => void downloadWorkspaceBackup()}
+          type="button"
+        >
+          ⇩ 备份整个工作区
         </button>
 
         <div className="sidebar-footer">

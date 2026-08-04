@@ -217,6 +217,17 @@ describe('workspace API', () => {
       });
       expect(dashboardResponse.statusCode).toBe(201);
       const dashboard = dashboardResponse.json() as { id: string };
+
+      const workspaceBackupResponse = await app.inject({
+        method: 'GET',
+        url: '/api/workspace/backup'
+      });
+      expect(workspaceBackupResponse.statusCode).toBe(200);
+      expect(workspaceBackupResponse.headers['content-type']).toContain('application/zip');
+      expect(workspaceBackupResponse.headers['content-disposition']).toContain('.pmdbackup');
+      expect(workspaceBackupResponse.headers['x-content-type-options']).toBe('nosniff');
+      expect(workspaceBackupResponse.rawPayload.subarray(0, 2).toString()).toBe('PK');
+
       expect(
         (
           await app.inject({

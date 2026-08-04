@@ -13,6 +13,7 @@ import {
   OutlookDraftError,
   type MailDraftAdapter
 } from '../outlook/adapter.js';
+import { createWorkspaceBackup } from '../persistence/backups.js';
 import { ResourceNotFoundError, WorkspaceService } from './service.js';
 
 const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
@@ -48,6 +49,24 @@ export function registerWorkspaceRoutes(
   const mailDraftAdapter = options.mailDraftAdapter ?? createDefaultMailDraftAdapter();
 
   app.get('/api/databases', async () => service.listDatabases());
+  app.get('/api/workspace/backup', async (_request, reply) => {
+    const workspace = persistence.sqlite
+      .prepare('SELECT id, name FROM workspaces ORDER BY created_at ASC LIMIT 1')
+      .get() as { id: string; name: string } | undefined;
+    const backup = await createWorkspaceBackup(persistence.sqlite, persistence.paths, {
+      migrationState: persistence.migrationState,
+      applicationVersion: process.env.PM_APP_VERSION?.trim() || '0.1.0',
+      workspace: workspace ?? null
+    });
+    return reply
+      .header(
+        'content-disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(backup.filename)}`
+      )
+      .header('x-content-type-options', 'nosniff')
+      .type('application/zip')
+      .send(backup.archive);
+  });
   app.get('/api/dashboards', async () => service.listDashboards());
   app.post('/api/dashboards', async (request, reply) =>
     reply.code(201).send(service.createDashboard(request.body))

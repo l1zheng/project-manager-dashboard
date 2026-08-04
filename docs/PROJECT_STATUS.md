@@ -32,12 +32,12 @@ Last updated: 2026-08-04
 
 ## Active task
 
-`P7-02`: Implement verified `.pmdbackup` full-workspace creation and download.
+`P7-03`: Implement restore inspection followed by the controlled replacement and rollback workflow.
 
 ## Next tasks
 
-1. `P7-02` — Implement and test `.pmdbackup` creation and download using the accepted manifest and verification boundary.
-2. `P7-03` — Implement restore inspection followed by the controlled replacement and rollback workflow.
+1. `P7-03` — Implement restore inspection followed by the controlled replacement and rollback workflow.
+2. `P7-04` — Generalize automatic backup retention for pre-restore backups and add adversarial retention tests.
 3. On the target Windows machine, complete `P6-03`, open both generated Excel files, and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
 
 ## Risks and validation items
@@ -53,6 +53,8 @@ Last updated: 2026-08-04
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Build on the matching Windows architecture and run persistence tests from the final portable artifact. |
 
 ## Verification log
+
+- 2026-08-04: Completed P7-02. Added `GET /api/workspace/backup` and a global `备份整个工作区` browser action. Each download is a `.pmdbackup` ZIP-compatible container with only `manifest.json` and a SQLite online-backup snapshot. The versioned manifest records the application version, timestamp, workspace identity when available, migration counts, byte size, and SHA-256 digest. Before packaging, the snapshot must pass SQLite quick and foreign-key checks; staging files are removed after the response buffer is formed. Unit coverage reads the generated ZIP, validates exact entries/manifest/digest, and reopens the extracted Chinese workspace data; API coverage verifies download headers and payload. Browser verification on local Vite/Fastify confirmed the globally available control and its successful-download notice. Verified `pnpm test` (37 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 
 - 2026-08-04: Completed P7-01 and accepted ADR-0004. Manual backups will be single `.pmdbackup` ZIP-compatible containers with exactly a versioned manifest and a verified/checksummed SQLite online-backup snapshot. Restore input is bounded and treated as untrusted, must match a bundled migration prefix, creates a verified pre-restore backup, and is applied only during controlled startup with deterministic rollback. The first Windows release will be an offline architecture-specific portable directory built on matching Windows with an embedded Node 24 LTS runtime, production dependencies, browser/API assets, migrations, Outlook script, and integrity manifest. Electron and Node single-executable packaging are deferred because they add an unnecessary browser runtime or native-addon extraction risk. Documentation-only architecture validation completed with formatting and diff checks; implementation begins at P7-02.
 
