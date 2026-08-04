@@ -32,3 +32,13 @@ The API creates its local workspace database under the platform application-data
 ```bash
 pnpm --filter @project-manager/api seed:demo
 ```
+
+## Windows portable release
+
+The release artifact must be built on matching Windows hardware because `better-sqlite3` is native. The first x64 build is pinned to Node 24.19.0 and pnpm 11.9.0:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -File .\release\build-windows-portable.ps1 -Architecture x64 -ApplicationVersion 0.1.0
+```
+
+The resulting ZIP contains its own Node runtime, physical production dependencies, browser/API builds, migrations, Outlook bridge, loopback launcher, and an exact SHA-256 file manifest. The target PC needs neither Node nor pnpm and can remain offline. See [the Windows verification checklist](docs/WINDOWS_VERIFICATION.md) before treating the artifact as production-ready.

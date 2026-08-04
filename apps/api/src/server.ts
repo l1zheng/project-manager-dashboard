@@ -1,13 +1,18 @@
 import { buildApp } from './app.js';
 import { openPersistence } from './persistence/database.js';
 import { fileURLToPath } from 'node:url';
+import { resolveServerConfig } from './server-config.js';
 
-const host = process.env.PM_HOST ?? '127.0.0.1';
-const port = Number(process.env.PM_API_PORT ?? 4300);
+const { host, port } = resolveServerConfig();
 const persistence = await openPersistence();
 const webDistDirectory =
   process.env.PM_WEB_DIST_DIR?.trim() ?? fileURLToPath(new URL('../../web/dist/', import.meta.url));
-const app = await buildApp({ persistence, webDistDirectory, loopbackAddress: `${host}:${port}` });
+const app = await buildApp({
+  persistence,
+  webDistDirectory,
+  loopbackAddress: `${host}:${port}`,
+  launchToken: process.env.PM_LAUNCH_TOKEN
+});
 
 try {
   await app.listen({ host, port });

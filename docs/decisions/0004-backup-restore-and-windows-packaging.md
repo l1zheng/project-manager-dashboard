@@ -92,15 +92,16 @@ The exact internal paths may change without affecting product data. The release 
 
 Packaging rules:
 
-- Embed a pinned official Node.js 24 LTS Windows runtime; the target machine does not install Node or pnpm.
+- Embed the pinned official Node.js 24.19.0 Windows runtime; the target machine does not install Node or pnpm. The build configuration records the official x64 and ARM64 archive URLs and SHA-256 digests, and extraction proceeds only after a digest match.
 - Build the release on the matching Windows architecture with the frozen lockfile so `better-sqlite3` is the correct Windows binary. Do not construct the final native-dependency tree on macOS and relabel it as Windows.
-- Use `pnpm deploy --prod` or an equivalently isolated production tree, then add the built browser assets, migrations, Outlook script, and runtime.
+- Use modern `pnpm deploy --prod` from the frozen injected-workspace lockfile with a hoisted physical dependency layout, then add the built browser assets, migrations, Outlook script, and runtime. Remove unneeded `.bin` command links and reject every remaining symbolic link or junction before publishing the ZIP.
 - Serve the production browser build from the same loopback Fastify process. The launcher binds only to `127.0.0.1`, waits for a health response, and opens the default browser.
+- Use a per-process random launcher token to authenticate graceful stop/restart calls. A second launch reuses the healthy same-version process; a pending restore or version change closes the authenticated process before starting the packaged version. The token is never exposed by diagnostics or release files.
 - Store all mutable data under `%LOCALAPPDATA%\ProjectManagerDashboard`, outside the release directory, so replacing application files cannot overwrite user data.
 - Require no network connection after the artifact is obtained. Do not add an automatic updater in the first release.
 - Make the portable artifact the canonical tested release. A later signed installer may be a thin wrapper around the same directory, but it must not introduce another application runtime or move workspace data into the install directory.
 
-The first package candidate is Windows x64. Before release, the target work computer's architecture is recorded; an ARM64 target requires a separate ARM64 Node runtime and native dependency build rather than emulation being assumed.
+The first package candidate is Windows x64. Before release, the target work computer's architecture is recorded; an ARM64 target uses its separately pinned ARM64 Node archive and requires a matching native dependency build rather than emulation being assumed.
 
 The launcher initially favors transparent behavior and actionable logs over hiding failures. A console-free signed native launcher is an optional release-polish task after the portable package passes the clean-machine checklist.
 
@@ -159,5 +160,5 @@ Costs and risks:
 - [SQLite Online Backup API](https://sqlite.org/backup.html)
 - [`better-sqlite3` backup API](https://github.com/WiseLibs/better-sqlite3/blob/master/docs/api.md#backupdestination-options---promise)
 - [pnpm deploy](https://pnpm.io/cli/deploy)
-- [Node.js single executable applications](https://nodejs.org/download/release/v24.18.0/docs/api/single-executable-applications.html)
+- [Node.js single executable applications](https://nodejs.org/download/release/v24.19.0/docs/api/single-executable-applications.html)
 - [Node.js 24 downloads](https://nodejs.org/en/download/archive/v24)

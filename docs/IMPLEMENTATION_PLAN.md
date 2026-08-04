@@ -172,7 +172,7 @@ Tasks:
 - Add bounded restore inspection, explicit confirmation, pre-restore backup, controlled restart, startup replacement, and rollback. Completed in P7-03 with strict archive/migration validation, pending-state read-only protection, interrupted-state recovery, preserved diagnostics, automated rollback tests, and an isolated browser restart verification.
 - Generalize and test automatic pre-migration and pre-restore retention. Completed in P7-04 with separate 10-item groups, strict generated-filename recognition, bounded deletion diagnostics, and adversarial retention tests.
 - Serve the production web build from the loopback API and add first-run/data-directory diagnostics. Completed in P7-05 with same-origin static assets, safe client-route fallback, and a no-record-content runtime diagnostics view.
-- Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies. P7-06.
+- Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies. Completed in P7-06 with a Windows-only frozen build pipeline, pinned Node 24.19.0 archives, physical production deployment, native SQLite self-test, authenticated launcher restart, and full-file integrity manifest; final artifact execution remains in the P7-07 Windows matrix.
 - Test clean-machine installation, offline operation, upgrade migrations, and injected restore failure. P7-07.
 - Write user documentation and recovery instructions. P7-08.
 

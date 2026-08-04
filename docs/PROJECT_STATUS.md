@@ -4,7 +4,7 @@ Last updated: 2026-08-04
 
 ## Current state
 
-- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 backup, restore, retention, and local production serving are complete through P7-05. Windows desktop Excel verification also remains manual.
+- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 implementation is complete through the P7-06 portable-release pipeline. The P7-07 clean-Windows/offline/recovery matrix and desktop Excel verification remain manual.
 - Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, both Excel downloads, Outlook HTML/clipboard fallbacks, a Windows classic Outlook draft bridge, and verified full-workspace backup/restore with startup rollback.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
@@ -28,16 +28,16 @@ Last updated: 2026-08-04
 - Drizzle-generated SQL migrations are committed and embedded. Pending migrations and destructive imports require a verified online backup; `drizzle-kit push` is forbidden for user databases.
 - Completion is configured explicitly on at most one status field per database using stable completed option IDs; status labels are never guessed.
 - Manual workspace backups use one versioned `.pmdbackup` container containing a checksummed, verified SQLite snapshot. Restore is staged and validated as untrusted input, creates a pre-restore backup, and switches databases only during controlled startup with rollback.
-- The first Windows release is an offline, architecture-specific portable directory with a pinned Node.js 24 LTS runtime and Windows-built native dependencies. Electron and Node single-executable packaging are deferred; mutable data remains under `%LOCALAPPDATA%`.
+- The first Windows release is an offline, architecture-specific portable directory with the pinned official Node.js 24.19.0 runtime and Windows-built native dependencies. The frozen build emits an exact-file integrity manifest and an authenticated loopback launcher; Electron and Node single-executable packaging are deferred, and mutable data remains under `%LOCALAPPDATA%`.
 
 ## Active task
 
-`P7-06`: Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies.
+`P7-07`: Run the clean-Windows, offline, upgrade, Outlook/Excel, and restore-failure release matrix on the target x64 Windows machine.
 
 ## Next tasks
 
-1. `P7-06` — Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies.
-2. On the target Windows machine, complete `P6-03`, open both generated Excel files, and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
+1. `P7-07` — On the target Windows machine, build the x64 ZIP and run [the Windows verification checklist](WINDOWS_VERIFICATION.md), including `P6-03` and both generated Excel files.
+2. `P7-08` — Finish end-user installation, backup, restore, and recovery documentation after the Windows matrix is recorded.
 
 ## Risks and validation items
 
@@ -52,6 +52,8 @@ Last updated: 2026-08-04
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Build on the matching Windows architecture and run persistence tests from the final portable artifact. |
 
 ## Verification log
+
+- 2026-08-04: Completed P7-06 implementation. Added a Windows-only portable-release pipeline that requires matching Windows architecture, exact Node 24.19.0 and pnpm 11.9.0, a frozen injected-workspace lockfile, and a pinned official Node archive SHA-256. Production deployment is hoisted and physical; unneeded `.bin` links are removed and any remaining symbolic link/junction blocks publication. The package includes only built API/domain/export code, web assets, migrations, Outlook script, production dependencies, `node.exe`, launcher controls, and an exact sorted SHA-256 manifest. The embedded runtime must report the intended Windows architecture and load/query packaged `better-sqlite3` before ZIP creation. The server now rejects every non-`127.0.0.1` bind and invalid/privileged port. The loopback launcher writes all mutable state/logs under `%LOCALAPPDATA%`, handles second launch, authenticated stop, version replacement, and pending-restore restart through a random 256-bit token that is never exposed by diagnostics. Cross-platform tests cover manifest generation, tamper/additional-file/link rejection, server binding, and launcher/build invariants; a real modern pnpm deploy on this Mac produced a 100 MB physical production tree with only removable `.bin` links and passed the packaged native-SQLite smoke test for the host architecture. A 7,875-file simulated release then passed exact-set hashing with zero links. The final Windows x64 ZIP cannot be truthfully produced or executed on macOS and remains the P7-07 target-machine gate. Verified `pnpm test` (57 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 
 - 2026-08-04: Completed P7-05. The compiled API now serves the built React application from the same loopback origin (with explicit asset MIME/cache headers, traversal rejection, client-route fallback, and API 404 protection). The dashboard queries a local diagnostics endpoint on startup, shows a first-run local-data notice, and exposes a “本机诊断” panel with only application/runtime/architecture, loopback address, data directory, SQLite/migration health, newest verified automatic backup, free disk space, and Outlook probe information. It contains no project records or tokens. Automated coverage verifies API/static separation, cache behavior, client-route fallback, diagnostics shape, first-run state, and no record-content leakage. An isolated compiled-production smoke run on this Mac confirmed the same-origin page and diagnostics response on `127.0.0.1`. Verified `pnpm test` (50 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 

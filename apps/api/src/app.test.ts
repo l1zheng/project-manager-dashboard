@@ -112,4 +112,32 @@ describe('health endpoint', () => {
       await rm(webDirectory, { recursive: true, force: true });
     }
   });
+
+  it('allows only the authenticated local launcher to request a graceful stop', async () => {
+    const launchToken = 'a'.repeat(64);
+    let shutdownCalls = 0;
+    const runtimeApp = await buildApp({
+      launchToken,
+      shutdown: () => {
+        shutdownCalls += 1;
+      }
+    });
+
+    try {
+      const denied = await runtimeApp.inject({ method: 'POST', url: '/api/runtime/shutdown' });
+      const accepted = await runtimeApp.inject({
+        method: 'POST',
+        url: '/api/runtime/shutdown',
+        headers: { 'x-project-manager-launch-token': launchToken }
+      });
+      await new Promise((resolve) => setImmediate(resolve));
+
+      expect(denied.statusCode).toBe(403);
+      expect(accepted.statusCode).toBe(200);
+      expect(accepted.json()).toEqual({ status: 'stopping' });
+      expect(shutdownCalls).toBe(1);
+    } finally {
+      await runtimeApp.close();
+    }
+  });
 });

@@ -1,15 +1,15 @@
 # Windows verification checklist
 
-Run this checklist on the Windows PC intended to use the first release. It validates the local Node.js runtime and SQLite native module before Outlook integration work begins.
+Run this checklist on the Windows PC intended to build and use the first release. It validates both the source build and the self-contained portable artifact before Outlook integration is accepted.
 
 ## Prerequisites
 
 - Windows 10 or Windows 11.
-- Node.js 24 LTS, verified with `node --version`.
-- pnpm 11.9.0 or later, verified with `pnpm --version`.
+- Node.js 24.19.0, verified with `node --version`.
+- pnpm 11.9.0 exactly, verified with `pnpm --version`.
 - A clean clone of the private repository.
 
-Do not use Node.js 25 for this checklist; it is end-of-life and not the project release target.
+Do not use Node.js 25 or another Node 24 patch for the release build. The embedded runtime and native dependency build are deliberately pinned to 24.19.0.
 
 ## Clean-install check
 
@@ -62,3 +62,40 @@ Before declaring Windows support ready, record:
 - Any antivirus, endpoint-security, or corporate-policy warning.
 
 Outlook COM and final packaged-application verification are separate Phase 6 and Phase 7 checks.
+
+## Build the portable x64 artifact
+
+Run from the repository root on the matching x64 Windows build machine:
+
+```powershell
+powershell.exe -NoLogo -NoProfile -File .\release\build-windows-portable.ps1 `
+  -Architecture x64 `
+  -ApplicationVersion 0.1.0
+```
+
+The script downloads the pinned official runtime when it is not already cached, checks its committed SHA-256, repeats the frozen install/tests/lint/build, creates a physical production dependency tree, loads the packaged native SQLite module, generates and verifies `RELEASE-MANIFEST.json`, and produces `artifacts\ProjectManagerDashboard-0.1.0-win-x64.zip`.
+
+For a controlled/offline build environment, download the exact archive named in `release\windows-portable.config.json` through an approved channel and pass `-RuntimeArchive C:\approved\node-v24.19.0-win-x64.zip`. The same committed digest is still required.
+
+## Clean-machine portable verification
+
+On a clean Windows 10/11 x64 account that does not have Node or pnpm installed:
+
+1. Extract the ZIP to a normal user-writable application directory.
+2. Disconnect the network before the first launch.
+3. Run `verify-release.cmd`; it must report success.
+4. Run `start-dashboard.cmd`; the default browser must open `http://127.0.0.1:4300`.
+5. Open “本机诊断” and confirm Node 24.19.0, `win32`, `x64`, healthy SQLite, no pending migration, and a data directory under `%LOCALAPPDATA%\ProjectManagerDashboard`.
+6. Create a database and record, close the browser, and run `start-dashboard.cmd` again. It must reuse the one healthy backend and reopen the same data.
+7. Run `stop-dashboard.cmd`, confirm health is no longer reachable, and then start it again.
+8. Confirm no SQLite database, backup, export, launcher state, or log was written beneath the extracted release directory.
+
+Tamper with a disposable copy of one shipped file and confirm both `verify-release.cmd` and `start-dashboard.cmd` refuse to proceed. Restore from the original ZIP rather than editing the manifest.
+
+## Offline functional and recovery matrix
+
+While still offline, verify database/view/dashboard editing, static preview, both Excel downloads, Outlook HTML download, and clipboard fallback. Reconnect only for the classic Outlook COM check if company policy requires it.
+
+Create a workspace backup, change the workspace, restore the backup with explicit confirmation, and run `start-dashboard.cmd` again. The launcher must detect the pending restore, gracefully restart the authenticated backend, reproduce the backed-up workspace exactly, and preserve its pre-restore backup. Repeat with the documented injected restore failure to confirm automatic rollback.
+
+Finally, start the previous portable version with representative data, then run the new version's launcher. Record whether a pre-migration backup is created, the migration completes once, and all data remains available. Keep the old release ZIP and a manual `.pmdbackup` until the new version has passed this checklist.

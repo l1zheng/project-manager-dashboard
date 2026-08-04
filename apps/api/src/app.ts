@@ -4,6 +4,7 @@ import { collectRuntimeDiagnostics } from './diagnostics.js';
 import type { Persistence } from './persistence/database.js';
 import { createDefaultMailDraftAdapter, type MailDraftAdapter } from './outlook/adapter.js';
 import { isWorkspaceRestorePending } from './persistence/restore.js';
+import { registerRuntimeControl } from './runtime-control.js';
 import { registerWebAssets } from './web-assets.js';
 import { registerWorkspaceRoutes } from './workspace/routes.js';
 
@@ -12,13 +13,17 @@ export interface BuildAppOptions {
   mailDraftAdapter?: MailDraftAdapter;
   webDistDirectory?: string;
   loopbackAddress?: string;
+  launchToken?: string;
+  shutdown?: () => void | Promise<void>;
 }
 
 export async function buildApp({
   persistence,
   mailDraftAdapter,
   webDistDirectory,
-  loopbackAddress
+  loopbackAddress,
+  launchToken,
+  shutdown
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true });
   const adapter = mailDraftAdapter ?? createDefaultMailDraftAdapter();
@@ -60,6 +65,8 @@ export async function buildApp({
       collectRuntimeDiagnostics(persistence, { mailDraftAdapter: adapter, loopbackAddress })
     );
   }
+
+  registerRuntimeControl(app, { launchToken, shutdown });
 
   if (webDistDirectory) await registerWebAssets(app, webDistDirectory);
 

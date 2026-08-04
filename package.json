@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "pnpm --filter @project-manager/domain build && pnpm --parallel --filter @project-manager/web --filter @project-manager/api dev",
     "build": "pnpm -r --if-present run build",
-    "test": "pnpm --filter @project-manager/domain build && pnpm --filter @project-manager/export build && pnpm -r --if-present run test",
+    "test": "node --test release/release-manifest.test.mjs && pnpm --filter @project-manager/domain build && pnpm --filter @project-manager/export build && pnpm -r --if-present run test",
     "lint": "pnpm -r --if-present run lint",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

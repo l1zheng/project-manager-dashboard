@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "files": [
+    "dist",
+    "drizzle",
+    "scripts/verify-native-runtime.mjs"
+  ],
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "build": "tsc -p tsconfig.json && node scripts/copy-outlook-script.mjs",
+    "build": "node ../../scripts/clean-dist.mjs && tsc -p tsconfig.json && node scripts/copy-outlook-script.mjs",
     "test": "vitest run",
     "lint": "eslint src --max-warnings 0",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
