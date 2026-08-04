@@ -4,8 +4,8 @@ Last updated: 2026-08-04
 
 ## Current state
 
-- Phase: Phases 0 through 5 are implementation-complete; Windows desktop Excel verification remains manual. Phase 6 Outlook integration is next.
-- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, and both editable and presentation Excel downloads.
+- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification. Windows desktop Excel verification also remains manual.
+- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, both Excel downloads, Outlook HTML/clipboard fallbacks, and a Windows classic Outlook draft bridge.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -30,13 +30,13 @@ Last updated: 2026-08-04
 
 ## Active task
 
-`P6-02`: Implement Outlook HTML/plain-text rendering, HTML download, and the accepted PowerShell/COM adapter contract.
+`P6-03`: Verify Outlook signature retention and rendering on the target Windows classic Outlook installation.
 
 ## Next tasks
 
-1. `P6-02` — Implement availability detection, signature-preserving draft creation, rich clipboard data, and HTML download fallback from ADR-0003.
-2. Verify the PowerShell/COM bridge and configured Outlook signature on the target Windows classic Outlook installation.
-3. Open both generated Excel files in desktop Excel on the target Windows machine and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
+1. `P6-03` — Verify the PowerShell/COM bridge and configured Outlook signature on the target Windows classic Outlook installation.
+2. Open both generated Excel files in desktop Excel on the target Windows machine and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
+3. Start Phase 7: manual workspace backup and restore, automatic backup retention, and Windows packaging.
 
 ## Risks and validation items
 
@@ -50,6 +50,8 @@ Last updated: 2026-08-04
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Validate clean Node 24 LTS installation and persistence tests in P0-03, then repeat for the release package. |
 
 ## Verification log
+
+- 2026-08-04: Completed P6-02. Added a canonical Outlook renderer (escaped table/inline-style HTML fragment, UTF-8 full HTML, plain text, and normalized subject), `创建 Outlook 草稿`, `复制邮件内容`, and `下载 Outlook HTML` dashboard actions. Added a Windows-only PowerShell/COM adapter packaged alongside the API: it probes Outlook registration, passes report data only through a bounded temporary JSON file, uses `shell: false`, displays a new mail inspector before inserting the report before the initialized signature, and maps timeout/policy/platform failures to fallbacks. Tests verify escaping, text fallback, subject normalization, JSON-not-command invocation, output limits, no-send/no-recipient/no-save script restrictions, API header guard, and fake-adapter draft flow. On this macOS machine, an isolated end-to-end run verified a valid UTF-8 HTML download (200) and the expected 501 `platform_unsupported` draft response with clipboard/HTML fallbacks. Actual COM and signature behavior remains a Windows classic Outlook acceptance gate.
 
 - 2026-08-04: Completed P6-01 and accepted ADR-0003. The Windows bridge will pass a bounded server-generated report fragment through a temporary UTF-8 JSON file to a committed PowerShell script invoked without a shell or execution-policy bypass. Draft creation displays a new HTML mail item first, then inserts the report after the existing body tag to preserve Outlook's initialized signature. The API accepts no recipients, attachments, arbitrary HTML, commands, or script paths; the shipped script contains no Save/Send path. Availability and automation failures map to rich-copy and HTML-download fallbacks, with final COM/signature behavior retained as a Windows acceptance gate.
 

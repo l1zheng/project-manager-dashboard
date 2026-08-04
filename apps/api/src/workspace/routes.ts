@@ -4,9 +4,15 @@ import {
   buildEditableWorkbook,
   buildPresentationWorkbook,
   buildReportModel,
+  renderOutlookReport,
   renderReportHtml
 } from '@project-manager/export';
 import type { Persistence } from '../persistence/database.js';
+import {
+  createDefaultMailDraftAdapter,
+  OutlookDraftError,
+  type MailDraftAdapter
+} from '../outlook/adapter.js';
 import { ResourceNotFoundError, WorkspaceService } from './service.js';
 
 const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
@@ -33,8 +39,13 @@ const reportPreviewQuerySchema = z.object({
     .optional()
 });
 
-export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persistence): void {
+export function registerWorkspaceRoutes(
+  app: FastifyInstance,
+  persistence: Persistence,
+  options: { mailDraftAdapter?: MailDraftAdapter } = {}
+): void {
   const service = new WorkspaceService(persistence);
+  const mailDraftAdapter = options.mailDraftAdapter ?? createDefaultMailDraftAdapter();
 
   app.get('/api/databases', async () => service.listDatabases());
   app.get('/api/dashboards', async () => service.listDashboards());
@@ -45,29 +56,11 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
     service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId)
   );
   app.get('/api/dashboards/:dashboardId/report-preview', async (request) => {
-    const source = service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId);
-    const query = reportPreviewQuerySchema.parse(request.query);
-    const model = buildReportModel(source, {
-      title: query.title,
-      period: query.period ?? null,
-      density: query.density,
-      includeEmptySections: query.includeEmptySections,
-      includeCompleted: query.includeCompleted,
-      highlightStatus: query.highlightStatus
-    });
+    const model = reportModelForRequest(service, request);
     return { model, html: renderReportHtml(model) };
   });
   app.get('/api/dashboards/:dashboardId/export/editable.xlsx', async (request, reply) => {
-    const source = service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId);
-    const query = reportPreviewQuerySchema.parse(request.query);
-    const model = buildReportModel(source, {
-      title: query.title,
-      period: query.period ?? null,
-      density: query.density,
-      includeEmptySections: query.includeEmptySections,
-      includeCompleted: query.includeCompleted,
-      highlightStatus: query.highlightStatus
-    });
+    const model = reportModelForRequest(service, request);
     const workbook = await buildEditableWorkbook(model);
     return reply
       .header(
@@ -78,16 +71,7 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
       .send(Buffer.from(workbook));
   });
   app.get('/api/dashboards/:dashboardId/export/presentation.xlsx', async (request, reply) => {
-    const source = service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId);
-    const query = reportPreviewQuerySchema.parse(request.query);
-    const model = buildReportModel(source, {
-      title: query.title,
-      period: query.period ?? null,
-      density: query.density,
-      includeEmptySections: query.includeEmptySections,
-      includeCompleted: query.includeCompleted,
-      highlightStatus: query.highlightStatus
-    });
+    const model = reportModelForRequest(service, request);
     const workbook = await buildPresentationWorkbook(model);
     return reply
       .header(
@@ -96,6 +80,34 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
       )
       .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .send(Buffer.from(workbook));
+  });
+  app.get('/api/integrations/outlook', async () => mailDraftAdapter.probe());
+  app.get('/api/dashboards/:dashboardId/export/outlook.html', async (request, reply) => {
+    const report = renderOutlookReport(reportModelForRequest(service, request));
+    return reply
+      .header(
+        'content-disposition',
+        `attachment; filename*=UTF-8''${encodeURIComponent(`${safeExportFilename(report.subject)}-Outlook报告.html`)}`
+      )
+      .header(
+        'content-security-policy',
+        "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
+      )
+      .type('text/html; charset=utf-8')
+      .send(report.htmlDocument);
+  });
+  app.post('/api/dashboards/:dashboardId/export/outlook-draft', async (request, reply) => {
+    if (request.headers['x-project-manager-action'] !== 'create-outlook-draft') {
+      return reply.code(403).send({
+        error: 'action_confirmation_required',
+        message: '创建 Outlook 草稿需要来自本应用的明确操作。'
+      });
+    }
+    const report = renderOutlookReport(reportModelForRequest(service, request));
+    return mailDraftAdapter.createDraft({
+      subject: report.subject,
+      htmlFragment: report.htmlFragment
+    });
   });
   app.patch('/api/dashboards/:dashboardId', async (request) =>
     service.updateDashboard(dashboardParamsSchema.parse(request.params).dashboardId, request.body)
@@ -192,8 +204,32 @@ export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persi
     if (error instanceof ResourceNotFoundError) {
       return reply.code(404).send({ error: 'not_found', message: error.message });
     }
+    if (error instanceof OutlookDraftError) {
+      const statusCode = error.code === 'platform_unsupported' ? 501 : 503;
+      return reply.code(statusCode).send({
+        error: error.code,
+        message: error.message,
+        fallbacks: ['clipboard', 'html_download']
+      });
+    }
     request.log.error(error);
     return reply.code(500).send({ error: 'internal_error' });
+  });
+}
+
+function reportModelForRequest(
+  service: WorkspaceService,
+  request: { params: unknown; query: unknown }
+) {
+  const source = service.getDashboard(dashboardParamsSchema.parse(request.params).dashboardId);
+  const query = reportPreviewQuerySchema.parse(request.query);
+  return buildReportModel(source, {
+    title: query.title,
+    period: query.period ?? null,
+    density: query.density,
+    includeEmptySections: query.includeEmptySections,
+    includeCompleted: query.includeCompleted,
+    highlightStatus: query.highlightStatus
   });
 }
 

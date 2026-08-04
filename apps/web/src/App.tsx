@@ -107,6 +107,7 @@ export function App() {
   const [isAddingRecord, setIsAddingRecord] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string>();
+  const [exportNotice, setExportNotice] = useState<string>();
   const [databaseName, setDatabaseName] = useState('');
   const [databaseDescription, setDatabaseDescription] = useState('');
   const [fieldName, setFieldName] = useState('');
@@ -407,6 +408,75 @@ export function App() {
     } finally {
       setIsSaving(false);
     }
+  }
+
+  function reportQuery() {
+    const query = new URLSearchParams();
+    if (reportTitle.trim()) query.set('title', reportTitle.trim());
+    if (reportPeriod.trim()) query.set('period', reportPeriod.trim());
+    query.set('density', reportDensity);
+    query.set('includeEmptySections', String(includeEmptySections));
+    query.set('includeCompleted', String(includeCompleted));
+    query.set('highlightStatus', String(highlightReportStatus));
+    return query;
+  }
+
+  async function createOutlookDraft() {
+    if (!selectedDashboardId) return;
+    setIsSaving(true);
+    setError(undefined);
+    setExportNotice(undefined);
+    try {
+      await request(
+        `/api/dashboards/${selectedDashboardId}/export/outlook-draft?${reportQuery()}`,
+        {
+          method: 'POST',
+          headers: { 'x-project-manager-action': 'create-outlook-draft' }
+        }
+      );
+      setExportNotice('已在经典 Outlook 中打开草稿；请补充收件人并自行检查、发送。');
+    } catch (requestError) {
+      setError(readRequestError(requestError, '创建 Outlook 草稿失败。可使用复制或 HTML 下载。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function copyOutlookReport() {
+    if (!selectedDashboardId) return;
+    setIsSaving(true);
+    setError(undefined);
+    setExportNotice(undefined);
+    try {
+      const response = await fetch(
+        `/api/dashboards/${selectedDashboardId}/export/outlook.html?${reportQuery()}`
+      );
+      if (!response.ok) throw new Error(`获取报告失败（${response.status}）`);
+      const html = await response.text();
+      if (!navigator.clipboard || !window.ClipboardItem) {
+        throw new Error('当前浏览器不支持富文本复制，请下载 HTML 报告。');
+      }
+      const text = new DOMParser().parseFromString(html, 'text/html').body.innerText;
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([html], { type: 'text/html' }),
+          'text/plain': new Blob([text], { type: 'text/plain' })
+        })
+      ]);
+      setExportNotice('报告已复制为富文本，可直接粘贴到 Outlook 草稿。');
+    } catch (requestError) {
+      setError(readRequestError(requestError, '复制报告失败，请下载 HTML 报告。'));
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  function downloadOutlookHtml() {
+    if (!selectedDashboardId) return;
+    const anchor = document.createElement('a');
+    anchor.href = `/api/dashboards/${selectedDashboardId}/export/outlook.html?${reportQuery()}`;
+    anchor.download = `${reportTitle.trim() || dashboardDetail?.dashboard.name || '项目周报'}-Outlook报告.html`;
+    anchor.click();
   }
 
   async function downloadEditableWorkbook() {
@@ -852,6 +922,11 @@ export function App() {
         </header>
 
         {error && <div className="error-banner">{error}</div>}
+        {exportNotice && (
+          <div className="archive-notice" role="status">
+            {exportNotice}
+          </div>
+        )}
         {lastArchived && (
           <div className="archive-notice" role="status">
             已归档{lastArchived.kind}。
@@ -1620,6 +1695,30 @@ export function App() {
                         type="button"
                       >
                         下载展示版 Excel
+                      </button>
+                      <button
+                        className="button primary small"
+                        disabled={isSaving}
+                        onClick={() => void createOutlookDraft()}
+                        type="button"
+                      >
+                        创建 Outlook 草稿
+                      </button>
+                      <button
+                        className="button secondary small"
+                        disabled={isSaving}
+                        onClick={() => void copyOutlookReport()}
+                        type="button"
+                      >
+                        复制邮件内容
+                      </button>
+                      <button
+                        className="button secondary small"
+                        disabled={isSaving}
+                        onClick={downloadOutlookHtml}
+                        type="button"
+                      >
+                        下载 Outlook HTML
                       </button>
                     </>
                   )}

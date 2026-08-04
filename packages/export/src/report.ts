@@ -140,6 +140,10 @@ function displayFieldValue(
 }
 
 export function renderReportHtml(model: ReportModel): string {
+  return renderOutlookDocument(model);
+}
+
+function renderOutlookDocument(model: ReportModel): string {
   const cellPadding = model.density === 'compact' ? '5px 7px' : '9px 10px';
   const sections = model.sections
     .filter(

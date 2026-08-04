@@ -148,12 +148,12 @@ Status: in progress — P6-01 security and compatibility boundary accepted on 20
 Tasks:
 
 - Finalize the local process, signature preservation, no-send, and fallback contract. Completed in P6-01.
-- Finalize conservative Outlook-compatible HTML templates.
-- Implement rich-HTML clipboard fallback.
-- Implement the Windows PowerShell/COM draft adapter.
-- Detect Outlook integration availability and show actionable fallback errors.
-- Verify preservation of the user's existing Outlook signature policy.
-- Test classic Outlook with Chinese text, long content, multiple tables, and status colors.
+- Finalize conservative Outlook-compatible HTML templates. Completed in P6-02 with escaped table/inline-style HTML, text fallback, and single-line subjects.
+- Implement rich-HTML clipboard fallback. Completed in P6-02 with browser `text/html` plus `text/plain` clipboard data after a direct user gesture.
+- Implement the Windows PowerShell/COM draft adapter. Completed in P6-02 with a packaged PowerShell bridge, JSON request file, timeout, and no-send script scan.
+- Detect Outlook integration availability and show actionable fallback errors. Completed in P6-02; macOS returns a safe platform-unsupported response with HTML/clipboard fallback.
+- Verify preservation of the user's existing Outlook signature policy. Pending target-Windows manual verification.
+- Test classic Outlook with Chinese text, long content, multiple tables, and status colors. Pending target-Windows manual verification.
 
 Exit criteria:
 
