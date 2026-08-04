@@ -4,7 +4,7 @@ Last updated: 2026-08-04
 
 ## Current state
 
-- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 backup creation and controlled restore are complete through P7-03. Windows desktop Excel verification also remains manual.
+- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 backup creation, controlled restore, and automatic-backup retention are complete through P7-04. Windows desktop Excel verification also remains manual.
 - Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, both Excel downloads, Outlook HTML/clipboard fallbacks, a Windows classic Outlook draft bridge, and verified full-workspace backup/restore with startup rollback.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
@@ -32,12 +32,12 @@ Last updated: 2026-08-04
 
 ## Active task
 
-`P7-04`: Generalize automatic backup retention for pre-restore backups and add adversarial retention tests.
+`P7-05`: Serve the production web build from Fastify and add first-run/data-directory diagnostics.
 
 ## Next tasks
 
-1. `P7-04` — Generalize automatic backup retention for pre-restore backups and add adversarial retention tests.
-2. `P7-05` — Serve the production web build from Fastify and add first-run/data-directory diagnostics.
+1. `P7-05` — Serve the production web build from Fastify and add first-run/data-directory diagnostics.
+2. `P7-06` — Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies.
 3. On the target Windows machine, complete `P6-03`, open both generated Excel files, and run [the Windows verification checklist](WINDOWS_VERIFICATION.md).
 
 ## Risks and validation items
@@ -53,6 +53,8 @@ Last updated: 2026-08-04
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Build on the matching Windows architecture and run persistence tests from the final portable artifact. |
 
 ## Verification log
+
+- 2026-08-04: Completed P7-04. Automatic retention now treats generated `pre-migration-*` and `pre-restore-*` snapshots as independent groups, retaining the newest 10 in each. It recognizes only the exact generated filename shape, so manual `.pmdbackup` files and similarly named unrelated files are excluded. Database and manifest deletion are handled as one logical retention item: a missing manifest is recorded, a manifest deletion failure is returned as a bounded diagnostic, and a database deletion failure leaves its manifest untouched. Creating a pre-restore backup now triggers the same retention pass as migration backups. Tests cover independent groups, retention boundaries, missing/undeletable manifests, unrelated files, and invalid settings. Verified `pnpm test` (48 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 
 - 2026-08-04: Completed P7-03. Added bounded `.pmdbackup` upload and inspection, strict two-entry ZIP validation, manifest/schema/digest/SQLite/foreign-key/migration-prefix checks, explicit replacement confirmation, a verified `pre-restore-*` online backup, and an atomic pending-restore marker. Startup now applies the staged database only before opening normal persistence, detects interrupted states, removes only exact SQLite sidecars, migrates and validates the candidate, and either finalizes or restores the verified prior workspace while preserving failure evidence. Once confirmation succeeds, mutation APIs return 409 and the browser blocks interaction until restart. Automated coverage proves successful replacement, injected-migration rollback, interrupted apply/rollback recovery, staged-candidate revalidation, divergent migration rejection, missing rollback-source safety, extra/duplicate ZIP rejection, checksum tamper rejection, API confirmation guards, and pending read-only behavior. A fully isolated browser run verified upload, inspection details, disabled unconfirmed action, restart lock, process restart, and the restored-success notice; no real workspace data was used. Verified `pnpm test` (45 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 

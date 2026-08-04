@@ -163,14 +163,14 @@ Exit criteria:
 
 ## Phase 7 — Backup, packaging, and release hardening
 
-Status: in progress — P7-01 through P7-03 completed on 2026-08-04; retention, production serving, packaging, and release validation remain.
+Status: in progress — P7-01 through P7-04 completed on 2026-08-04; production serving, packaging, and release validation remain.
 
 Tasks:
 
 - Define the backup container, restore transaction, rollback, retention, and Windows release shape. Completed in P7-01.
 - Add verified `.pmdbackup` full-workspace creation and download. Completed in P7-02.
 - Add bounded restore inspection, explicit confirmation, pre-restore backup, controlled restart, startup replacement, and rollback. Completed in P7-03 with strict archive/migration validation, pending-state read-only protection, interrupted-state recovery, preserved diagnostics, automated rollback tests, and an isolated browser restart verification.
-- Generalize and test automatic pre-migration and pre-restore retention. P7-04; pre-migration creation and retention already exist from P0-03.
+- Generalize and test automatic pre-migration and pre-restore retention. Completed in P7-04 with separate 10-item groups, strict generated-filename recognition, bounded deletion diagnostics, and adversarial retention tests.
 - Serve the production web build from the loopback API and add first-run/data-directory diagnostics. P7-05.
 - Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies. P7-06.
 - Test clean-machine installation, offline operation, upgrade migrations, and injected restore failure. P7-07.

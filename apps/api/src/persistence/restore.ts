@@ -17,7 +17,7 @@ import Database from 'better-sqlite3';
 import * as yauzl from 'yauzl';
 import { z } from 'zod';
 import { workspaceBackupManifestSchema, type WorkspaceBackupManifest } from './backup-format.js';
-import { createVerifiedBackup } from './backups.js';
+import { createVerifiedBackup, pruneAutomaticBackups } from './backups.js';
 import {
   assertDatabaseHealthy,
   assertForeignKeysHealthy,
@@ -222,6 +222,7 @@ async function prepareWorkspaceRestore(
   verifyRestoreCandidate(candidatePath, migrationsFolder, staged.manifest);
 
   const preRestoreBackup = await createVerifiedBackup(sqlite, paths, now, 'pre-restore');
+  await pruneAutomaticBackups(paths);
   const marker: PendingRestoreMarker = {
     version: restoreMarkerVersion,
     restoreId,

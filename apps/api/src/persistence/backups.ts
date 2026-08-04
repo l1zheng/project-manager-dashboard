@@ -13,6 +13,10 @@ import type { DataPaths } from './paths.js';
 
 const automaticBackupSuffix = '.sqlite';
 export type AutomaticBackupKind = 'pre-migration' | 'pre-restore';
+export const automaticBackupKinds: readonly AutomaticBackupKind[] = [
+  'pre-migration',
+  'pre-restore'
+];
 
 export interface VerifiedBackup {
   databasePath: string;
@@ -24,6 +28,13 @@ export interface WorkspaceBackup {
   archive: Buffer;
   filename: string;
   manifest: WorkspaceBackupManifest;
+}
+
+export interface AutomaticBackupRetentionReport {
+  retained: Record<AutomaticBackupKind, number>;
+  deleted: string[];
+  missingManifests: string[];
+  failures: Array<{ filename: string; operation: 'database' | 'manifest'; message: string }>;
 }
 
 export interface CreateWorkspaceBackupOptions {
@@ -113,26 +124,78 @@ export async function createWorkspaceBackup(
   }
 }
 
-export async function pruneAutomaticBackups(paths: DataPaths, maximumCount = 10): Promise<void> {
-  const entries = await readdir(paths.backupsDirectory, { withFileTypes: true });
-  const automaticBackups = entries
-    .filter(
-      (entry) =>
-        entry.isFile() &&
-        entry.name.startsWith('pre-migration-') &&
-        entry.name.endsWith(automaticBackupSuffix)
-    )
-    .map((entry) => entry.name)
-    .sort((left, right) => right.localeCompare(left));
+export async function pruneAutomaticBackups(
+  paths: DataPaths,
+  maximumCount = 10
+): Promise<AutomaticBackupRetentionReport> {
+  if (!Number.isSafeInteger(maximumCount) || maximumCount < 0) {
+    throw new RangeError('Automatic backup retention count must be a non-negative safe integer.');
+  }
 
-  await Promise.all(
-    automaticBackups
-      .slice(maximumCount)
-      .flatMap((filename) => [
-        unlink(join(paths.backupsDirectory, filename)),
-        unlink(join(paths.backupsDirectory, `${filename}.manifest.json`)).catch(() => undefined)
-      ])
-  );
+  const entries = await readdir(paths.backupsDirectory, { withFileTypes: true });
+  const report: AutomaticBackupRetentionReport = {
+    retained: { 'pre-migration': 0, 'pre-restore': 0 },
+    deleted: [],
+    missingManifests: [],
+    failures: []
+  };
+
+  for (const kind of automaticBackupKinds) {
+    const automaticBackups = entries
+      .filter((entry) => entry.isFile() && isAutomaticBackupFilename(entry.name, kind))
+      .map((entry) => entry.name)
+      .sort((left, right) => right.localeCompare(left));
+    report.retained[kind] = automaticBackups.length;
+
+    for (const filename of automaticBackups.slice(maximumCount)) {
+      const databasePath = join(paths.backupsDirectory, filename);
+      const manifestPath = `${databasePath}.manifest.json`;
+      try {
+        await unlink(databasePath);
+        report.deleted.push(filename);
+        report.retained[kind] -= 1;
+      } catch (error) {
+        report.failures.push({
+          filename,
+          operation: 'database',
+          message: retentionFailureMessage(error)
+        });
+        continue;
+      }
+
+      try {
+        await unlink(manifestPath);
+      } catch (error) {
+        if (isMissingFileError(error)) {
+          report.missingManifests.push(`${filename}.manifest.json`);
+        } else {
+          report.failures.push({
+            filename: `${filename}.manifest.json`,
+            operation: 'manifest',
+            message: retentionFailureMessage(error)
+          });
+        }
+      }
+    }
+  }
+
+  return report;
+}
+
+function isAutomaticBackupFilename(filename: string, kind: AutomaticBackupKind): boolean {
+  const escapedKind = kind.replace('-', '\\-');
+  return new RegExp(
+    `^${escapedKind}-\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\${automaticBackupSuffix}$`,
+    'i'
+  ).test(filename);
+}
+
+function isMissingFileError(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
+}
+
+function retentionFailureMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : 'Unknown retention failure.').slice(0, 500);
 }
 
 function verifySnapshot(snapshotPath: string): void {

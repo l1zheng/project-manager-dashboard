@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import Database from 'better-sqlite3';
 import * as yauzl from 'yauzl';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createWorkspaceBackup } from './backups.js';
+import { createWorkspaceBackup, pruneAutomaticBackups } from './backups.js';
 import { openPersistence } from './database.js';
 import { resolveDataPaths } from './paths.js';
 import * as schema from './schema.js';
@@ -93,7 +93,102 @@ describe('workspace backups', () => {
       persistence.close();
     }
   });
+
+  it('retains the newest ten backups independently for migration and restore groups', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'project-manager-backup-retention-'));
+    temporaryRoots.push(rootDirectory);
+    const paths = resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } });
+    const persistence = await openPersistence({ dataPaths: paths });
+    persistence.close();
+
+    for (const kind of ['pre-migration', 'pre-restore'] as const) {
+      for (let index = 1; index <= 12; index += 1) {
+        await writeAutomaticBackup(paths.backupsDirectory, automaticBackupFilename(kind, index));
+      }
+    }
+    await writeFile(
+      join(paths.backupsDirectory, 'ProjectManagerWorkspace-user.pmdbackup'),
+      'manual'
+    );
+    await writeFile(join(paths.backupsDirectory, 'pre-migration-manual.sqlite'), 'must remain');
+
+    const report = await pruneAutomaticBackups(paths);
+    const entries = await readdir(paths.backupsDirectory);
+
+    expect(report).toMatchObject({
+      retained: { 'pre-migration': 10, 'pre-restore': 10 },
+      failures: [],
+      missingManifests: []
+    });
+    expect(report.deleted).toHaveLength(4);
+    expect(
+      entries.filter((name) => name.startsWith('pre-migration-') && name.endsWith('.sqlite'))
+    ).toHaveLength(11);
+    expect(
+      entries.filter((name) => name.startsWith('pre-restore-') && name.endsWith('.sqlite'))
+    ).toHaveLength(10);
+    expect(entries).toContain('ProjectManagerWorkspace-user.pmdbackup');
+    expect(entries).toContain('pre-migration-manual.sqlite');
+    expect(entries).not.toContain(automaticBackupFilename('pre-migration', 1));
+    expect(entries).not.toContain(automaticBackupFilename('pre-restore', 2));
+    expect(entries).toContain(automaticBackupFilename('pre-migration', 12));
+    expect(entries).toContain(`${automaticBackupFilename('pre-restore', 12)}.manifest.json`);
+  });
+
+  it('reports a missing manifest and a manifest deletion failure without touching unrelated files', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'project-manager-backup-retention-errors-'));
+    temporaryRoots.push(rootDirectory);
+    const paths = resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } });
+    const persistence = await openPersistence({ dataPaths: paths });
+    persistence.close();
+
+    const missingManifestBackup = automaticBackupFilename('pre-migration', 1);
+    const manifestDirectoryBackup = automaticBackupFilename('pre-migration', 2);
+    const retainedBackup = automaticBackupFilename('pre-migration', 3);
+    await writeFile(join(paths.backupsDirectory, missingManifestBackup), 'old');
+    await writeFile(join(paths.backupsDirectory, manifestDirectoryBackup), 'old');
+    await mkdir(join(paths.backupsDirectory, `${manifestDirectoryBackup}.manifest.json`));
+    await writeAutomaticBackup(paths.backupsDirectory, retainedBackup);
+    await writeFile(join(paths.backupsDirectory, 'pre-restore-not-generated.sqlite'), 'unrelated');
+
+    const report = await pruneAutomaticBackups(paths, 1);
+
+    expect(report.retained['pre-migration']).toBe(1);
+    expect(report.missingManifests).toEqual([`${missingManifestBackup}.manifest.json`]);
+    expect(report.failures).toEqual([
+      expect.objectContaining({
+        filename: `${manifestDirectoryBackup}.manifest.json`,
+        operation: 'manifest'
+      })
+    ]);
+    await expect(
+      readdir(join(paths.backupsDirectory, `${manifestDirectoryBackup}.manifest.json`))
+    ).resolves.toEqual([]);
+    expect(await readdir(paths.backupsDirectory)).toContain('pre-restore-not-generated.sqlite');
+  });
+
+  it('rejects invalid retention counts', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'project-manager-backup-retention-count-'));
+    temporaryRoots.push(rootDirectory);
+    const paths = resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } });
+    const persistence = await openPersistence({ dataPaths: paths });
+    persistence.close();
+
+    await expect(pruneAutomaticBackups(paths, -1)).rejects.toThrow(RangeError);
+    await expect(pruneAutomaticBackups(paths, 1.5)).rejects.toThrow(RangeError);
+  });
 });
+
+async function writeAutomaticBackup(directory: string, filename: string): Promise<void> {
+  await writeFile(join(directory, filename), 'automatic backup');
+  await writeFile(join(directory, `${filename}.manifest.json`), '{"kind":"test"}\n');
+}
+
+function automaticBackupFilename(kind: 'pre-migration' | 'pre-restore', index: number): string {
+  const day = String(index).padStart(2, '0');
+  const suffix = String(index).padStart(12, '0');
+  return `${kind}-2026-08-${day}T00-00-00-000Z-00000000-0000-4000-8000-${suffix}.sqlite`;
+}
 
 async function readZipEntries(archive: Buffer): Promise<Record<string, Buffer>> {
   const zip = await yauzl.fromBufferPromise(archive, {
