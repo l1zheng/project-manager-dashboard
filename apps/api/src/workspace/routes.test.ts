@@ -30,7 +30,7 @@ describe('workspace API', () => {
         return { status: 'displayed' };
       }
     };
-    const app = buildApp({ persistence, mailDraftAdapter });
+    const app = await buildApp({ persistence, mailDraftAdapter });
 
     try {
       const databaseResponse = await app.inject({
@@ -380,7 +380,7 @@ describe('workspace API', () => {
 });
 
 async function createField(
-  app: ReturnType<typeof buildApp>,
+  app: Awaited<ReturnType<typeof buildApp>>,
   databaseId: string,
   payload: Record<string, unknown>
 ) {

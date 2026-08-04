@@ -1,12 +1,12 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { buildApp } from './app.js';
 import { openPersistence } from './persistence/database.js';
 import { resolveDataPaths } from './persistence/paths.js';
 
-const app = buildApp();
+const app = await buildApp();
 
 afterAll(async () => {
   await app.close();
@@ -28,7 +28,7 @@ describe('health endpoint', () => {
     const persistence = await openPersistence({
       dataPaths: resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } })
     });
-    const storageApp = buildApp({ persistence });
+    const storageApp = await buildApp({ persistence });
 
     try {
       const response = await storageApp.inject({ method: 'GET', url: '/api/health' });
@@ -43,6 +43,73 @@ describe('health endpoint', () => {
     } finally {
       await storageApp.close();
       await rm(rootDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('reports local runtime diagnostics without workspace contents', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'project-manager-diagnostics-'));
+    const persistence = await openPersistence({
+      dataPaths: resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } })
+    });
+    const storageApp = await buildApp({
+      persistence,
+      mailDraftAdapter: {
+        probe: async () => ({ available: false, reason: 'platform_unsupported' }),
+        createDraft: async () => ({ status: 'displayed' })
+      },
+      loopbackAddress: '127.0.0.1:4300'
+    });
+
+    try {
+      const response = await storageApp.inject({ method: 'GET', url: '/api/diagnostics' });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({
+        application: { loopbackAddress: '127.0.0.1:4300' },
+        storage: {
+          dataDirectory: rootDirectory,
+          database: { healthy: true },
+          firstRun: true,
+          migration: { pendingCount: 0 }
+        },
+        outlook: { available: false, reason: 'platform_unsupported' }
+      });
+      expect(response.body).not.toContain('records');
+    } finally {
+      await storageApp.close();
+      await rm(rootDirectory, { recursive: true, force: true });
+    }
+  });
+
+  it('serves a production web build while keeping API misses as API 404 responses', async () => {
+    const webDirectory = await mkdtemp(join(tmpdir(), 'project-manager-web-build-'));
+    await mkdir(join(webDirectory, 'assets'));
+    await writeFile(webDirectory + '/index.html', '<!doctype html><title>项目管理工作台</title>');
+    await writeFile(join(webDirectory, 'assets', 'app.js'), 'window.appReady = true;');
+    const webApp = await buildApp({ webDistDirectory: webDirectory });
+
+    try {
+      const index = await webApp.inject({ method: 'GET', url: '/' });
+      const asset = await webApp.inject({ method: 'GET', url: '/assets/app.js' });
+      const clientRoute = await webApp.inject({ method: 'GET', url: '/dashboard/today' });
+      const missingAsset = await webApp.inject({ method: 'GET', url: '/assets/missing.js' });
+      const apiMiss = await webApp.inject({ method: 'GET', url: '/api/does-not-exist' });
+      const apiRoot = await webApp.inject({ method: 'GET', url: '/api' });
+
+      expect(index.statusCode).toBe(200);
+      expect(index.headers['cache-control']).toBe('no-cache');
+      expect(index.body).toContain('项目管理工作台');
+      expect(asset.statusCode).toBe(200);
+      expect(asset.headers['cache-control']).toContain('immutable');
+      expect(asset.headers['content-type']).toContain('text/javascript');
+      expect(clientRoute.statusCode).toBe(200);
+      expect(clientRoute.body).toContain('项目管理工作台');
+      expect(missingAsset.statusCode).toBe(404);
+      expect(apiMiss.statusCode).toBe(404);
+      expect(apiRoot.statusCode).toBe(404);
+    } finally {
+      await webApp.close();
+      await rm(webDirectory, { recursive: true, force: true });
     }
   });
 });

@@ -220,6 +220,24 @@ h2 {
   gap: 14px;
   margin-top: 18px;
 }
+.diagnostic-item {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: #536075;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.diagnostic-item strong {
+  color: #273653;
+  font-size: 12px;
+}
+.diagnostic-item span {
+  overflow-wrap: anywhere;
+}
+.diagnostic-item.full-width {
+  grid-column: 1 / -1;
+}
 label {
   display: grid;
   gap: 7px;

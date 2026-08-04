@@ -67,6 +67,24 @@ type RestoreInspection = {
   };
   migration: { appliedCount: number; pendingCount: number; totalCount: number };
 };
+type RuntimeDiagnostics = {
+  application: {
+    version: string;
+    nodeVersion: string;
+    platform: string;
+    architecture: string;
+    loopbackAddress: string;
+  };
+  storage: {
+    dataDirectory: string;
+    database: { healthy: boolean };
+    migration: { appliedCount: number; pendingCount: number; totalCount: number };
+    latestAutomaticBackup?: { kind: string; createdAt: string; bytes: number };
+    availableBytes?: number;
+    firstRun: boolean;
+  };
+  outlook: { available: boolean; reason?: string };
+};
 
 type HealthState =
   { kind: 'loading' } | { kind: 'ready'; response: HealthResponse } | { kind: 'error' };
@@ -124,6 +142,8 @@ export function App() {
   const [restoreFileName, setRestoreFileName] = useState('');
   const [restoreReplacementConfirmed, setRestoreReplacementConfirmed] = useState(false);
   const [restoreRestartRequired, setRestoreRestartRequired] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<RuntimeDiagnostics>();
+  const [isDiagnosticsOpen, setIsDiagnosticsOpen] = useState(false);
   const [databaseName, setDatabaseName] = useState('');
   const [databaseDescription, setDatabaseDescription] = useState('');
   const [fieldName, setFieldName] = useState('');
@@ -345,6 +365,9 @@ export function App() {
       }
       setDatabases(databaseList);
       setDashboards(dashboardList);
+      if (databaseList.length === 0 && healthResponse.storage?.restore?.status === undefined) {
+        setExportNotice('欢迎使用。数据只保存在本机；可在“本机诊断”中查看存储位置。');
+      }
       setSelectedDashboardId(dashboardList[0]?.id);
       setSelectedDatabaseId((current) => current ?? databaseList[0]?.id);
     } catch {
@@ -358,6 +381,15 @@ export function App() {
       setDashboardDetail(await request<DashboardDetail>(`/api/dashboards/${dashboardId}`));
     } catch {
       setError('读取看板失败。');
+    }
+  }
+
+  async function openDiagnostics() {
+    setIsDiagnosticsOpen(true);
+    try {
+      setDiagnostics(await request<RuntimeDiagnostics>('/api/diagnostics'));
+    } catch (requestError) {
+      setError(readRequestError(requestError, '读取本机诊断失败。'));
     }
   }
 
@@ -1066,6 +1098,14 @@ export function App() {
         >
           ⇧ 从备份恢复
         </button>
+        <button
+          className="new-database-link"
+          disabled={health.kind !== 'ready'}
+          onClick={() => void openDiagnostics()}
+          type="button"
+        >
+          ⓘ 本机诊断
+        </button>
 
         <div className="sidebar-footer">
           <span className={`status-light ${health.kind}`} />
@@ -1117,6 +1157,72 @@ export function App() {
           <div className="archive-notice" role="status">
             {exportNotice}
           </div>
+        )}
+        {isDiagnosticsOpen && diagnostics && (
+          <section className="panel creation-panel" aria-label="本机诊断">
+            <div className="panel-heading">
+              <div>
+                <span className="section-kicker">仅显示运行环境，不含项目记录</span>
+                <h2>本机诊断</h2>
+                <p>用于确认离线运行、存储位置、备份和经典 Outlook 集成状态。</p>
+              </div>
+              <button
+                className="button tertiary small"
+                onClick={() => setIsDiagnosticsOpen(false)}
+                type="button"
+              >
+                关闭
+              </button>
+            </div>
+            <div className="form-grid diagnostics-grid">
+              <DiagnosticItem label="应用版本" value={diagnostics.application.version} />
+              <DiagnosticItem
+                label="本地地址"
+                value={`http://${diagnostics.application.loopbackAddress}`}
+              />
+              <DiagnosticItem
+                label="运行环境"
+                value={`${diagnostics.application.platform} · ${diagnostics.application.architecture} · Node ${diagnostics.application.nodeVersion}`}
+              />
+              <DiagnosticItem
+                label="数据库"
+                value={diagnostics.storage.database.healthy ? '健康' : '需要检查'}
+              />
+              <DiagnosticItem
+                label="迁移状态"
+                value={`${diagnostics.storage.migration.appliedCount}/${diagnostics.storage.migration.totalCount} 已应用，${diagnostics.storage.migration.pendingCount} 待处理`}
+              />
+              <DiagnosticItem
+                label="可用磁盘空间"
+                value={
+                  diagnostics.storage.availableBytes === undefined
+                    ? '无法读取'
+                    : formatBytes(diagnostics.storage.availableBytes)
+                }
+              />
+              <DiagnosticItem
+                label="最新自动备份"
+                value={
+                  diagnostics.storage.latestAutomaticBackup
+                    ? `${diagnostics.storage.latestAutomaticBackup.kind} · ${new Date(diagnostics.storage.latestAutomaticBackup.createdAt).toLocaleString('zh-CN')} · ${formatBytes(diagnostics.storage.latestAutomaticBackup.bytes)}`
+                    : '尚无自动备份'
+                }
+              />
+              <DiagnosticItem
+                label="经典 Outlook"
+                value={
+                  diagnostics.outlook.available
+                    ? '可创建草稿'
+                    : `当前不可用${diagnostics.outlook.reason ? `（${diagnostics.outlook.reason}）` : ''}`
+                }
+              />
+              <DiagnosticItem
+                label="本机数据目录"
+                value={diagnostics.storage.dataDirectory}
+                fullWidth
+              />
+            </div>
+          </section>
         )}
         {restoreInspection && (
           <section className="panel creation-panel" aria-label="确认恢复工作区">
@@ -2116,6 +2222,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(payload?.message ?? `请求失败（${response.status}）`);
   }
   return (await response.json()) as T;
+}
+
+function DiagnosticItem({
+  label,
+  value,
+  fullWidth = false
+}: {
+  label: string;
+  value: string;
+  fullWidth?: boolean;
+}) {
+  return (
+    <div className={fullWidth ? 'diagnostic-item full-width' : 'diagnostic-item'}>
+      <strong>{label}</strong>
+      <span>{value}</span>
+    </div>
+  );
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
 }
 
 function readRequestError(error: unknown, fallback: string): string {

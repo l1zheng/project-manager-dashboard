@@ -37,6 +37,12 @@ export interface AutomaticBackupRetentionReport {
   failures: Array<{ filename: string; operation: 'database' | 'manifest'; message: string }>;
 }
 
+export interface LatestAutomaticBackup {
+  kind: AutomaticBackupKind;
+  createdAt: string;
+  bytes: number;
+}
+
 export interface CreateWorkspaceBackupOptions {
   migrationState: MigrationState;
   applicationVersion: string;
@@ -180,6 +186,50 @@ export async function pruneAutomaticBackups(
   }
 
   return report;
+}
+
+export async function findLatestVerifiedAutomaticBackup(
+  paths: DataPaths
+): Promise<LatestAutomaticBackup | undefined> {
+  const entries = await readdir(paths.backupsDirectory, { withFileTypes: true });
+  const candidates = entries
+    .filter((entry) => entry.isFile())
+    .flatMap((entry) =>
+      automaticBackupKinds.flatMap((kind) =>
+        isAutomaticBackupFilename(entry.name, kind) ? [{ filename: entry.name, kind }] : []
+      )
+    )
+    .sort((left, right) => right.filename.localeCompare(left.filename));
+
+  for (const candidate of candidates) {
+    const databasePath = join(paths.backupsDirectory, candidate.filename);
+    const manifestPath = `${databasePath}.manifest.json`;
+    try {
+      const [details, manifestFile] = await Promise.all([
+        stat(databasePath),
+        readFile(manifestPath, 'utf8')
+      ]);
+      const manifest = JSON.parse(manifestFile) as {
+        createdAt?: unknown;
+        databaseFilename?: unknown;
+        kind?: unknown;
+      };
+      if (
+        !details.isFile() ||
+        details.size <= 0 ||
+        typeof manifest.createdAt !== 'string' ||
+        manifest.databaseFilename !== candidate.filename ||
+        manifest.kind !== candidate.kind
+      ) {
+        continue;
+      }
+      verifySnapshot(databasePath);
+      return { kind: candidate.kind, createdAt: manifest.createdAt, bytes: details.size };
+    } catch {
+      // Diagnostics deliberately skips incomplete or invalid automatic snapshots.
+    }
+  }
+  return undefined;
 }
 
 function isAutomaticBackupFilename(filename: string, kind: AutomaticBackupKind): boolean {
