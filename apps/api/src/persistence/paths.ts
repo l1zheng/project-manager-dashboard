@@ -1,6 +1,6 @@
 import { mkdir } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { posix, win32 } from 'node:path';
 
 const applicationDirectoryName = 'ProjectManagerDashboard';
 
@@ -25,19 +25,20 @@ export function resolveDataPaths({
   homeDirectory = homedir(),
   platform = process.platform
 }: ResolveDataPathsOptions = {}): DataPaths {
+  const path = platform === 'win32' ? win32 : posix;
   const override = environment.PM_DATA_DIR?.trim();
   const rootDirectory = override
-    ? resolve(override)
+    ? path.resolve(override)
     : resolveDefaultDataDirectory({ environment, homeDirectory, platform });
 
   return {
     rootDirectory,
-    databasePath: join(rootDirectory, 'workspace.sqlite'),
-    backupsDirectory: join(rootDirectory, 'backups'),
-    exportsDirectory: join(rootDirectory, 'exports'),
-    logsDirectory: join(rootDirectory, 'logs'),
-    restoreStagingDirectory: join(rootDirectory, 'restore-staging'),
-    pendingRestorePath: join(rootDirectory, 'pending-restore.json')
+    databasePath: path.join(rootDirectory, 'workspace.sqlite'),
+    backupsDirectory: path.join(rootDirectory, 'backups'),
+    exportsDirectory: path.join(rootDirectory, 'exports'),
+    logsDirectory: path.join(rootDirectory, 'logs'),
+    restoreStagingDirectory: path.join(rootDirectory, 'restore-staging'),
+    pendingRestorePath: path.join(rootDirectory, 'pending-restore.json')
   };
 }
 
@@ -56,19 +57,20 @@ function resolveDefaultDataDirectory({
   homeDirectory,
   platform
 }: Required<ResolveDataPathsOptions>): string {
+  const path = platform === 'win32' ? win32 : posix;
   if (platform === 'win32') {
-    return join(
-      environment.LOCALAPPDATA?.trim() || join(homeDirectory, 'AppData', 'Local'),
+    return path.join(
+      environment.LOCALAPPDATA?.trim() || path.join(homeDirectory, 'AppData', 'Local'),
       applicationDirectoryName
     );
   }
 
   if (platform === 'darwin') {
-    return join(homeDirectory, 'Library', 'Application Support', applicationDirectoryName);
+    return path.join(homeDirectory, 'Library', 'Application Support', applicationDirectoryName);
   }
 
-  return join(
-    environment.XDG_DATA_HOME?.trim() || join(homeDirectory, '.local', 'share'),
+  return path.join(
+    environment.XDG_DATA_HOME?.trim() || path.join(homeDirectory, '.local', 'share'),
     'project-manager-dashboard'
   );
 }

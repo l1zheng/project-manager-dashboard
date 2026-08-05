@@ -1,6 +1,6 @@
 # Project Status
 
-Last updated: 2026-08-04
+Last updated: 2026-08-05
 
 ## Current state
 
@@ -52,6 +52,8 @@ Last updated: 2026-08-04
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Build on the matching Windows architecture and run persistence tests from the final portable artifact. |
 
 ## Verification log
+
+- 2026-08-05: P7-07 Windows x64 build validation exposed and fixed three release blockers: pnpm 11 was configured to force a `better-sqlite3` source build despite its bundled Win32 x64 prebuild; cross-platform tests constructed Windows paths through the host path implementation; and CMD launchers passed `%~dp0` trailing backslashes into PowerShell quoted arguments. The dependency is now prebuild-only, path resolution selects the requested platform implementation, and launcher commands use `RemoteSigned` (never `Bypass`) with a trailing-slash-safe release root. On Windows x64 with the SHA-verified Node 24.19.0 runtime, frozen install completed without a C/C++ toolchain and native SQLite returned `{ ok: 1 }`; release/API tests, lint, build, physical production deployment, packaged native SQLite, manifest generation/verification, and `ProjectManagerDashboard-0.1.0-win-x64.zip` creation all passed. The remaining manual P7-07 matrix items are offline first launch, interactive Excel/Outlook rendering, and restore/upgrade journeys.
 
 - 2026-08-04: Completed P7-06 implementation. Added a Windows-only portable-release pipeline that requires matching Windows architecture, exact Node 24.19.0 and pnpm 11.9.0, a frozen injected-workspace lockfile, and a pinned official Node archive SHA-256. Production deployment is hoisted and physical; unneeded `.bin` links are removed and any remaining symbolic link/junction blocks publication. The package includes only built API/domain/export code, web assets, migrations, Outlook script, production dependencies, `node.exe`, launcher controls, and an exact sorted SHA-256 manifest. The embedded runtime must report the intended Windows architecture and load/query packaged `better-sqlite3` before ZIP creation. The server now rejects every non-`127.0.0.1` bind and invalid/privileged port. The loopback launcher writes all mutable state/logs under `%LOCALAPPDATA%`, handles second launch, authenticated stop, version replacement, and pending-restore restart through a random 256-bit token that is never exposed by diagnostics. Cross-platform tests cover manifest generation, tamper/additional-file/link rejection, server binding, and launcher/build invariants; a real modern pnpm deploy on this Mac produced a 100 MB physical production tree with only removable `.bin` links and passed the packaged native-SQLite smoke test for the host architecture. A 7,875-file simulated release then passed exact-set hashing with zero links. The final Windows x64 ZIP cannot be truthfully produced or executed on macOS and remains the P7-07 target-machine gate. Verified `pnpm test` (57 tests), `pnpm lint`, `pnpm build`, `pnpm format:check`, and `git diff --check`.
 

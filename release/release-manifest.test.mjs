@@ -44,11 +44,14 @@ test('rejects tampered, unexpected, and linked release entries', async () => {
   }
 });
 
-test('release scripts pin runtime, loopback, frozen deployment, local data, and no policy bypass', async () => {
-  const [builder, launcher, verifier, configText] = await Promise.all([
+test('release scripts pin runtime, loopback, frozen deployment, local data, and a safe PowerShell policy', async () => {
+  const [builder, launcher, verifier, startCommand, stopCommand, verifyCommand, configText] = await Promise.all([
     readFile(new URL('./build-windows-portable.ps1', import.meta.url), 'utf8'),
     readFile(new URL('./windows/start-dashboard.ps1', import.meta.url), 'utf8'),
     readFile(new URL('./windows/verify-release.ps1', import.meta.url), 'utf8'),
+    readFile(new URL('./windows/start-dashboard.cmd', import.meta.url), 'utf8'),
+    readFile(new URL('./windows/stop-dashboard.cmd', import.meta.url), 'utf8'),
+    readFile(new URL('./windows/verify-release.cmd', import.meta.url), 'utf8'),
     readFile(new URL('./windows-portable.config.json', import.meta.url), 'utf8')
   ]);
   const config = JSON.parse(configText);
@@ -63,6 +66,9 @@ test('release scripts pin runtime, loopback, frozen deployment, local data, and 
   assert.match(launcher, /project-manager-api/);
   assert.doesNotMatch(launcher, /0\.0\.0\.0/);
   assert.doesNotMatch(`${builder}\n${launcher}\n${verifier}`, /ExecutionPolicy|EncodedCommand/i);
+  assert.match(`${startCommand}\n${stopCommand}\n${verifyCommand}`, /-ExecutionPolicy RemoteSigned/i);
+  assert.doesNotMatch(`${startCommand}\n${stopCommand}\n${verifyCommand}`, /ExecutionPolicy Bypass|EncodedCommand/i);
+  assert.match(`${startCommand}\n${stopCommand}\n${verifyCommand}`, /ReleaseRoot "%RELEASE_ROOT:~0,-1%"/i);
 });
 
 async function fixture() {

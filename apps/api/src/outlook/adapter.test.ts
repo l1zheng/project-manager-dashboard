@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   OutlookDraftError,
@@ -6,7 +7,7 @@ import {
   type BridgeInvocation
 } from './adapter.js';
 
-const scriptPath = new URL('./outlook-draft.ps1', import.meta.url).pathname;
+const scriptPath = fileURLToPath(new URL('./outlook-draft.ps1', import.meta.url));
 
 describe('Windows classic Outlook adapter', () => {
   it('uses a JSON request file instead of putting report content in PowerShell arguments', async () => {
