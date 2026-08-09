@@ -167,6 +167,66 @@
   min-width: 0;
   gap: 46px;
 }
+.v2-module-block {
+  position: relative;
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+.v2-module-block.is-dragging {
+  opacity: 0.38;
+}
+.v2-module-block.is-drop-before::before,
+.v2-module-block.is-drop-after::after {
+  position: absolute;
+  z-index: 12;
+  right: 0;
+  left: 0;
+  height: 3px;
+  border-radius: 999px;
+  background: #2f80ed;
+  box-shadow: 0 0 0 2px rgba(47, 128, 237, 0.12);
+  content: '';
+  pointer-events: none;
+}
+.v2-module-block.is-drop-before::before {
+  top: -24px;
+}
+.v2-module-block.is-drop-after::after {
+  bottom: -24px;
+}
+.v2-block-drag-handle {
+  display: inline-grid;
+  width: 24px;
+  min-width: 24px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  color: #9b9a97;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  cursor: grab;
+  opacity: 0.35;
+  touch-action: none;
+}
+.v2-module-block:hover .v2-block-drag-handle,
+.v2-module-block:focus-within .v2-block-drag-handle {
+  opacity: 1;
+}
+.v2-block-drag-handle:hover {
+  color: #37352f;
+  background: #efefed;
+}
+.v2-block-drag-handle:active,
+body.v2-is-dragging-module {
+  cursor: grabbing;
+}
+body.v2-is-dragging-module {
+  user-select: none;
+}
 .v2-table-block {
   min-width: 0;
   scroll-margin-top: 58px;
@@ -190,6 +250,11 @@
   font-size: 11px;
   opacity: 0.45;
 }
+.v2-content-block-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
 .v2-content-block:hover .v2-content-block-toolbar,
 .v2-content-block:focus-within .v2-content-block-toolbar {
   opacity: 1;
@@ -204,6 +269,17 @@
 }
 .v2-content-block-toolbar button:hover {
   background: #efefed;
+}
+.v2-content-block-toolbar .v2-block-drag-handle {
+  width: 24px;
+  min-width: 24px;
+  height: 26px;
+  padding: 0;
+  cursor: grab;
+  touch-action: none;
+}
+.v2-content-block-toolbar .v2-block-drag-handle:active {
+  cursor: grabbing;
 }
 .v2-page-text-editor {
   width: 100%;
@@ -640,6 +716,11 @@
 }
 .v2-menu-command:hover {
   background: #f1f1ef;
+}
+.v2-menu-command:disabled {
+  color: #b4b4b0;
+  background: transparent;
+  cursor: default;
 }
 .v2-menu-command > span {
   width: 18px;

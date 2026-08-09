@@ -214,6 +214,7 @@ Tasks:
 - Prototype per-field export alignment and row-title emphasis instead of guessing presentation from mutable field names. Completed.
 - Vertically center editable table cells so multiline narrative content does not leave neighboring metadata controls pinned to the top. Completed in the prototype.
 - Generalize the page from table-only blocks to ordered table, text, and image modules, with inline text editing, local image selection/replacement, captions, module navigation, and mixed export preview. Completed in the prototype.
+- Reorder every module kind from an in-context drag handle, with explicit up/down menu commands as the precise and keyboard-accessible fallback; sidebar and export order share the same state. Completed in the prototype.
 - On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, presentation-Excel image embedding, and a reviewed Outlook CID-image extension. Pending production integration.
 - Obtain hands-on user acceptance before reconnecting the shell to SQLite.
 

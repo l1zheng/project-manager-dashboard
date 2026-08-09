@@ -60,6 +60,11 @@ type DestructiveConfirmation = 'column' | 'table' | 'row' | 'content';
 
 type PreviewMode = 'report' | 'excel';
 
+type BlockDropTarget = {
+  blockId: string;
+  edge: 'before' | 'after';
+};
+
 type ExportSettings = {
   title: string;
   period: string;
@@ -180,6 +185,8 @@ export function PrototypeV2() {
   const [destructiveConfirmation, setDestructiveConfirmation] = useState<DestructiveConfirmation>();
   const [blankRowDrafts, setBlankRowDrafts] = useState<Record<string, Record<string, string>>>({});
   const [draggingColumn, setDraggingColumn] = useState<{ tableId: string; columnId: string }>();
+  const [draggingBlockId, setDraggingBlockId] = useState<string>();
+  const [blockDropTarget, setBlockDropTarget] = useState<BlockDropTarget>();
   const [resizingColumn, setResizingColumn] = useState<{ tableId: string; columnId: string }>();
   const [previewMode, setPreviewMode] = useState<PreviewMode>();
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
@@ -457,6 +464,125 @@ export function PrototypeV2() {
     );
   }
 
+  function movePageBlockByOffset(blockId: string, offset: -1 | 1) {
+    const sourceIndex = pageBlocks.findIndex((block) => block.id === blockId);
+    const targetIndex = sourceIndex + offset;
+    if (sourceIndex < 0 || targetIndex < 0 || targetIndex >= pageBlocks.length) {
+      closePopover();
+      return;
+    }
+    setPageBlocks((current) => {
+      const currentSourceIndex = current.findIndex((block) => block.id === blockId);
+      const currentTargetIndex = currentSourceIndex + offset;
+      if (currentSourceIndex < 0 || currentTargetIndex < 0 || currentTargetIndex >= current.length)
+        return current;
+      const next = [...current];
+      const [source] = next.splice(currentSourceIndex, 1);
+      next.splice(currentTargetIndex, 0, source!);
+      return next;
+    });
+    setNotice(offset < 0 ? '已将模块上移。' : '已将模块下移。');
+    closePopover();
+  }
+
+  function reorderPageBlock(
+    sourceBlockId: string,
+    targetBlockId: string,
+    edge: BlockDropTarget['edge']
+  ) {
+    if (sourceBlockId === targetBlockId) return;
+    const sourceIndex = pageBlocks.findIndex((block) => block.id === sourceBlockId);
+    const targetIndex = pageBlocks.findIndex((block) => block.id === targetBlockId);
+    if (
+      sourceIndex < 0 ||
+      targetIndex < 0 ||
+      (edge === 'before' && sourceIndex + 1 === targetIndex) ||
+      (edge === 'after' && sourceIndex - 1 === targetIndex)
+    )
+      return;
+    setPageBlocks((current) => {
+      const currentSourceIndex = current.findIndex((block) => block.id === sourceBlockId);
+      if (currentSourceIndex < 0) return current;
+      const next = [...current];
+      const [source] = next.splice(currentSourceIndex, 1);
+      const currentTargetIndex = next.findIndex((block) => block.id === targetBlockId);
+      if (!source || currentTargetIndex < 0) return current;
+      next.splice(edge === 'before' ? currentTargetIndex : currentTargetIndex + 1, 0, source);
+      if (next.every((block, index) => block.id === current[index]?.id)) return current;
+      return next;
+    });
+    setNotice('已调整模块顺序，导出预览会使用相同顺序。');
+  }
+
+  function startPageBlockReorder(event: ReactPointerEvent<HTMLButtonElement>, blockId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    closePopover();
+    setDraggingBlockId(blockId);
+    document.body.classList.add('v2-is-dragging-module');
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const target = document
+        .elementFromPoint(moveEvent.clientX, moveEvent.clientY)
+        ?.closest<HTMLElement>('[data-v2-block-id]');
+      const targetBlockId = target?.dataset.v2BlockId;
+      if (!target || !targetBlockId || targetBlockId === blockId) {
+        setBlockDropTarget(undefined);
+      } else {
+        const rect = target.getBoundingClientRect();
+        setBlockDropTarget({
+          blockId: targetBlockId,
+          edge: moveEvent.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+        });
+      }
+      if (moveEvent.clientY < 90) window.scrollBy({ top: -18 });
+      if (moveEvent.clientY > window.innerHeight - 70) window.scrollBy({ top: 18 });
+    };
+    const cleanup = () => {
+      setDraggingBlockId(undefined);
+      setBlockDropTarget(undefined);
+      document.body.classList.remove('v2-is-dragging-module');
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('pointercancel', cleanup);
+      window.removeEventListener('blur', cleanup);
+    };
+    const handleUp = (upEvent: PointerEvent) => {
+      const target = document
+        .elementFromPoint(upEvent.clientX, upEvent.clientY)
+        ?.closest<HTMLElement>('[data-v2-block-id]');
+      const targetBlockId = target?.dataset.v2BlockId;
+      if (target && targetBlockId && targetBlockId !== blockId) {
+        const rect = target.getBoundingClientRect();
+        reorderPageBlock(
+          blockId,
+          targetBlockId,
+          upEvent.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+        );
+      }
+      cleanup();
+    };
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp, { once: true });
+    window.addEventListener('pointercancel', cleanup, { once: true });
+    window.addEventListener('blur', cleanup, { once: true });
+  }
+
+  function pageBlockClassName(baseClassName: string, blockId: string) {
+    return [
+      baseClassName,
+      'v2-module-block',
+      draggingBlockId === blockId ? 'is-dragging' : '',
+      blockDropTarget?.blockId === blockId
+        ? blockDropTarget.edge === 'before'
+          ? 'is-drop-before'
+          : 'is-drop-after'
+        : ''
+    ]
+      .filter(Boolean)
+      .join(' ');
+  }
+
   function loadImage(blockId: string, file?: File) {
     if (!file) return;
     if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
@@ -673,9 +799,25 @@ export function PrototypeV2() {
           {pageBlocks.map((block) => {
             if (block.kind === 'text') {
               return (
-                <section className="v2-content-block" id={block.id} key={block.id}>
+                <section
+                  className={pageBlockClassName('v2-content-block', block.id)}
+                  data-v2-block-id={block.id}
+                  id={block.id}
+                  key={block.id}
+                >
                   <div className="v2-content-block-toolbar">
-                    <span>¶ 文字</span>
+                    <span className="v2-content-block-label">
+                      <button
+                        aria-label="拖动文字模块调整顺序"
+                        className="v2-block-drag-handle"
+                        onPointerDown={(event) => startPageBlockReorder(event, block.id)}
+                        title="拖动调整模块顺序"
+                        type="button"
+                      >
+                        ⋮⋮
+                      </button>
+                      <span>¶ 文字</span>
+                    </span>
                     <button
                       aria-label="文字模块更多操作"
                       onClick={(event) => {
@@ -710,9 +852,25 @@ export function PrototypeV2() {
             }
             if (block.kind === 'image') {
               return (
-                <section className="v2-content-block" id={block.id} key={block.id}>
+                <section
+                  className={pageBlockClassName('v2-content-block', block.id)}
+                  data-v2-block-id={block.id}
+                  id={block.id}
+                  key={block.id}
+                >
                   <div className="v2-content-block-toolbar">
-                    <span>▧ 图片</span>
+                    <span className="v2-content-block-label">
+                      <button
+                        aria-label="拖动图片模块调整顺序"
+                        className="v2-block-drag-handle"
+                        onPointerDown={(event) => startPageBlockReorder(event, block.id)}
+                        title="拖动调整模块顺序"
+                        type="button"
+                      >
+                        ⋮⋮
+                      </button>
+                      <span>▧ 图片</span>
+                    </span>
                     <button
                       aria-label="图片模块更多操作"
                       onClick={(event) => {
@@ -774,9 +932,23 @@ export function PrototypeV2() {
             const table = visibleTables.find((candidate) => candidate.id === block.tableId);
             if (!table) return null;
             return (
-              <section className="v2-table-block" id={table.id} key={block.id}>
+              <section
+                className={pageBlockClassName('v2-table-block', block.id)}
+                data-v2-block-id={block.id}
+                id={table.id}
+                key={block.id}
+              >
                 <div className="v2-table-title-row">
                   <div className="v2-table-title">
+                    <button
+                      aria-label={`拖动${table.name}模块调整顺序`}
+                      className="v2-block-drag-handle"
+                      onPointerDown={(event) => startPageBlockReorder(event, block.id)}
+                      title="拖动调整模块顺序"
+                      type="button"
+                    >
+                      ⋮⋮
+                    </button>
                     <span>{table.icon}</span>
                     <input
                       aria-label={`${table.name}表格名称`}
@@ -1104,6 +1276,12 @@ export function PrototypeV2() {
             (() => {
               const table = tables.find((candidate) => candidate.id === popover.tableId);
               if (!table) return null;
+              const block = pageBlocks.find(
+                (candidate) => candidate.kind === 'table' && candidate.tableId === table.id
+              );
+              const blockIndex = block
+                ? pageBlocks.findIndex((candidate) => candidate.id === block.id)
+                : -1;
               return (
                 <div className="v2-popover-content v2-compact-menu">
                   <div className="v2-popover-title">
@@ -1128,6 +1306,22 @@ export function PrototypeV2() {
                     </div>
                   ) : (
                     <div className="v2-menu-list">
+                      <button
+                        className="v2-menu-command"
+                        disabled={blockIndex <= 0}
+                        onClick={() => block && movePageBlockByOffset(block.id, -1)}
+                        type="button"
+                      >
+                        <span>↑</span> 上移模块
+                      </button>
+                      <button
+                        className="v2-menu-command"
+                        disabled={blockIndex < 0 || blockIndex >= pageBlocks.length - 1}
+                        onClick={() => block && movePageBlockByOffset(block.id, 1)}
+                        type="button"
+                      >
+                        <span>↓</span> 下移模块
+                      </button>
                       <button
                         className="v2-menu-command"
                         onClick={() => duplicateTable(table.id)}
@@ -1200,6 +1394,7 @@ export function PrototypeV2() {
             (() => {
               const block = pageBlocks.find((candidate) => candidate.id === popover.blockId);
               if (!block || block.kind === 'table') return null;
+              const blockIndex = pageBlocks.findIndex((candidate) => candidate.id === block.id);
               return (
                 <div className="v2-popover-content v2-compact-menu">
                   <div className="v2-popover-title">
@@ -1223,13 +1418,31 @@ export function PrototypeV2() {
                       </div>
                     </div>
                   ) : (
-                    <button
-                      className="v2-menu-command is-danger"
-                      onClick={() => setDestructiveConfirmation('content')}
-                      type="button"
-                    >
-                      <span>⌫</span> 删除模块
-                    </button>
+                    <div className="v2-menu-list">
+                      <button
+                        className="v2-menu-command"
+                        disabled={blockIndex <= 0}
+                        onClick={() => movePageBlockByOffset(block.id, -1)}
+                        type="button"
+                      >
+                        <span>↑</span> 上移模块
+                      </button>
+                      <button
+                        className="v2-menu-command"
+                        disabled={blockIndex >= pageBlocks.length - 1}
+                        onClick={() => movePageBlockByOffset(block.id, 1)}
+                        type="button"
+                      >
+                        <span>↓</span> 下移模块
+                      </button>
+                      <button
+                        className="v2-menu-command is-danger"
+                        onClick={() => setDestructiveConfirmation('content')}
+                        type="button"
+                      >
+                        <span>⌫</span> 删除模块
+                      </button>
+                    </div>
                   )}
                 </div>
               );

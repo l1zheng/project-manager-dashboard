@@ -17,6 +17,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 7. Filter each table from a menu anchored to that table's toolbar.
 8. Open export from the page toolbar and preview the complete static report before choosing editable Excel, presentation Excel, or Outlook.
 9. Add explanatory text or a local image on the same page without creating an artificial database.
+10. Drag any module by its `⋮⋮` handle, or use its overflow menu to move it up or down; navigation and export follow the new order.
 
 ## Interaction rules
 
@@ -32,6 +33,8 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - The property menu exposes one multiline-capable `文本` type; it does not ask the user to choose between short and long text.
 - Editable table cells are vertically centered by default; multiline narrative text stays horizontally left-aligned while short metadata can remain horizontally centered.
 - The page-level `添加模块` menu creates a table, inline text, or a local image with an optional caption. These modules share one ordered page and one export preview.
+- Every module kind has the same drag handle and before/after drop feedback. Overflow menus expose up/down commands, disabling directions that are unavailable at the page boundary.
+- Page rendering, sidebar navigation, and export preview consume one canonical module order rather than maintaining separate lists.
 - Prototype image bytes are kept only in memory. Production promotion must use validated local assets rather than retaining arbitrary paths or external URLs.
 - Export presentation is field metadata, not a field-name heuristic: all body cells are vertically centered, short metadata may also be horizontally centered, and a business-title field may be emphasized independently of its mutable label.
 - Empty tables remain visible in the export preview with their headers.
@@ -58,6 +61,8 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - [x] Editable controls remain vertically centered when a neighboring narrative cell wraps to multiple lines.
 - [x] Text and image modules can be created, edited, navigated, and deleted alongside tables.
 - [x] The export preview preserves mixed module order and excludes all editing controls.
+- [x] Table, text, and image modules expose the same drag and up/down ordering controls.
+- [x] Reordering immediately updates the page, sidebar navigation, and export preview together.
 
 The checklist above passed automated browser interaction and visual verification on 2026-08-09. Hands-on user acceptance remains the promotion gate.
 
