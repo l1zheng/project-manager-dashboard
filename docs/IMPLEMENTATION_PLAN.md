@@ -195,7 +195,7 @@ Exit criteria:
 
 ## Phase 8 — Notion-style workspace correction
 
-Status: implementation complete; final browser verification on the user's active Mac workspace pending service restart approval
+Status: implementation and active Mac workspace browser verification complete; user workflow acceptance pending
 
 Reason:
 

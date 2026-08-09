@@ -4,7 +4,7 @@ Last updated: 2026-08-09
 
 ## Current state
 
-- Phase: Phase 8 Notion-style workspace correction is implemented after real-use feedback exposed a severe primary-flow mismatch in 0.1.0. Final browser verification against the user's active Mac workspace is pending a permitted service restart.
+- Phase: Phase 8 Notion-style workspace correction is implemented and running against the user's active Mac workspace after real-use feedback exposed a severe primary-flow mismatch in 0.1.0. User workflow acceptance is pending.
 - Implementation: the default browser surface is now one workspace canvas containing all active tables. Default views/dashboard placements are assembled automatically; table titles, column titles, cells, new rows, new columns, and per-table filters are edited in place. The existing independent database/view/dashboard model and export pipeline remain intact.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
@@ -33,12 +33,12 @@ Last updated: 2026-08-09
 
 ## Active task
 
-Complete Phase 8 browser verification on the active Mac workspace, then publish the corrective release.
+Collect the user's hands-on acceptance of the Phase 8 workspace, then publish the corrective release.
 
 ## Next tasks
 
-1. Restart the compiled Mac service with the active local data directory and verify the new single-page workspace using the user's existing tables.
-2. Verify creating a second differently shaped table, inline field rename, inline record save, independent filtering, and both Excel exports.
+1. Let the user verify creating a second differently shaped table, inline field rename, inline record save, independent filtering, and both Excel exports.
+2. Address any remaining workflow friction without re-exposing internal entities.
 3. Publish the corrective release and repeat the Windows browser regression before the next portable package.
 
 ## Risks and validation items
@@ -54,6 +54,8 @@ Complete Phase 8 browser verification on the active Mac workspace, then publish 
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
 
 ## Verification log
+
+- 2026-08-09: Started the rebuilt production service against the user's approved Mac data directory and ran the idempotent workspace assembly. It created only the missing primary dashboard/default view/placement metadata, preserved the existing `需求跟踪` schema and its record, and returned the complete table through the workspace endpoint. Browser verification confirmed the new landing page shows `项目工作台`, the existing table and six editable column headers, the existing row, an inline new-record row, per-table filtering, add-column, collapse, and export controls. Fixed a production-only bootstrap bug by omitting the JSON content type on bodyless requests, then rebuilt and reopened `http://127.0.0.1:4300` in the user's default browser.
 
 - 2026-08-09: Implemented the Phase 8 Notion-style workspace correction after the user rejected the production workflow as overly complex and inconsistent with the agreed direction. Added an idempotent primary-dashboard assembler, database rename API, a new single-page React workspace with vertically stacked editable tables, inline table/column/cell editing, inline row/column creation, per-table filters, compact exports, and automatic saved-view/dashboard placement. Added API coverage proving two differently shaped databases appear together and repeated assembly is idempotent. Verified release tests (3), domain tests (11), export tests (15), API tests (29), lint, TypeScript builds, and production web build. Browser verification is pending because the local-service restart permission review disconnected; the active user data was not modified by the failed restart attempt.
 
