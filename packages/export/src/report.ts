@@ -7,9 +7,12 @@ export type ReportField = {
   name: string;
   type: FieldType;
   width: number | undefined;
+  reportAlign?: 'left' | 'center' | 'right';
+  reportEmphasis?: 'normal' | 'strong';
 };
 
 export type ReportSection = {
+  kind?: 'table';
   blockId: string;
   title: string;
   description: string | null;
@@ -17,6 +20,31 @@ export type ReportSection = {
   fields: ReportField[];
   rows: Array<{ recordId: string; values: ReportCellValue[] }>;
 };
+
+export type ReportTextBlock = {
+  kind: 'text';
+  blockId: string;
+  title: string;
+  body: string;
+  includeInExport: boolean;
+};
+
+export type ReportImageBlock = {
+  kind: 'image';
+  blockId: string;
+  title: string | null;
+  caption: string | null;
+  includeInExport: boolean;
+  asset: {
+    id: string;
+    mimeType: string;
+    byteLength: number;
+    originalFilename: string | null;
+    contentUrl: string;
+  } | null;
+};
+
+export type ReportBlock = ReportSection | ReportTextBlock | ReportImageBlock;
 
 export type ReportModel = {
   version: 1;
@@ -26,6 +54,7 @@ export type ReportModel = {
   includeEmptySections: boolean;
   includeCompleted: boolean;
   highlightStatus: boolean;
+  blocks?: ReportBlock[];
   sections: ReportSection[];
 };
 
@@ -38,38 +67,130 @@ export type ReportBuildOptions = {
   highlightStatus?: boolean;
 };
 
+type DashboardTableBlockSource = {
+  id: string;
+  kind?: 'table_view';
+  titleOverride: string | null;
+  description: string | null;
+  includeInExport: boolean;
+  view: {
+    database: { name: string };
+    view: {
+      name: string;
+      config: {
+        visibleFieldIds: string[];
+        fieldWidths: Record<string, number>;
+        fieldPresentation?: Record<
+          string,
+          {
+            reportAlign?: 'left' | 'center' | 'right';
+            reportEmphasis?: 'normal' | 'strong';
+          }
+        >;
+      };
+    };
+    fields: Array<{
+      id: string;
+      name: string;
+      type: FieldType;
+      config: FieldConfig;
+    }>;
+    records: Array<{
+      id: string;
+      sequenceNumber: number;
+      values: Record<string, ReportCellValue>;
+    }>;
+  };
+};
+
+type DashboardTextBlockSource = {
+  id: string;
+  kind: 'text';
+  includeInExport: boolean;
+  config: { version: 1; title: string; body: string };
+};
+
+type DashboardImageBlockSource = {
+  id: string;
+  kind: 'image';
+  includeInExport: boolean;
+  config: { version: 1; title: string | null; caption: string | null };
+  asset: ReportImageBlock['asset'];
+};
+
 export type DashboardReportSource = {
   dashboard: { name: string };
-  blocks: Array<{
-    id: string;
-    titleOverride: string | null;
-    description: string | null;
-    includeInExport: boolean;
-    view: {
-      database: { name: string };
-      view: {
-        name: string;
-        config: { visibleFieldIds: string[]; fieldWidths: Record<string, number> };
-      };
-      fields: Array<{
-        id: string;
-        name: string;
-        type: FieldType;
-        config: FieldConfig;
-      }>;
-      records: Array<{
-        id: string;
-        sequenceNumber: number;
-        values: Record<string, ReportCellValue>;
-      }>;
-    };
-  }>;
+  blocks: Array<DashboardTableBlockSource | DashboardTextBlockSource | DashboardImageBlockSource>;
 };
 
 export function buildReportModel(
   source: DashboardReportSource,
   options?: ReportBuildOptions
 ): ReportModel {
+  const blocks = source.blocks.map((block): ReportBlock => {
+    if (block.kind === 'text') {
+      return {
+        kind: 'text',
+        blockId: block.id,
+        title: block.config.title,
+        body: block.config.body,
+        includeInExport: block.includeInExport
+      };
+    }
+    if (block.kind === 'image') {
+      return {
+        kind: 'image',
+        blockId: block.id,
+        title: block.config.title,
+        caption: block.config.caption,
+        includeInExport: block.includeInExport,
+        asset: block.asset
+      };
+    }
+    const fields = block.view.view.config.visibleFieldIds
+      .map((id) => block.view.fields.find((field) => field.id === id))
+      .filter(
+        (
+          field
+        ): field is {
+          id: string;
+          name: string;
+          type: FieldType;
+          config: FieldConfig;
+        } => field !== undefined
+      )
+      .map((field) => ({
+        id: field.id,
+        name: field.name,
+        type: field.type,
+        width: block.view.view.config.fieldWidths[field.id],
+        ...block.view.view.config.fieldPresentation?.[field.id]
+      }));
+    return {
+      kind: 'table',
+      blockId: block.id,
+      title: block.titleOverride ?? block.view.database.name,
+      description: block.description,
+      includeInExport: block.includeInExport,
+      fields,
+      rows: block.view.records
+        .filter(
+          (record) =>
+            (options?.includeCompleted ?? true) ||
+            !isRecordCompleted(block.view.fields, record.values)
+        )
+        .map((record) => ({
+          recordId: record.id,
+          values: fields.map((field) => {
+            const sourceField = block.view.fields.find((candidate) => candidate.id === field.id)!;
+            return displayFieldValue(
+              sourceField,
+              field.type === 'sequence' ? record.sequenceNumber : (record.values[field.id] ?? null)
+            );
+          })
+        }))
+    };
+  });
   return {
     version: 1,
     title: options?.title?.trim() || source.dashboard.name,
@@ -78,56 +199,13 @@ export function buildReportModel(
     includeEmptySections: options?.includeEmptySections ?? false,
     includeCompleted: options?.includeCompleted ?? true,
     highlightStatus: options?.highlightStatus ?? true,
-    sections: source.blocks.map((block) => {
-      const fields = block.view.view.config.visibleFieldIds
-        .map((id) => block.view.fields.find((field) => field.id === id))
-        .filter(
-          (
-            field
-          ): field is {
-            id: string;
-            name: string;
-            type: FieldType;
-            config: FieldConfig;
-          } => field !== undefined
-        )
-        .map((field) => ({
-          id: field.id,
-          name: field.name,
-          type: field.type,
-          width: block.view.view.config.fieldWidths[field.id]
-        }));
-      return {
-        blockId: block.id,
-        title: block.titleOverride ?? block.view.database.name,
-        description: block.description,
-        includeInExport: block.includeInExport,
-        fields,
-        rows: block.view.records
-          .filter(
-            (record) =>
-              (options?.includeCompleted ?? true) ||
-              !isRecordCompleted(block.view.fields, record.values)
-          )
-          .map((record) => ({
-            recordId: record.id,
-            values: fields.map((field) => {
-              const sourceField = block.view.fields.find((candidate) => candidate.id === field.id)!;
-              return displayFieldValue(
-                sourceField,
-                field.type === 'sequence'
-                  ? record.sequenceNumber
-                  : (record.values[field.id] ?? null)
-              );
-            })
-          }))
-      };
-    })
+    blocks,
+    sections: blocks.filter(isReportSection)
   };
 }
 
 function displayFieldValue(
-  field: DashboardReportSource['blocks'][number]['view']['fields'][number],
+  field: DashboardTableBlockSource['view']['fields'][number],
   value: ReportCellValue
 ): ReportCellValue {
   const optionLabels = new Map(field.config.options?.map((option) => [option.id, option.label]));
@@ -138,6 +216,10 @@ function displayFieldValue(
     return value.map((optionId) => optionLabels.get(optionId) ?? optionId);
   }
   return value;
+}
+
+export function isReportSection(block: ReportBlock): block is ReportSection {
+  return block.kind === undefined || block.kind === 'table';
 }
 
 export function renderReportHtml(model: ReportModel): string {

@@ -61,7 +61,7 @@ describe('workspace backups', () => {
         version: 1,
         createdAt: '2026-08-04T08:00:00.000Z',
         applicationVersion: '0.1.0-test',
-        database: { filename: 'workspace.sqlite', migrations: { appliedCount: 1, totalCount: 1 } },
+        database: { filename: 'workspace.sqlite', migrations: { appliedCount: 2, totalCount: 2 } },
         workspace: { id: 'workspace-1', name: '中文项目工作区' }
       });
 

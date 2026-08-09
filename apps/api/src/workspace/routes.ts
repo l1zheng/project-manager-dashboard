@@ -27,6 +27,11 @@ import {
   ResourceNotFoundError,
   WorkspaceService
 } from './service.js';
+import {
+  ImageAssetValidationError,
+  maximumImageAssetBytes,
+  supportedImageMimeTypes
+} from './media.js';
 
 const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
 const fieldParamsSchema = z.object({ fieldId: z.string().trim().min(1).max(120) });
@@ -71,6 +76,13 @@ export function registerWorkspaceRoutes(
     { parseAs: 'buffer' },
     (_request, body, done) => done(null, body)
   );
+  for (const mimeType of supportedImageMimeTypes) {
+    app.addContentTypeParser(
+      mimeType,
+      { parseAs: 'buffer', bodyLimit: maximumImageAssetBytes },
+      (_request, body, done) => done(null, body)
+    );
+  }
 
   app.addHook('preHandler', async (request, reply) => {
     if (!isWorkspaceMutation(request.method, request.url)) return;
@@ -213,6 +225,38 @@ export function registerWorkspaceRoutes(
   app.patch('/api/dashboard-blocks/:blockId', async (request) =>
     service.updateDashboardBlock(blockParamsSchema.parse(request.params).blockId, request.body)
   );
+  app.put('/api/dashboards/:dashboardId/block-order', async (request) =>
+    service.reorderDashboardBlocks(
+      dashboardParamsSchema.parse(request.params).dashboardId,
+      request.body
+    )
+  );
+  app.put(
+    '/api/dashboard-blocks/:blockId/image',
+    { bodyLimit: maximumImageAssetBytes },
+    async (request) => {
+      if (!Buffer.isBuffer(request.body)) {
+        throw new ImageAssetValidationError('image_body_required', '请选择图片文件。');
+      }
+      return service.replaceImageBlockAsset(blockParamsSchema.parse(request.params).blockId, {
+        content: request.body,
+        mimeType: request.headers['content-type'] ?? '',
+        originalFilename: decodeImageFilename(request.headers['x-project-manager-filename'])
+      });
+    }
+  );
+  app.get('/api/media-assets/:mediaAssetId/content', async (request, reply) => {
+    const mediaAssetId = z
+      .object({ mediaAssetId: z.string().trim().min(1).max(120) })
+      .parse(request.params).mediaAssetId;
+    const asset = service.getMediaAssetContent(mediaAssetId);
+    return reply
+      .header('content-length', asset.byteLength)
+      .header('x-content-type-options', 'nosniff')
+      .header('cache-control', 'private, no-store')
+      .type(asset.mimeType)
+      .send(asset.content);
+  });
   app.post('/api/databases', async (request, reply) => {
     const database = service.createDatabase(request.body);
     return reply.code(201).send(database);
@@ -309,9 +353,24 @@ export function registerWorkspaceRoutes(
     if (error instanceof RestoreValidationError) {
       return reply.code(400).send({ error: error.code, message: error.message });
     }
+    if (error instanceof ImageAssetValidationError) {
+      return reply.code(error.code === 'image_too_large' ? 413 : 400).send({
+        error: error.code,
+        message: error.message
+      });
+    }
     request.log.error(error);
     return reply.code(500).send({ error: 'internal_error' });
   });
+}
+
+function decodeImageFilename(value: string | string[] | undefined): string | null {
+  if (typeof value !== 'string' || !value) return null;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function reportModelForRequest(

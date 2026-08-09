@@ -21,10 +21,23 @@ export type ViewConfig = {
   version: 1;
   visibleFieldIds: string[];
   fieldWidths: Record<string, number>;
+  fieldPresentation: Record<string, FieldPresentation>;
   filter: FilterExpression | null;
   sorts: SortClause[];
   includeArchived: boolean;
 };
+
+export type FieldPresentation = {
+  reportAlign?: 'left' | 'center' | 'right';
+  reportEmphasis?: 'normal' | 'strong';
+};
+
+const fieldPresentationSchema = z
+  .object({
+    reportAlign: z.enum(['left', 'center', 'right']).optional(),
+    reportEmphasis: z.enum(['normal', 'strong']).optional()
+  })
+  .strict();
 
 const viewConfigSchema = z
   .object({
@@ -32,6 +45,9 @@ const viewConfigSchema = z
     visibleFieldIds: z.array(z.string().trim().min(1).max(120)).max(100),
     fieldWidths: z
       .record(z.string().trim().min(1).max(120), z.number().int().min(60).max(1200))
+      .default({}),
+    fieldPresentation: z
+      .record(z.string().trim().min(1).max(120), fieldPresentationSchema)
       .default({}),
     filter: z.unknown().nullable().default(null),
     sorts: z.array(sortClauseSchema).max(10).default([]),
@@ -47,6 +63,7 @@ export function parseViewConfig(
   const fieldIds = new Set(fields.map((field) => field.id));
   assertKnownUniqueIds(raw.visibleFieldIds, fieldIds, 'visibleFieldIds');
   assertKnownUniqueIds(Object.keys(raw.fieldWidths), fieldIds, 'fieldWidths');
+  assertKnownUniqueIds(Object.keys(raw.fieldPresentation), fieldIds, 'fieldPresentation');
   assertKnownUniqueIds(
     raw.sorts.map((sort) => sort.fieldId),
     fieldIds,

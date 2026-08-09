@@ -48,4 +48,38 @@ describe('view configuration', () => {
       parseViewConfig({ version: 1, visibleFieldIds: ['gone'], filter: null }, fields)
     ).toThrow();
   });
+
+  it('defaults presentation metadata for old views and validates stable field references', () => {
+    expect(
+      parseViewConfig(
+        { version: 1, visibleFieldIds: ['title'], fieldWidths: {}, filter: null },
+        fields
+      ).fieldPresentation
+    ).toEqual({});
+    expect(
+      parseViewConfig(
+        {
+          version: 1,
+          visibleFieldIds: ['title'],
+          fieldWidths: {},
+          fieldPresentation: {
+            title: { reportAlign: 'center', reportEmphasis: 'strong' }
+          },
+          filter: null
+        },
+        fields
+      ).fieldPresentation.title
+    ).toEqual({ reportAlign: 'center', reportEmphasis: 'strong' });
+    expect(() =>
+      parseViewConfig(
+        {
+          version: 1,
+          visibleFieldIds: ['title'],
+          fieldPresentation: { gone: { reportAlign: 'center' } },
+          filter: null
+        },
+        fields
+      )
+    ).toThrow();
+  });
 });

@@ -7,8 +7,10 @@ import {
   createRecordInputSchema,
   createViewInputSchema,
   evaluateViewRecords,
+  parseDashboardBlockConfig,
   parseFieldConfig,
   parseViewConfig,
+  reorderDashboardBlocksInputSchema,
   updateFieldInputSchema,
   updateDatabaseInputSchema,
   updateDashboardBlockInputSchema,
@@ -16,6 +18,7 @@ import {
   updateViewInputSchema,
   validateRecordValues,
   type CreateRecordInput,
+  type DashboardBlockConfig,
   type FieldDefinitionForValidation,
   type FilterExpression
 } from '@project-manager/domain';
@@ -23,6 +26,7 @@ import { and, asc, eq, isNull } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import type { Persistence } from '../persistence/database.js';
 import * as schema from '../persistence/schema.js';
+import { validateImageAsset } from './media.js';
 
 const defaultWorkspaceSettingKey = 'default_workspace_id';
 const defaultWorkspaceName = '我的项目管理';
@@ -91,10 +95,15 @@ export class WorkspaceService {
     const blocks = this.persistence.db
       .select()
       .from(schema.dashboardBlocks)
-      .where(eq(schema.dashboardBlocks.dashboardId, dashboard.id))
+      .where(
+        and(
+          eq(schema.dashboardBlocks.dashboardId, dashboard.id),
+          isNull(schema.dashboardBlocks.archivedAt)
+        )
+      )
       .orderBy(asc(schema.dashboardBlocks.sortOrder))
       .all()
-      .map((block) => ({ ...block, view: this.getView(block.viewId) }));
+      .map((block) => this.toDashboardBlockOutput(block));
     return { dashboard, blocks };
   }
 
@@ -128,22 +137,34 @@ export class WorkspaceService {
   createDashboardBlock(dashboardId: string, input: unknown) {
     const command = createDashboardBlockInputSchema.parse(input);
     const dashboard = this.requireActiveDashboard(dashboardId);
-    const view = this.requireActiveView(command.viewId);
+    if (command.viewId) {
+      const view = this.requireActiveView(command.viewId);
+      const database = this.requireActiveDatabase(view.databaseId);
+      if (database.workspaceId !== dashboard.workspaceId) {
+        throw new ResourceNotFoundError('View');
+      }
+    }
+    if (command.mediaAssetId) {
+      this.requireActiveMediaAsset(command.mediaAssetId, dashboard.workspaceId);
+    }
     const now = new Date();
     const block = {
       id: randomUUID(),
       dashboardId: dashboard.id,
-      viewId: view.id,
-      titleOverride: normalizeNullable(command.titleOverride),
-      description: normalizeNullable(command.description),
+      kind: command.kind,
+      viewId: command.viewId,
+      mediaAssetId: command.mediaAssetId,
+      configVersion: command.config.version,
+      configJson: JSON.stringify(command.config),
       sortOrder: this.nextSortOrder('dashboard_blocks', 'dashboard_id', dashboard.id),
       isCollapsed: command.isCollapsed ?? false,
       includeInExport: command.includeInExport ?? true,
+      archivedAt: null,
       createdAt: now,
       updatedAt: now
     };
     this.persistence.db.insert(schema.dashboardBlocks).values(block).run();
-    return block;
+    return this.toDashboardBlockOutput(block);
   }
 
   updateDashboardBlock(blockId: string, input: unknown) {
@@ -151,15 +172,36 @@ export class WorkspaceService {
     const block = this.requireDashboardBlock(blockId);
     this.requireActiveDashboard(block.dashboardId);
     const updatedAt = new Date();
+    const currentConfig = parseDashboardBlockConfig(block.kind, parseJsonObject(block.configJson));
+    let nextConfig: DashboardBlockConfig =
+      command.config === undefined
+        ? currentConfig
+        : parseDashboardBlockConfig(block.kind, command.config);
+    if (block.kind === 'table_view') {
+      const tableConfig = parseDashboardBlockConfig('table_view', nextConfig);
+      nextConfig = {
+        ...tableConfig,
+        titleOverride:
+          command.titleOverride === undefined
+            ? tableConfig.titleOverride
+            : (normalizeNullable(command.titleOverride) ?? null),
+        description:
+          command.description === undefined
+            ? tableConfig.description
+            : (normalizeNullable(command.description) ?? null)
+      };
+    } else if (command.titleOverride !== undefined || command.description !== undefined) {
+      throw new ZodError([
+        {
+          code: 'custom',
+          path: [],
+          message: 'Legacy title and description updates apply only to table modules.'
+        }
+      ]);
+    }
     const next = {
-      titleOverride:
-        command.titleOverride === undefined
-          ? block.titleOverride
-          : normalizeNullable(command.titleOverride),
-      description:
-        command.description === undefined
-          ? block.description
-          : normalizeNullable(command.description),
+      configVersion: nextConfig.version,
+      configJson: JSON.stringify(nextConfig),
       isCollapsed: command.isCollapsed ?? block.isCollapsed,
       includeInExport: command.includeInExport ?? block.includeInExport,
       sortOrder: command.sortOrder ?? block.sortOrder,
@@ -170,7 +212,109 @@ export class WorkspaceService {
       .set(next)
       .where(eq(schema.dashboardBlocks.id, block.id))
       .run();
-    return { ...block, ...next };
+    return this.toDashboardBlockOutput({ ...block, ...next });
+  }
+
+  replaceImageBlockAsset(
+    blockId: string,
+    input: { content: Buffer; mimeType: string; originalFilename?: string | null }
+  ) {
+    const block = this.requireDashboardBlock(blockId);
+    if (block.kind !== 'image') throw new ResourceNotFoundError('Image module');
+    const dashboard = this.requireActiveDashboard(block.dashboardId);
+    const validated = validateImageAsset(input);
+    const replace = this.persistence.sqlite.transaction(() => {
+      const now = new Date();
+      const asset = {
+        id: randomUUID(),
+        workspaceId: dashboard.workspaceId,
+        mimeType: validated.mimeType,
+        byteLength: validated.byteLength,
+        sha256: validated.sha256,
+        originalFilename: validated.originalFilename,
+        content: validated.content,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now
+      };
+      this.persistence.db.insert(schema.mediaAssets).values(asset).run();
+      this.persistence.db
+        .update(schema.dashboardBlocks)
+        .set({ mediaAssetId: asset.id, updatedAt: now })
+        .where(eq(schema.dashboardBlocks.id, block.id))
+        .run();
+      if (block.mediaAssetId) {
+        const anotherReference = this.persistence.db
+          .select({ id: schema.dashboardBlocks.id })
+          .from(schema.dashboardBlocks)
+          .where(
+            and(
+              eq(schema.dashboardBlocks.mediaAssetId, block.mediaAssetId),
+              isNull(schema.dashboardBlocks.archivedAt)
+            )
+          )
+          .get();
+        if (!anotherReference) {
+          this.persistence.db
+            .update(schema.mediaAssets)
+            .set({ archivedAt: now, updatedAt: now })
+            .where(eq(schema.mediaAssets.id, block.mediaAssetId))
+            .run();
+        }
+      }
+      return this.toDashboardBlockOutput({ ...block, mediaAssetId: asset.id, updatedAt: now });
+    });
+    return replace();
+  }
+
+  getMediaAssetContent(mediaAssetId: string) {
+    const workspace = this.ensureDefaultWorkspace();
+    const asset = this.requireActiveMediaAsset(mediaAssetId, workspace.id);
+    return {
+      content: asset.content,
+      mimeType: asset.mimeType,
+      byteLength: asset.byteLength
+    };
+  }
+
+  reorderDashboardBlocks(dashboardId: string, input: unknown) {
+    const command = reorderDashboardBlocksInputSchema.parse(input);
+    const dashboard = this.requireActiveDashboard(dashboardId);
+    const activeBlocks = this.persistence.db
+      .select({ id: schema.dashboardBlocks.id })
+      .from(schema.dashboardBlocks)
+      .where(
+        and(
+          eq(schema.dashboardBlocks.dashboardId, dashboard.id),
+          isNull(schema.dashboardBlocks.archivedAt)
+        )
+      )
+      .all();
+    const activeIds = new Set(activeBlocks.map((block) => block.id));
+    if (
+      command.blockIds.length !== activeIds.size ||
+      command.blockIds.some((blockId) => !activeIds.has(blockId))
+    ) {
+      throw new ZodError([
+        {
+          code: 'custom',
+          path: ['blockIds'],
+          message: 'Block order must contain every active dashboard module exactly once.'
+        }
+      ]);
+    }
+    const reorder = this.persistence.sqlite.transaction(() => {
+      const updatedAt = new Date();
+      for (const [index, blockId] of command.blockIds.entries()) {
+        this.persistence.db
+          .update(schema.dashboardBlocks)
+          .set({ sortOrder: (index + 1) * sortOrderStep, updatedAt })
+          .where(eq(schema.dashboardBlocks.id, blockId))
+          .run();
+      }
+      return this.getDashboard(dashboard.id);
+    });
+    return reorder();
   }
 
   createDatabase(input: unknown) {
@@ -217,7 +361,11 @@ export class WorkspaceService {
       const databases = this.listDatabases();
       const dashboard = this.listDashboards()[0] ?? this.createDashboard({ name: '项目工作台' });
       let detail = this.getDashboard(dashboard.id);
-      const representedDatabaseIds = new Set(detail.blocks.map((block) => block.view.database.id));
+      const representedDatabaseIds = new Set(
+        detail.blocks.flatMap((block) =>
+          block.kind === 'table_view' ? [block.view.database.id] : []
+        )
+      );
 
       for (const database of databases) {
         if (representedDatabaseIds.has(database.id)) continue;
@@ -692,7 +840,7 @@ export class WorkspaceService {
     const block = this.persistence.db
       .select()
       .from(schema.dashboardBlocks)
-      .where(eq(schema.dashboardBlocks.id, blockId))
+      .where(and(eq(schema.dashboardBlocks.id, blockId), isNull(schema.dashboardBlocks.archivedAt)))
       .get();
     if (!block) throw new ResourceNotFoundError('Dashboard block');
     return block;
@@ -740,6 +888,22 @@ export class WorkspaceService {
       .get();
     if (!view) throw new ResourceNotFoundError('View');
     return view;
+  }
+
+  private requireActiveMediaAsset(mediaAssetId: string, workspaceId: string) {
+    const asset = this.persistence.db
+      .select()
+      .from(schema.mediaAssets)
+      .where(
+        and(
+          eq(schema.mediaAssets.id, mediaAssetId),
+          eq(schema.mediaAssets.workspaceId, workspaceId),
+          isNull(schema.mediaAssets.archivedAt)
+        )
+      )
+      .get();
+    if (!asset) throw new ResourceNotFoundError('Media asset');
+    return asset;
   }
 
   private setArchived(
@@ -836,6 +1000,49 @@ export class WorkspaceService {
         parseJsonObject(view.configJson),
         this.listActiveFields(view.databaseId).map((field) => this.toValidationField(field))
       )
+    };
+  }
+
+  private toDashboardBlockOutput(block: typeof schema.dashboardBlocks.$inferSelect) {
+    const config = parseDashboardBlockConfig(block.kind, parseJsonObject(block.configJson));
+    if (block.kind === 'table_view') {
+      if (!block.viewId) throw new Error('A persisted table module is missing its view reference.');
+      const tableConfig = parseDashboardBlockConfig('table_view', config);
+      return {
+        ...block,
+        kind: 'table_view' as const,
+        config: tableConfig,
+        titleOverride: tableConfig.titleOverride,
+        description: tableConfig.description,
+        view: this.getView(block.viewId)
+      };
+    }
+    if (block.kind === 'text') {
+      return {
+        ...block,
+        kind: 'text' as const,
+        config: parseDashboardBlockConfig('text', config)
+      };
+    }
+    const asset = block.mediaAssetId
+      ? this.requireActiveMediaAsset(
+          block.mediaAssetId,
+          this.requireActiveDashboard(block.dashboardId).workspaceId
+        )
+      : null;
+    return {
+      ...block,
+      kind: 'image' as const,
+      config: parseDashboardBlockConfig('image', config),
+      asset: asset
+        ? {
+            id: asset.id,
+            mimeType: asset.mimeType,
+            byteLength: asset.byteLength,
+            originalFilename: asset.originalFilename,
+            contentUrl: `/api/media-assets/${asset.id}/content`
+          }
+        : null
     };
   }
 }

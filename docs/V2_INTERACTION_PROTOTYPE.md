@@ -68,7 +68,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - [x] A text module's large title is editable and appears as the same section level in sidebar navigation and export preview.
 - [x] An image title appears in navigation and export only when supplied; a blank title emits no export heading.
 
-The checklist above passed automated browser interaction and visual verification on 2026-08-09. Hands-on user acceptance remains the promotion gate.
+The checklist above passed automated browser interaction and visual verification on 2026-08-09. The user completed hands-on acceptance on 2026-08-09 and authorized strict production promotion.
 
 ## Non-goals
 

@@ -4,8 +4,8 @@ Last updated: 2026-08-09
 
 ## Current state
 
-- Phase: Phase 9 V2 interaction prototype and browser checklist are complete, with iterative hands-on acceptance in progress. The existing Phase 8 workspace remains available; the separate in-memory route now validates mixed table/text/image modules before production integration.
-- Implementation: the V2 browser surface is one workspace canvas containing ordered table, text, and image modules. Tables retain independent schemas, inline editing, filters, and layout; text is edited inline; local images support selection/replacement and captions. The production independent database/view/dashboard model and export pipeline remain intact and have not yet adopted mixed-block persistence.
+- Phase: Phase 10 accepted V2 production integration. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is now active under ADR-0005.
+- Implementation: the accepted V2 browser surface remains the visual baseline. Production persistence now has a tested Phase 10 foundation for polymorphic table/text/image blocks, validated SQLite media assets, view-owned export presentation metadata, atomic module order, and a canonical mixed report projection. The production React workspace and mixed output adapters have not yet been connected to this foundation.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -35,13 +35,13 @@ Last updated: 2026-08-09
 
 ## Active task
 
-Collect hands-on acceptance for the expanded mixed-module V2 interaction before reconnecting it to SQLite.
+Implement the backward-compatible polymorphic block/media/view-presentation foundation, then reconnect the accepted V2 components to SQLite without redesigning their interaction.
 
 ## Next tasks
 
-1. Let the user exercise contextual property menus, column resize/reorder, automatic row creation, filters, text/image modules, and mixed export preview on `/prototype-v2`.
-2. Record any interaction corrections from hands-on feedback.
-3. After acceptance, extract/reuse the V2 components in the SQLite-backed workspace, add mixed-block/media persistence, and repeat Excel/Outlook regression.
+1. Add and upgrade-test the polymorphic `dashboard_blocks` and bounded `media_assets` persistence contract.
+2. Extend saved-view presentation metadata and the canonical mixed report model.
+3. Extract/reuse the accepted V2 workspace components against the new APIs, then repeat Excel/Outlook regression.
 
 ## Risks and validation items
 
@@ -57,6 +57,10 @@ Collect hands-on acceptance for the expanded mixed-module V2 interaction before 
 | Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Prototype preview passed; production promotion must use validated SQLite assets, workbook embedding, generated Outlook CIDs, and regression on target Windows. |
 
 ## Verification log
+
+- 2026-08-09: Completed the high-risk Phase 10 production foundation. Migration `0001` creates bounded local media assets and rebuilds legacy dashboard blocks into validated `table_view`/`text`/`image` modules. A real one-migration fixture proved automatic verified backup plus lossless preservation of legacy block ID, dashboard/view references, order, collapse/export flags, timestamps, title, and description. Added strict versioned block schemas, old-view-compatible field presentation metadata, PNG/JPEG/WebP/GIF signature validation, transactional image replacement, same-origin no-store image reads, exact-set atomic module ordering, and an ordered mixed report projection with a table-only editable-Excel compatibility view. Full regression passed 65 application tests and 3 release tests; Drizzle migration history check passed. No live user database was migrated during this isolated verification.
+
+- 2026-08-09: User accepted the current V2 interaction and Excel baseline for production promotion. ADR-0005 freezes the prototype as the implementation contract and selects a lossless block-table rebuild, validated SQLite media assets, view-owned export presentation metadata, atomic ordering, and one mixed canonical report order. Existing databases, fields, records, and views remain untouched by the block migration.
 
 - 2026-08-09: Removed the two explanatory subtitle lines that had been manually added only to the Excel style-review fixture. Presentation exports now have an explicit regression contract: a table-module description appears only when the user saved one, while a null description places the column header immediately after the section title and consumes no extra row. No database description or sample copy is synthesized by the report builder.
 

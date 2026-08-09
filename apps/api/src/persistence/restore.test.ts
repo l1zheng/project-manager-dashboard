@@ -56,7 +56,7 @@ describe('workspace restore recovery', () => {
     );
     expect(inspection).toMatchObject({
       manifest: { workspace: { id: source.workspaceId, name: '来源工作区' } },
-      migration: { appliedCount: 1, pendingCount: 0, totalCount: 1 }
+      migration: { appliedCount: 2, pendingCount: 0, totalCount: 2 }
     });
 
     const receipt = await confirmWorkspaceRestore(

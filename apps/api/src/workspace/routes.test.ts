@@ -333,7 +333,7 @@ describe('workspace API', () => {
       expect(restoreInspectionResponse.statusCode).toBe(201);
       expect(restoreInspectionResponse.json()).toMatchObject({
         manifest: { format: 'project-manager-workspace-backup', version: 1 },
-        migration: { appliedCount: 1, pendingCount: 0, totalCount: 1 }
+        migration: { appliedCount: 2, pendingCount: 0, totalCount: 2 }
       });
       const restoreId = restoreInspectionResponse.json().restoreId as string;
 

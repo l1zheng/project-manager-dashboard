@@ -37,7 +37,7 @@ describe('health endpoint', () => {
       expect(response.json()).toMatchObject({
         storage: {
           engine: 'sqlite',
-          migration: { appliedCount: 1, pendingCount: 0, totalCount: 1 }
+          migration: { appliedCount: 2, pendingCount: 0, totalCount: 2 }
         }
       });
     } finally {

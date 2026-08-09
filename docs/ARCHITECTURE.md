@@ -244,6 +244,8 @@ The launcher pins `127.0.0.1`, the configured non-privileged port, the built web
 
 The complete container, restore transaction, rollback, retention, packaging, and release-validation decisions are recorded in [ADR-0004](decisions/0004-backup-restore-and-windows-packaging.md).
 
+The accepted V2 production-promotion contract, polymorphic-block migration, validated SQLite image boundary, saved-view presentation metadata, and mixed-report evolution are recorded in [ADR-0005](decisions/0005-v2-production-promotion.md).
+
 ## 9. Architecture decisions still to validate
 
 - Clean Windows execution of the portable runtime bundle and its pinned `better-sqlite3` native binary under Node.js 24 LTS.

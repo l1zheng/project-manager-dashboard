@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export * from './filter.js';
 export * from './view.js';
+export * from './dashboard.js';
 
 export const healthResponseSchema = z.object({
   status: z.literal('ok'),
@@ -151,25 +152,6 @@ export const updateDashboardInputSchema = z
   .refine((input) => input.name !== undefined || input.description !== undefined, {
     message: 'At least one dashboard property must be supplied.'
   });
-export const createDashboardBlockInputSchema = z.object({
-  viewId: identifierSchema,
-  titleOverride: optionalDescriptionSchema,
-  description: optionalDescriptionSchema,
-  isCollapsed: z.boolean().optional(),
-  includeInExport: z.boolean().optional()
-});
-export const updateDashboardBlockInputSchema = z
-  .object({
-    titleOverride: optionalDescriptionSchema,
-    description: optionalDescriptionSchema,
-    isCollapsed: z.boolean().optional(),
-    includeInExport: z.boolean().optional(),
-    sortOrder: z.number().int().nonnegative().optional()
-  })
-  .refine((input) => Object.values(input).some((value) => value !== undefined), {
-    message: 'At least one dashboard block property must be supplied.'
-  });
-
 export const updateRecordInputSchema = createRecordInputSchema;
 
 export type UpdateRecordInput = z.infer<typeof updateRecordInputSchema>;

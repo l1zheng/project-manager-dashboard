@@ -195,7 +195,7 @@ Exit criteria:
 
 ## Phase 9 — V2 interaction-shell validation
 
-Status: prototype and browser checklist completed on 2026-08-09; iterative hands-on acceptance in progress
+Status: completed and accepted by the user on 2026-08-09
 
 Reason:
 
@@ -221,14 +221,37 @@ Tasks:
 - Apply explicit all-side borders to every populated business table cell and merged presentation span, matching Excel's “所有框线” expectation while retaining the accepted color hierarchy. Completed after hands-on review.
 - Match Excel's manual “所有框线” command exactly by rendering those table borders as uniform black thin lines rather than theme-colored or gray lines. Completed after direct comparison with Excel.
 - Keep table-module descriptions strictly opt-in in presentation exports: no example copy, database-description fallback, or empty subtitle row. Completed after export review.
-- On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, presentation-Excel image embedding, and a reviewed Outlook CID-image extension. Pending production integration.
-- Obtain hands-on user acceptance before reconnecting the shell to SQLite.
+- On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, presentation-Excel image embedding, and a reviewed Outlook CID-image extension. Moved to Phase 10.
+- Obtain hands-on user acceptance before reconnecting the shell to SQLite. Completed.
 
 Exit criteria:
 
 - The V2 acceptance checklist is completed in a browser.
 - The user confirms the interaction direction, including mixed page modules.
 - Production integration can reuse the accepted components rather than rebuilding them independently.
+
+## Phase 10 — Accepted V2 production integration
+
+Status: in progress — architecture and migration contract accepted in ADR-0005 on 2026-08-09
+
+Tasks:
+
+- Rebuild `dashboard_blocks` as a backward-compatible polymorphic table and migrate every legacy block losslessly. Completed in the Phase 10 foundation slice with a real legacy upgrade fixture and verified pre-migration backup.
+- Add bounded, signature-validated SQLite media assets and transactional image-block creation/replacement. Foundation completed for PNG/JPEG/WebP/GIF raw-body upload, replacement, metadata projection, and same-origin content reads.
+- Extend saved-view configuration with field-level export alignment and title-emphasis metadata while parsing old configurations unchanged. Completed with default-empty backward compatibility and stable-field validation.
+- Evolve the canonical report into ordered table/text/image blocks; retain table-only projection for editable Excel. Canonical mixed ordering and the table-only compatibility projection are complete; mixed output adapters remain pending.
+- Extend presentation Excel with embedded validated images and extend Outlook with server-generated CID attachments without relaxing the no-send boundary.
+- Extract/reuse the accepted V2 components in the production workspace and connect them to the SQLite APIs.
+- Implement atomic module reorder, blank-row creation, view-specific column resize/reorder, and the accepted duplicate/archive actions. Atomic complete-order persistence is implemented; UI connection and remaining actions are pending.
+- Repeat the complete V2 checklist against isolated SQLite data, then run export and Windows Outlook regression.
+
+Exit criteria:
+
+- The production `/` route matches the accepted `/prototype-v2` interaction and visible hierarchy.
+- Existing user tables and records survive migration without renamed IDs or rewritten values.
+- Mixed modules and their order survive restart and appear identically in preview and presentation export.
+- Editable Excel remains table-only; presentation Excel and Outlook preserve the mixed report order.
+- The temporary prototype route can be removed only after the production checklist passes.
 
 ## Phase 8 — Notion-style workspace correction
 

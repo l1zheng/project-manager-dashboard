@@ -2,6 +2,62 @@ import { describe, expect, it } from 'vitest';
 import { buildReportModel, renderReportHtml } from './report.js';
 
 describe('report model', () => {
+  it('preserves mixed module order while keeping editable-table sections separate', () => {
+    const model = buildReportModel({
+      dashboard: { name: '周报' },
+      blocks: [
+        {
+          id: 'text-1',
+          kind: 'text',
+          includeInExport: true,
+          config: { version: 1, title: '本周摘要', body: '按计划推进。' }
+        },
+        {
+          id: 'table-1',
+          kind: 'table_view',
+          titleOverride: null,
+          description: null,
+          includeInExport: true,
+          view: {
+            database: { name: '需求跟踪' },
+            view: {
+              name: '表格',
+              config: {
+                visibleFieldIds: ['title'],
+                fieldWidths: { title: 280 },
+                fieldPresentation: {
+                  title: { reportAlign: 'center', reportEmphasis: 'strong' }
+                }
+              }
+            },
+            fields: [{ id: 'title', name: '需求描述', type: 'long_text', config: { version: 1 } }],
+            records: [{ id: 'r1', sequenceNumber: 1, values: { title: '统一身份认证' } }]
+          }
+        },
+        {
+          id: 'image-1',
+          kind: 'image',
+          includeInExport: true,
+          config: { version: 1, title: '项目架构', caption: null },
+          asset: {
+            id: 'asset-1',
+            mimeType: 'image/png',
+            byteLength: 8,
+            originalFilename: '架构.png',
+            contentUrl: '/api/media-assets/asset-1/content'
+          }
+        }
+      ]
+    });
+
+    expect(model.blocks?.map((block) => block.kind)).toEqual(['text', 'table', 'image']);
+    expect(model.sections).toHaveLength(1);
+    expect(model.sections[0]?.fields[0]).toMatchObject({
+      reportAlign: 'center',
+      reportEmphasis: 'strong'
+    });
+  });
+
   it('projects saved visible fields and escapes rendered user content', () => {
     const model = buildReportModel({
       dashboard: { name: '周报' },
