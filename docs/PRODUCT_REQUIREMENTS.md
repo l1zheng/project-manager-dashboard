@@ -141,7 +141,7 @@ The user can:
 - Choose whether a block is included in export by default.
 - Open the source database or edit the linked view.
 
-The first release uses vertically stacked full-width modules. A table module owns an independent database view, a text module is directly editable, and an image module accepts a supported local image plus an optional caption. Multi-column freeform layout is deferred until the basic reporting workflow is reliable.
+The first release uses vertically stacked full-width modules. A table module owns an independent database view, a text module has a directly editable section title and multiline body, and an image module accepts a supported local image plus an optional caption. Multi-column freeform layout is deferred until the basic reporting workflow is reliable.
 
 Primary-workflow acceptance criteria:
 
@@ -149,7 +149,7 @@ Primary-workflow acceptance criteria:
 - All modules assigned to the current workspace are visible together as vertically stacked editable blocks.
 - The system creates the default view and dashboard placement automatically; the user does not need to understand or assemble those entities.
 - Table title, column names, cell values, new rows, new columns, and per-table filters are editable in place.
-- Text modules can be edited inline, and image modules can select, replace, or remove a local image without exposing filesystem paths.
+- Text-module titles and bodies can be edited inline, and image modules can select, replace, or remove a local image without exposing filesystem paths.
 - Editable table cells are vertically centered by default. Narrative text remains horizontally left-aligned; short metadata may be horizontally centered by field presentation settings.
 - Transient export, filter, and column-property menus close when the user clicks outside them or presses `Escape`; closing an unsaved property menu discards its local draft.
 
@@ -166,7 +166,7 @@ Before exporting, the user can preview the static report and choose:
 
 Interactive browser controls must not appear in the rendered report.
 
-The primary workspace export defaults to every module on the page, including header-only empty tables. Text and image modules retain their page order in static report and presentation exports. Before any report or workbook request begins, pending inline saves must finish successfully so the exported values cannot lag behind the visible page.
+The primary workspace export defaults to every module on the page, including header-only empty tables. Text-module titles render at the same section-heading level as table titles, while text and image modules retain their page order in static report and presentation exports. Before any report or workbook request begins, pending inline saves must finish successfully so the exported values cannot lag behind the visible page.
 
 ### FR-7 Outlook export
 

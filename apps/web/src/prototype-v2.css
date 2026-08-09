@@ -281,6 +281,23 @@ body.v2-is-dragging-module {
 .v2-content-block-toolbar .v2-block-drag-handle:active {
   cursor: grabbing;
 }
+.v2-page-text-title {
+  width: min(680px, 100%);
+  border: 0;
+  border-radius: 4px;
+  padding: 3px 10px;
+  color: #37352f;
+  background: transparent;
+  font: inherit;
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.4;
+  outline: none;
+}
+.v2-page-text-title:hover,
+.v2-page-text-title:focus {
+  background: #f7f7f5;
+}
 .v2-page-text-editor {
   width: 100%;
   min-height: 92px;
@@ -984,6 +1001,13 @@ body.v2-is-dragging-module {
 }
 .v2-report-page section.is-excel h2 {
   margin-top: 5px;
+}
+.v2-static-text-block h2 {
+  margin: 0 0 9px;
+  color: #262626;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.35;
 }
 .v2-static-text-block p {
   margin: 0;

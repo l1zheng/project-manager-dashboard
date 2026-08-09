@@ -44,7 +44,7 @@ type PrototypeTable = {
 
 type PrototypePageBlock =
   | { id: string; kind: 'table'; tableId: string }
-  | { id: string; kind: 'text'; content: string }
+  | { id: string; kind: 'text'; title: string; content: string }
   | { id: string; kind: 'image'; src?: string; fileName?: string; caption: string };
 
 type PopoverState =
@@ -436,7 +436,12 @@ export function PrototypeV2() {
     const id = `block-${crypto.randomUUID()}`;
     setPageBlocks((current) => [
       ...current,
-      { id, kind: 'text', content: '在这里输入说明、结论或本周摘要。' }
+      {
+        id,
+        kind: 'text',
+        title: '本周摘要',
+        content: '在这里输入说明、结论或本周摘要。'
+      }
     ]);
     setNotice('已添加文字模块。');
     closePopover();
@@ -739,7 +744,7 @@ export function PrototypeV2() {
           }
           return (
             <a href={`#${block.id}`} key={block.id}>
-              {block.kind === 'text' ? '¶ 文字' : '▧ 图片'}
+              {block.kind === 'text' ? `¶ ${block.title.trim() || '文字'}` : '▧ 图片'}
             </a>
           );
         })}
@@ -833,6 +838,19 @@ export function PrototypeV2() {
                       •••
                     </button>
                   </div>
+                  <input
+                    aria-label="文字模块标题"
+                    className="v2-page-text-title"
+                    onChange={(event) =>
+                      updatePageBlock(block.id, (current) =>
+                        current.kind === 'text'
+                          ? { ...current, title: event.target.value }
+                          : current
+                      )
+                    }
+                    placeholder="输入模块标题…"
+                    value={block.title}
+                  />
                   <textarea
                     aria-label="文字模块内容"
                     className="v2-page-text-editor"
@@ -1399,7 +1417,9 @@ export function PrototypeV2() {
                 <div className="v2-popover-content v2-compact-menu">
                   <div className="v2-popover-title">
                     <span>{block.kind === 'text' ? '¶' : '▧'}</span>
-                    <strong>{block.kind === 'text' ? '文字模块' : '图片模块'}</strong>
+                    <strong>
+                      {block.kind === 'text' ? block.title.trim() || '文字模块' : '图片模块'}
+                    </strong>
                   </div>
                   {destructiveConfirmation === 'content' ? (
                     <div className="v2-delete-confirm">
@@ -1785,9 +1805,11 @@ function ExportPreview({
             {exportSettings.period && <p>{exportSettings.period}</p>}
             {pageBlocks.map((block) => {
               if (block.kind === 'text') {
-                if (!exportSettings.includeEmpty && !block.content.trim()) return null;
+                if (!exportSettings.includeEmpty && !block.title.trim() && !block.content.trim())
+                  return null;
                 return (
                   <section className="v2-static-text-block" key={block.id}>
+                    <h2>{block.title.trim() || '文字'}</h2>
                     <p>{block.content.trim() || '—'}</p>
                   </section>
                 );

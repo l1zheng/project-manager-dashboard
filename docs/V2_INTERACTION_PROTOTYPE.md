@@ -33,6 +33,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - The property menu exposes one multiline-capable `文本` type; it does not ask the user to choose between short and long text.
 - Editable table cells are vertically centered by default; multiline narrative text stays horizontally left-aligned while short metadata can remain horizontally centered.
 - The page-level `添加模块` menu creates a table, inline text, or a local image with an optional caption. These modules share one ordered page and one export preview.
+- A text module has a large inline-editable section title above its multiline body. Sidebar navigation and static exports reuse that title; the export heading matches the table-section hierarchy.
 - Every module kind has the same drag handle and before/after drop feedback. Overflow menus expose up/down commands, disabling directions that are unavailable at the page boundary.
 - Page rendering, sidebar navigation, and export preview consume one canonical module order rather than maintaining separate lists.
 - Prototype image bytes are kept only in memory. Production promotion must use validated local assets rather than retaining arbitrary paths or external URLs.
@@ -63,6 +64,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - [x] The export preview preserves mixed module order and excludes all editing controls.
 - [x] Table, text, and image modules expose the same drag and up/down ordering controls.
 - [x] Reordering immediately updates the page, sidebar navigation, and export preview together.
+- [x] A text module's large title is editable and appears as the same section level in sidebar navigation and export preview.
 
 The checklist above passed automated browser interaction and visual verification on 2026-08-09. Hands-on user acceptance remains the promotion gate.
 
