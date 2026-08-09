@@ -132,6 +132,7 @@ export function registerWorkspaceRoutes(
     return reply.code(204).send();
   });
   app.get('/api/dashboards', async () => service.listDashboards());
+  app.post('/api/workspace/primary-dashboard', async () => service.ensurePrimaryDashboard());
   app.post('/api/dashboards', async (request, reply) =>
     reply.code(201).send(service.createDashboard(request.body))
   );
@@ -215,6 +216,9 @@ export function registerWorkspaceRoutes(
   app.get('/api/databases/:databaseId', async (request) => {
     return service.getDatabase(databaseParamsSchema.parse(request.params).databaseId);
   });
+  app.patch('/api/databases/:databaseId', async (request) =>
+    service.updateDatabase(databaseParamsSchema.parse(request.params).databaseId, request.body)
+  );
   app.get('/api/databases/:databaseId/views', async (request) =>
     service.listViews(databaseParamsSchema.parse(request.params).databaseId)
   );

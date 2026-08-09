@@ -79,6 +79,20 @@ export const createDatabaseInputSchema = z.object({
 
 export type CreateDatabaseInput = z.infer<typeof createDatabaseInputSchema>;
 
+export const updateDatabaseInputSchema = z
+  .object({
+    name: displayNameSchema.optional(),
+    description: optionalDescriptionSchema,
+    color: z.string().trim().max(40).nullable().optional()
+  })
+  .refine(
+    (input) =>
+      input.name !== undefined || input.description !== undefined || input.color !== undefined,
+    { message: 'At least one database property must be supplied.' }
+  );
+
+export type UpdateDatabaseInput = z.infer<typeof updateDatabaseInputSchema>;
+
 export const createFieldInputSchema = z.object({
   name: displayNameSchema,
   type: fieldTypeSchema,

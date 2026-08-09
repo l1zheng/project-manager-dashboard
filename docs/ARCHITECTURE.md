@@ -117,6 +117,22 @@ Filter expressions are structured data, not executable code. A view stores an ex
 
 The canonical operator, empty-value, nesting, and validation semantics are recorded in [ADR-0002](decisions/0002-shared-filter-semantics.md). This domain evaluator is the reference behavior for every presentation surface and any future SQLite optimization.
 
+### 5.1 Primary interaction projection
+
+The persistent domain model is intentionally richer than the normal UI. The browser's default surface is a single workspace canvas that projects the primary dashboard into vertically stacked editable tables:
+
+```text
+user creates a table
+  → database is created
+  → a default saved view is created automatically
+  → the view is placed on the primary dashboard automatically
+  → the editable table appears on the current page
+```
+
+An idempotent workspace bootstrap operation repairs missing default views or dashboard placements for active databases. This does not flatten schemas or duplicate records; it only assembles existing entities into the primary canvas. Database, view, and dashboard IDs remain the stable internal boundary used by filtering and exports.
+
+Routine schema and record operations are projected into the table itself: database names are table titles, fields are column headers, and records are rows. The legacy entity-by-entity configuration flow is not the default UI and may only reappear later as an explicitly advanced management surface.
+
 ## 6. Report rendering
 
 ### 6.1 Canonical report model

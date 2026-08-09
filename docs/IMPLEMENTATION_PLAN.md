@@ -193,6 +193,30 @@ Exit criteria:
 - Additional Outlook variants
 - Multi-user and LAN deployment
 
+## Phase 8 — Notion-style workspace correction
+
+Status: implementation complete; final browser verification on the user's active Mac workspace pending service restart approval
+
+Reason:
+
+Real-use feedback on 2026-08-09 showed that the production UI exposed the internal database → field editor → saved view → dashboard-block assembly sequence. This contradicted the intended Notion-style experience even though the underlying domain and exports were correct.
+
+Tasks:
+
+- Make the single workspace dashboard the default and only routine landing surface.
+- Automatically create missing default views and place every active database on the primary dashboard.
+- Create new tables directly on the page without a manual saved-view/dashboard step.
+- Edit table names, column names, cells, new rows, and new columns in place.
+- Keep filtering per table and place report/Excel/Outlook actions in one compact page toolbar.
+- Retain the existing database/view/dashboard model behind the interaction projection.
+- Add API coverage for idempotent multi-database workspace assembly and database renaming.
+
+Exit criteria:
+
+- Two differently shaped tables are visible and editable together immediately after opening the app.
+- A user can create a table, add columns, add a row, rename a column, and filter without leaving the workspace page.
+- Existing saved data and exports continue to use the shared view/report pipeline.
+
 ## Milestone order
 
 1. `M0 — Product direction`: Phase 0A.

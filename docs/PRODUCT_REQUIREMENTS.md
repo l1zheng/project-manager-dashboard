@@ -6,11 +6,11 @@ The product is a local project-management workspace for a single user. It preser
 
 Its defining workflow is:
 
-1. Create databases such as Requirement Tracking, Key Matters, and Key Risks.
-2. Give each database its own field names, field types, records, and saved views.
-3. Place selected views together on one dashboard.
-4. Filter and review work in the browser.
-5. export the current report to a classic Outlook draft or to Excel without manually rebuilding the layout.
+1. Open one workspace page that already contains all current tables.
+2. Create tables such as Requirement Tracking, Key Matters, and Key Risks directly on that page.
+3. Add or rename each table's business-specific columns from the table header and edit records inline.
+4. Filter each table independently without leaving the page.
+5. Export the current page to a classic Outlook draft or to Excel without manually rebuilding the layout.
 
 ## 2. User and environment
 
@@ -38,6 +38,10 @@ The same database may appear several times with different filters, sorts, visibl
 
 The application may create and display an Outlook draft. The user remains responsible for recipients, final review, and sending.
 
+### 3.5 Hide implementation concepts from the primary workflow
+
+Databases, saved views, dashboards, and dashboard blocks remain valid internal concepts, but the normal user journey must feel like editing several Notion-style inline tables on one page. Creating a table automatically creates and places its default view. Schema management is performed from table headers; a separate database/field configuration page must not be required for routine work.
+
 ## 4. Core concepts
 
 | Concept | Definition |
@@ -64,6 +68,7 @@ The user can:
 Acceptance criteria:
 
 - Creating a database does not require selecting a global schema.
+- Creating a database automatically places an editable table on the current workspace page.
 - Changing one database's fields does not affect another database.
 - Deleting a database requires confirmation and is recoverable through an archive or backup until permanent deletion.
 
@@ -83,7 +88,7 @@ First-release field types:
 - URL
 - Automatic sequence number
 
-The user can add, rename, reorder, configure, hide, and delete fields. Field values are stored against stable field IDs so renaming a field does not lose data.
+The user can add, rename, reorder, configure, hide, and delete fields. Routine add/rename operations are available from the table header. Field values are stored against stable field IDs so renaming a field does not lose data.
 
 Later field types:
 
@@ -136,6 +141,13 @@ The user can:
 - Open the source database or edit the linked view.
 
 The first release uses vertically stacked full-width table blocks. Multi-column freeform layout is deferred until the basic reporting workflow is reliable.
+
+Primary-workflow acceptance criteria:
+
+- Opening the application displays the workspace dashboard, not a schema configuration page.
+- All tables assigned to the current workspace are visible together as vertically stacked editable blocks.
+- The system creates the default view and dashboard placement automatically; the user does not need to understand or assemble those entities.
+- Table title, column names, cell values, new rows, new columns, and per-table filters are editable in place.
 
 ### FR-6 Report preview
 
@@ -232,10 +244,11 @@ Acceptance criteria:
 
 ## 8. Primary acceptance journey
 
-1. Create `需求跟踪` with seven requirement-specific fields.
-2. Create `关键风险` with risk-specific fields including `风险消减措施`.
-3. Add filtered views of both databases to one dashboard.
-4. Change the requirement view without changing the risk view.
-5. Preview the dashboard as a static weekly report.
-6. Open the report as a formatted draft in classic Outlook.
-7. Export both an editable workbook and a single-sheet presentation workbook.
+1. Open the application and immediately see one workspace page.
+2. Create `需求跟踪` on that page and add seven requirement-specific columns from its table header.
+3. Create `关键风险` on the same page with risk-specific columns including `风险消减措施`.
+4. Add and edit rows directly in both tables, then filter each table independently.
+5. Reload and confirm both differently shaped tables remain together on the page.
+6. Preview the page as a static weekly report.
+7. Open the report as a formatted draft in classic Outlook.
+8. Export both an editable workbook and a single-sheet presentation workbook.

@@ -10,6 +10,7 @@ import {
   parseFieldConfig,
   parseViewConfig,
   updateFieldInputSchema,
+  updateDatabaseInputSchema,
   updateDashboardBlockInputSchema,
   updateDashboardInputSchema,
   updateViewInputSchema,
@@ -181,6 +182,62 @@ export class WorkspaceService {
 
     this.persistence.db.insert(schema.databases).values(database).run();
     return database;
+  }
+
+  updateDatabase(databaseId: string, input: unknown) {
+    const command = updateDatabaseInputSchema.parse(input);
+    const database = this.requireActiveDatabase(databaseId);
+    const next = {
+      name: command.name ?? database.name,
+      description:
+        command.description === undefined
+          ? database.description
+          : normalizeNullable(command.description),
+      color: command.color === undefined ? database.color : normalizeNullable(command.color),
+      updatedAt: new Date()
+    };
+    this.persistence.db
+      .update(schema.databases)
+      .set(next)
+      .where(eq(schema.databases.id, database.id))
+      .run();
+    return { ...database, ...next };
+  }
+
+  ensurePrimaryDashboard() {
+    const ensure = this.persistence.sqlite.transaction(() => {
+      const databases = this.listDatabases();
+      const dashboard = this.listDashboards()[0] ?? this.createDashboard({ name: '项目工作台' });
+      let detail = this.getDashboard(dashboard.id);
+      const representedDatabaseIds = new Set(detail.blocks.map((block) => block.view.database.id));
+
+      for (const database of databases) {
+        if (representedDatabaseIds.has(database.id)) continue;
+        const existingView = this.listViews(database.id)[0];
+        let viewId = existingView?.id;
+        if (!viewId) {
+          const fields = this.getDatabase(database.id).fields;
+          viewId = this.createView(database.id, {
+            name: '表格',
+            config: {
+              version: 1,
+              visibleFieldIds: fields.map((field) => field.id),
+              filter: null,
+              sorts: [],
+              fieldWidths: {},
+              includeArchived: false
+            }
+          }).id;
+        }
+        this.createDashboardBlock(dashboard.id, { viewId });
+        representedDatabaseIds.add(database.id);
+      }
+
+      detail = this.getDashboard(dashboard.id);
+      return detail;
+    });
+
+    return ensure();
   }
 
   getDatabase(databaseId: string) {

@@ -4,8 +4,8 @@ Last updated: 2026-08-09
 
 ## Current state
 
-- Phase: Phases 0 through 7 are complete for the 0.1.0 personal release. The Windows x64 portable artifact, offline/recovery matrix, desktop Excel, and classic Outlook acceptance were confirmed on 2026-08-09; P7-08 user and recovery documentation is complete.
-- Implementation: version 0.1.0 supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, both Excel downloads, classic Outlook draft/HTML/clipboard paths, verified full-workspace backup/restore with startup rollback, and an integrity-checked offline Windows x64 portable package.
+- Phase: Phase 8 Notion-style workspace correction is implemented after real-use feedback exposed a severe primary-flow mismatch in 0.1.0. Final browser verification against the user's active Mac workspace is pending a permitted service restart.
+- Implementation: the default browser surface is now one workspace canvas containing all active tables. Default views/dashboard placements are assembled automatically; table titles, column titles, cells, new rows, new columns, and per-table filters are edited in place. The existing independent database/view/dashboard model and export pipeline remain intact.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -16,12 +16,13 @@ Last updated: 2026-08-09
 
 - Independent custom databases retain their own schemas and terminology.
 - Multiple saved database views are displayed together on one dashboard.
+- Databases, views, and dashboard blocks are internal concepts; the routine UI presents them as editable inline tables on one page and automatically performs default view/dashboard assembly.
 - View filters and layout drive all exports.
 - Outlook integration creates and displays a draft; it never sends.
 - Classic Outlook local automation is the primary integration, with rich-copy and HTML fallbacks.
 - Excel provides both editable multi-sheet and presentation single-sheet modes.
 - Presentation Excel uses a fine base grid and calculated merged spans.
-- The Phase 0A dashboard structure, database configuration flow, independent filtering, and Outlook/Excel preview direction are accepted as the production interaction baseline.
+- The Phase 0A reporting density and Outlook/Excel direction remain valid, but its separate database configuration workflow was rejected by real-use feedback on 2026-08-09 and is superseded by the Notion-style single-page workspace.
 - Model use follows a three-tier routing agreement; the assistant proactively recommends switching before tasks that materially benefit from a different tier.
 - Persistence targets Node.js 24 LTS with stable Drizzle ORM and `better-sqlite3`; built-in `node:sqlite` is deferred until stable in both the target runtime and Drizzle adapter.
 - Record values use versioned JSON keyed by stable field ID; field, option, and view semantics use stable IDs so labels can change without rewriting data.
@@ -32,12 +33,13 @@ Last updated: 2026-08-09
 
 ## Active task
 
-None for version 0.1.0. The personal release has completed implementation, Windows acceptance, user documentation, and recovery documentation.
+Complete Phase 8 browser verification on the active Mac workspace, then publish the corrective release.
 
 ## Next tasks
 
-1. Use version 0.1.0 for real weekly work and record concrete defects or workflow friction.
-2. Prioritize deferred backlog items only after user feedback or a new explicit requirement.
+1. Restart the compiled Mac service with the active local data directory and verify the new single-page workspace using the user's existing tables.
+2. Verify creating a second differently shaped table, inline field rename, inline record save, independent filtering, and both Excel exports.
+3. Publish the corrective release and repeat the Windows browser regression before the next portable package.
 
 ## Risks and validation items
 
@@ -52,6 +54,8 @@ None for version 0.1.0. The personal release has completed implementation, Windo
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
 
 ## Verification log
+
+- 2026-08-09: Implemented the Phase 8 Notion-style workspace correction after the user rejected the production workflow as overly complex and inconsistent with the agreed direction. Added an idempotent primary-dashboard assembler, database rename API, a new single-page React workspace with vertically stacked editable tables, inline table/column/cell editing, inline row/column creation, per-table filters, compact exports, and automatic saved-view/dashboard placement. Added API coverage proving two differently shaped databases appear together and repeated assembly is idempotent. Verified release tests (3), domain tests (11), export tests (15), API tests (29), lint, TypeScript builds, and production web build. Browser verification is pending because the local-service restart permission review disconnected; the active user data was not modified by the failed restart attempt.
 
 - 2026-08-09: Completed an isolated macOS production smoke test on the Mac mini without Outlook. The compiled app served on `127.0.0.1:4317` with a temporary `PM_DATA_DIR`; the browser created an independent database with sequence, short-text, long-text, date, person, and status fields, configured `已完成` completion semantics, created a Chinese record, saved a view, added it to a dashboard, and retained the complete record including `2026-08-15` after a page reload. Both editable and presentation Excel endpoints returned valid workbooks. Independent artifact-tool inspection confirmed one six-column editable sheet, one 60-column presentation report, typed date values rendered as `2026-08-15`, expected Chinese content/status, no formula errors, and legible visual layouts. The isolated service was stopped after verification; the normal macOS application-data directory was never used. No product defect was found.
 
