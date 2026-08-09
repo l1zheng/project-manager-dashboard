@@ -10,7 +10,7 @@ Its defining workflow is:
 2. Create tables such as Requirement Tracking, Key Matters, and Key Risks directly on that page, or add explanatory text and local images between them.
 3. Add or rename each table's business-specific columns from the table header and edit records inline.
 4. Filter each table independently without leaving the page.
-5. Export the current mixed page to a classic Outlook draft or to Excel without manually rebuilding the layout.
+5. Export the current mixed page to Excel without manually rebuilding the layout; classic Outlook draft export remains an optional follow-up convenience.
 
 ## 2. User and environment
 
@@ -168,9 +168,11 @@ Interactive browser controls must not appear in the rendered report.
 
 The primary workspace export defaults to every module on the page, including header-only empty tables. Text-module titles render at the same section-heading level as table titles. An image title renders at that level only when non-empty; an untitled image emits no placeholder heading. Text and image modules retain their page order in static report and presentation exports. Before any report or workbook request begins, pending inline saves must finish successfully so the exported values cannot lag behind the visible page.
 
-### FR-7 Outlook export
+### FR-7 Outlook export (optional follow-up)
 
-Primary first-release behavior on Windows with classic Outlook:
+The primary reporting handoff is Excel. The user may manually paste an exported workbook into Outlook, so classic Outlook automation must not block the usable dashboard-and-Excel workflow or its release acceptance.
+
+When the optional Windows classic Outlook integration is enabled:
 
 1. Render an Outlook-compatible HTML report using table layout and inline styles.
 2. Invoke the installed classic Outlook client locally.
@@ -261,5 +263,5 @@ Acceptance criteria:
 4. Add and edit rows directly in both tables, then filter each table independently.
 5. Reload and confirm both differently shaped tables remain together on the page.
 6. Preview the page as a static weekly report.
-7. Open the report as a formatted draft in classic Outlook.
-8. Export both an editable workbook and a single-sheet presentation workbook.
+7. Export both an editable workbook and a single-sheet presentation workbook.
+8. Optionally open the report as a formatted draft in classic Outlook on a Windows machine where that convenience integration has been accepted.

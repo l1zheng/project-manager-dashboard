@@ -141,9 +141,9 @@ Exit criteria:
 - Presentation workbook combines differently shaped modules on one sheet.
 - Excel opens both files without repair warnings.
 
-## Phase 6 — Classic Outlook draft integration
+## Phase 6 — Classic Outlook draft integration (optional follow-up)
 
-Status: completed — implementation completed on 2026-08-04 and Windows classic Outlook acceptance completed on 2026-08-09.
+Status: implementation complete; future Windows classic Outlook acceptance is optional and does not block the dashboard-and-Excel release path.
 
 Tasks:
 
@@ -232,7 +232,7 @@ Exit criteria:
 
 ## Phase 10 — Accepted V2 production integration
 
-Status: in progress — macOS production promotion verified; Windows classic Outlook CID acceptance remains
+Status: completed for the prioritized dashboard-and-Excel workflow — macOS production promotion and Excel verification passed; Windows classic Outlook CID rendering is a deferred optional acceptance.
 
 Tasks:
 
@@ -240,17 +240,17 @@ Tasks:
 - Add bounded, signature-validated SQLite media assets and transactional image-block creation/replacement. Foundation completed for PNG/JPEG/GIF raw-body upload, replacement, metadata projection, and same-origin content reads; WebP is deferred until deterministic workbook conversion exists.
 - Extend saved-view configuration with field-level export alignment and title-emphasis metadata while parsing old configurations unchanged. Completed with default-empty backward compatibility and stable-field validation.
 - Evolve the canonical report into ordered table/text/image blocks; retain a table-only projection for editable Excel. Completed.
-- Extend presentation Excel with embedded validated images and extend Outlook with server-generated CID attachments without relaxing the no-send boundary. Completed in code; classic Outlook CID rendering remains a Windows acceptance gate.
+- Extend presentation Excel with embedded validated images and extend Outlook with server-generated CID attachments without relaxing the no-send boundary. Completed in code; classic Outlook CID rendering is deferred as an optional Windows-only follow-up.
 - Extract/reuse the accepted V2 components in the production workspace and connect them to the SQLite APIs. Completed: `/` uses the accepted V2 surface and the strict polymorphic block response. Debug data is disposable during this promotion, so the UI does not contain a pre-migration service-response compatibility branch.
 - Implement atomic module reorder, blank-row creation, view-specific column resize/reorder, and the accepted duplicate/archive actions. Completed in the production UI and API, with browser and API regression coverage.
-- Repeat the complete V2 checklist against SQLite data and visually inspect the mixed presentation workbook. Completed on macOS against the normal application-data workspace; only the Windows Outlook CID regression remains.
+- Repeat the complete V2 checklist against SQLite data and visually inspect the mixed presentation workbook. Completed on macOS against the normal application-data workspace.
 
 Exit criteria:
 
 - The production `/` route matches the accepted `/prototype-v2` interaction and visible hierarchy.
 - Existing user tables and records survive migration without renamed IDs or rewritten values.
 - Mixed modules and their order survive restart and appear identically in preview and presentation export.
-- Editable Excel remains table-only; presentation Excel and Outlook preserve the mixed report order.
+- Editable Excel remains table-only; presentation Excel preserves the mixed report order. Outlook preserves it when that optional integration is used.
 - The temporary prototype route can be removed only after the production checklist passes.
 
 ## Phase 8 — Notion-style workspace correction

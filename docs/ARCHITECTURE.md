@@ -203,6 +203,8 @@ The Microsoft Outlook Object Model supports creating an item through `Applicatio
 
 The full process, signature, timeout, error-mapping, endpoint, fallback, and no-send decisions are recorded in [ADR-0003](decisions/0003-classic-outlook-draft-boundary.md).
 
+Classic Outlook remains an optional convenience integration. The core release acceptance path is the local dashboard plus editable and presentation Excel exports; a macOS development environment cannot validate the real Windows COM compose window, and that target-machine verification is deferred until the user chooses to prioritize it.
+
 ### 6.3 Excel layout engine
 
 Editable export maps each view to a normal worksheet table.

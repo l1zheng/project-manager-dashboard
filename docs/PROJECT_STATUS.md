@@ -5,7 +5,7 @@ Last updated: 2026-08-10
 ## Current state
 
 - Phase: Phase 10 accepted V2 production integration. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is now active under ADR-0005.
-- Implementation: the accepted V2 browser surface is the production `/` route and consumes only the strict polymorphic block API. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, and per-view layout. Its export controls call the real editable/presentation Excel and Outlook endpoints after persisting current page state. Presentation Excel, browser HTML, and Outlook HTML preserve the mixed module order; presentation Excel embeds validated internal images and classic Outlook receives them through bounded server-generated CID attachments. Full regression, workbook visual inspection, and live macOS browser verification passed; Windows Outlook CID acceptance remains.
+- Implementation: the accepted V2 browser surface is the production `/` route and consumes only the strict polymorphic block API. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, and per-view layout. Its export controls call the real editable/presentation Excel and optional Outlook endpoints after persisting current page state. Presentation Excel, browser HTML, and Outlook HTML preserve the mixed module order; presentation Excel embeds validated internal images and classic Outlook can receive them through bounded server-generated CID attachments. Full regression, workbook visual inspection, and live macOS browser verification passed. The dashboard-and-Excel workflow is the current acceptance baseline; Windows Outlook CID acceptance is deferred.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -21,7 +21,7 @@ Last updated: 2026-08-10
 - Production images will use bounded validated bytes in local SQLite, referenced by stable asset IDs, so full-workspace backup remains self-contained.
 - View filters and layout drive all exports.
 - Outlook integration creates and displays a draft; it never sends.
-- Classic Outlook local automation is the primary integration, with rich-copy and HTML fallbacks.
+- Excel is the primary reporting handoff. Classic Outlook local automation is an optional convenience integration, with HTML fallback.
 - Excel provides both editable multi-sheet and presentation single-sheet modes.
 - Presentation Excel uses a fine base grid and calculated merged spans.
 - The Phase 0A reporting density and Outlook/Excel direction remain valid, but its separate database configuration workflow was rejected by real-use feedback on 2026-08-09 and is superseded by the Notion-style single-page workspace.
@@ -35,13 +35,13 @@ Last updated: 2026-08-10
 
 ## Active task
 
-Complete the remaining Windows classic Outlook acceptance for inline CID images while keeping the reviewed no-send boundary intact.
+Collect user feedback from normal Mac dashboard-and-Excel use, then prioritize the next usability issue or feature request. Windows classic Outlook CID acceptance is explicitly deferred.
 
 ## Next tasks
 
-1. On the Windows target, verify PNG/JPEG/GIF inline images, signature retention, Chinese text, and visible compose-window behavior in classic Outlook.
-2. Run the existing no-send script scan and full release regression on Windows after that acceptance.
-3. Remove the temporary `/prototype-v2` route only after the user confirms the production `/` route remains satisfactory.
+1. Continue normal dashboard-and-Excel use on macOS and collect concrete usability feedback.
+2. Remove the temporary `/prototype-v2` route only after the user confirms the production `/` route remains satisfactory.
+3. When Outlook convenience becomes a priority, use a Windows target to verify PNG/JPEG/GIF inline images, Chinese text, and the visible classic Outlook compose window, then run the no-send scan and release regression there.
 
 ## Risks and validation items
 
@@ -54,9 +54,11 @@ Complete the remaining Windows classic Outlook acceptance for inline CID images 
 | Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | ADR-0004 validation, injected rollback, offline restore, and upgrade journeys passed; retain manual backups before updates. |
 | Packaging | Corporate Windows policy may reject an unsigned portable launcher. | The canonical portable bundle passed the target environment; add signing only if another policy environment requires it. |
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
-| Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes; generated Outlook CIDs are implemented and isolated, with target-Windows rendering still pending. |
+| Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes. Generated Outlook CIDs are implemented and isolated, but target-Windows rendering is deferred because Outlook is not the current primary handoff. |
 
 ## Verification log
+
+- 2026-08-10: User clarified that current development is on a Mac mini and that classic Outlook export is lower priority because Excel can be pasted into Outlook manually. The project therefore treats Excel as the primary reporting handoff. The existing no-send Outlook implementation and HTML fallback remain available, but real Windows COM/CID compose-window acceptance is deferred and no longer blocks the dashboard-and-Excel workflow.
 
 - 2026-08-10: Completed the high-model Phase 10 mixed-output promotion and removed the temporary old-service response compatibility branch at the user's direction. The production browser now consumes only strict `table_view`/`text`/`image` blocks. Browser/report HTML, presentation Excel, and Outlook HTML preserve one canonical mixed order; presentation Excel embeds validated PNG/JPEG/GIF bytes, while the classic Outlook bridge materializes only signature-matching internal assets into its unique request directory and attaches them with generated CIDs. Client-authored paths, general attachments, recipients, `Save`, and `Send` remain forbidden. The V2 export popover was reconnected to real editable/presentation Excel and Outlook draft/HTML actions, with a pre-export persistence gate for current tables, records, views, and content modules. The stale port-4300 process was stopped, migration `0002` applied to the normal macOS workspace, and the freshly built strict service was started. Live browser verification created, edited, reloaded, previewed, exported, and then deleted text/image acceptance modules; outside-click dismissal, anchored column properties, image upload, optional image title/caption, and cleanup all passed. A real live presentation workbook preserved `需求跟踪 → 关键风险 → 验收摘要 → 导出链路示意图`, contained one embedded image, used the accepted black all-border table grid, and had no formulas or formula errors. Artifact-tool and LibreOffice inspections confirmed the workbook structure and image payload. Automated verification passed 69 application tests, 3 release tests, TypeScript builds, Vite production build, ESLint, Prettier, and `git diff --check`. The only remaining platform gate is classic Outlook CID rendering on Windows.
 
