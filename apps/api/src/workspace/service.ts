@@ -16,7 +16,8 @@ import {
   updateViewInputSchema,
   validateRecordValues,
   type CreateRecordInput,
-  type FieldDefinitionForValidation
+  type FieldDefinitionForValidation,
+  type FilterExpression
 } from '@project-manager/domain';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { ZodError } from 'zod';
@@ -31,6 +32,13 @@ export class ResourceNotFoundError extends Error {
   constructor(resource: string) {
     super(`${resource} was not found.`);
     this.name = 'ResourceNotFoundError';
+  }
+}
+
+export class FieldValuesRequireClearError extends Error {
+  constructor() {
+    super('修改该列属性会使现有值失效。请确认清空这一列后再继续。');
+    this.name = 'FieldValuesRequireClearError';
   }
 }
 
@@ -293,30 +301,105 @@ export class WorkspaceService {
     }
 
     this.requireActiveDatabase(field.databaseId);
+    const currentConfig = parseFieldConfig(field.type, parseJsonObject(field.configJson));
+    const nextType = command.type ?? field.type;
     const nextConfig =
       command.config === undefined
-        ? parseFieldConfig(field.type, parseJsonObject(field.configJson))
-        : parseFieldConfig(field.type, command.config);
+        ? parseFieldConfig(nextType, nextType === field.type ? currentConfig : { version: 1 })
+        : parseFieldConfig(nextType, command.config);
     this.assertSingleCompletionField(field.databaseId, field.id, nextConfig);
-    const nextValues: Partial<typeof schema.fields.$inferInsert> = {
-      updatedAt: new Date(),
-      configVersion: nextConfig.version,
-      configJson: JSON.stringify(nextConfig)
-    };
-
-    if (command.name !== undefined) {
-      nextValues.name = command.name;
+    const records = this.persistence.db
+      .select()
+      .from(schema.records)
+      .where(eq(schema.records.databaseId, field.databaseId))
+      .all();
+    const invalidRecordIds = records.flatMap((record) => {
+      const values = parseJsonObject(record.valuesJson);
+      if (!(field.id in values)) return [];
+      try {
+        validateRecordValues([{ id: field.id, type: nextType, config: nextConfig }], {
+          [field.id]: values[field.id]
+        });
+        return [];
+      } catch {
+        return [record.id];
+      }
+    });
+    if (invalidRecordIds.length > 0 && command.clearValues !== true) {
+      throw new FieldValuesRequireClearError();
     }
-    if (command.description !== undefined) {
-      nextValues.description = normalizeNullable(command.description);
-    }
 
-    this.persistence.db
-      .update(schema.fields)
-      .set(nextValues)
-      .where(eq(schema.fields.id, field.id))
-      .run();
-    return this.toFieldOutput({ ...field, ...nextValues });
+    const update = this.persistence.sqlite.transaction(() => {
+      const updatedAt = new Date();
+      if (invalidRecordIds.length > 0) {
+        for (const record of records) {
+          if (!invalidRecordIds.includes(record.id)) continue;
+          const values = parseJsonObject(record.valuesJson);
+          delete values[field.id];
+          this.persistence.db
+            .update(schema.records)
+            .set({ valuesJson: JSON.stringify(values), updatedAt })
+            .where(eq(schema.records.id, record.id))
+            .run();
+        }
+      }
+
+      const nextValues: Partial<typeof schema.fields.$inferInsert> = {
+        type: nextType,
+        updatedAt,
+        configVersion: nextConfig.version,
+        configJson: JSON.stringify(nextConfig)
+      };
+      if (command.name !== undefined) nextValues.name = command.name;
+      if (command.description !== undefined) {
+        nextValues.description = normalizeNullable(command.description);
+      }
+      this.persistence.db
+        .update(schema.fields)
+        .set(nextValues)
+        .where(eq(schema.fields.id, field.id))
+        .run();
+
+      if (command.type !== undefined || command.config !== undefined) {
+        const validationFields = this.listActiveFields(field.databaseId).map((item) =>
+          item.id === field.id
+            ? { id: field.id, type: nextType, config: nextConfig }
+            : this.toValidationField(item)
+        );
+        const views = this.persistence.db
+          .select()
+          .from(schema.views)
+          .where(eq(schema.views.databaseId, field.databaseId))
+          .all();
+        for (const view of views) {
+          const rawConfig = parseJsonObject(view.configJson);
+          let config;
+          try {
+            config = parseViewConfig(rawConfig, validationFields);
+          } catch {
+            config = parseViewConfig(
+              {
+                ...rawConfig,
+                filter: removeFieldFromFilter(rawConfig.filter, field.id)
+              },
+              validationFields
+            );
+          }
+          this.persistence.db
+            .update(schema.views)
+            .set({
+              configVersion: config.version,
+              configJson: JSON.stringify(config),
+              updatedAt
+            })
+            .where(eq(schema.views.id, view.id))
+            .run();
+        }
+      }
+
+      return this.toFieldOutput({ ...field, ...nextValues });
+    });
+    return update();
   }
 
   createRecord(databaseId: string, input: unknown) {
@@ -763,6 +846,17 @@ function parseJsonObject(value: string): Record<string, unknown> {
     throw new Error('Expected a JSON object in local persistence.');
   }
   return parsed as Record<string, unknown>;
+}
+
+function removeFieldFromFilter(input: unknown, fieldId: string): FilterExpression | null {
+  if (!input || typeof input !== 'object') return null;
+  const node = input as FilterExpression;
+  if (node.kind === 'condition') return node.fieldId === fieldId ? null : node;
+  if (node.kind !== 'group') return null;
+  const children = node.children
+    .map((child) => removeFieldFromFilter(child, fieldId))
+    .filter((child): child is FilterExpression => child !== null);
+  return children.length === 0 ? null : { ...node, children };
 }
 
 function normalizeNullable(value: string | null | undefined): string | null | undefined {

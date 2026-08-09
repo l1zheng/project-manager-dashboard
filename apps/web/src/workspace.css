@@ -170,7 +170,7 @@
 }
 .workspace-toolbar {
   position: sticky;
-  z-index: 8;
+  z-index: 30;
   top: 0;
   display: flex;
   align-items: center;
@@ -247,6 +247,16 @@
 .export-popover label {
   color: #787774;
   font-size: 11px;
+}
+.export-popover {
+  right: auto;
+  left: 0;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+}
+.export-popover button {
+  width: 100%;
+  text-align: left;
 }
 .export-popover input,
 .filter-popover input,
@@ -419,16 +429,67 @@
   color: #9b9a97;
 }
 .column-menu {
-  right: -5px;
-  width: 150px;
+  position: fixed;
+  z-index: 60;
+  top: 96px;
+  right: 24px;
+  width: 330px;
+  max-height: min(620px, 72vh);
+  overflow-y: auto;
 }
 .column-menu span {
   color: #9b9a97;
   font-size: 11px;
 }
 .column-menu button {
-  color: #b42318;
+  color: #5f5e5a;
   text-align: left;
+}
+.column-menu strong {
+  font-size: 13px;
+}
+.column-menu label,
+.property-options,
+.property-completion {
+  display: grid;
+  gap: 6px;
+  color: #787774;
+  font-size: 11px;
+  font-weight: 600;
+}
+.column-menu input:not([type='checkbox']),
+.column-menu select {
+  width: 100%;
+  min-height: 34px;
+  border: 1px solid #deddd9;
+  border-radius: 5px;
+  padding: 5px 8px;
+  background: #fff;
+  font-size: 12px;
+}
+.property-option-row {
+  display: grid;
+  grid-template-columns: 1fr 34px;
+  gap: 6px;
+}
+.property-option-row button {
+  padding: 4px;
+  color: #b42318;
+  text-align: center;
+}
+.property-check {
+  display: flex !important;
+  align-items: center;
+  gap: 7px !important;
+  font-weight: 400 !important;
+}
+.property-check input {
+  width: auto;
+  min-height: 0;
+}
+.property-save {
+  width: 100%;
+  text-align: center !important;
 }
 .notion-table td > input:not([type='checkbox']),
 .notion-table td > select,

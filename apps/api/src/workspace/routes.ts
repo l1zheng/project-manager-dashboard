@@ -22,7 +22,11 @@ import {
   maximumRestoreArchiveBytes,
   RestoreValidationError
 } from '../persistence/restore.js';
-import { ResourceNotFoundError, WorkspaceService } from './service.js';
+import {
+  FieldValuesRequireClearError,
+  ResourceNotFoundError,
+  WorkspaceService
+} from './service.js';
 
 const databaseParamsSchema = z.object({ databaseId: z.string().trim().min(1).max(120) });
 const fieldParamsSchema = z.object({ fieldId: z.string().trim().min(1).max(120) });
@@ -290,6 +294,9 @@ export function registerWorkspaceRoutes(
     }
     if (error instanceof ResourceNotFoundError) {
       return reply.code(404).send({ error: 'not_found', message: error.message });
+    }
+    if (error instanceof FieldValuesRequireClearError) {
+      return reply.code(409).send({ error: 'field_values_require_clear', message: error.message });
     }
     if (error instanceof OutlookDraftError) {
       const statusCode = error.code === 'platform_unsupported' ? 501 : 503;

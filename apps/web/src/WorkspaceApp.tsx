@@ -49,6 +49,12 @@ type DashboardDetail = {
 };
 type EditableValue = string | boolean | string[];
 type FilterDraft = { fieldId: string; operator: FilterOperator; value: string };
+type FieldPropertyDraft = {
+  name: string;
+  type: FieldType;
+  options: Array<{ id: string; label: string; color?: string }>;
+  completedOptionIds: string[];
+};
 
 const fieldTypes: Array<{ value: FieldType; label: string }> = [
   { value: 'short_text', label: '文本' },
@@ -63,6 +69,7 @@ const fieldTypes: Array<{ value: FieldType; label: string }> = [
   { value: 'url', label: '链接' },
   { value: 'sequence', label: '自动编号' }
 ];
+const optionFieldTypes = new Set<FieldType>(['single_select', 'multi_select', 'status']);
 
 const filterLabels: Partial<Record<FilterOperator, string>> = {
   equals: '等于',
@@ -93,6 +100,9 @@ export function WorkspaceApp() {
   const [tableDescription, setTableDescription] = useState('');
   const [databaseNameDrafts, setDatabaseNameDrafts] = useState<Record<string, string>>({});
   const [fieldNameDrafts, setFieldNameDrafts] = useState<Record<string, string>>({});
+  const [fieldPropertyDrafts, setFieldPropertyDrafts] = useState<
+    Record<string, FieldPropertyDraft>
+  >({});
   const [recordDrafts, setRecordDrafts] = useState<Record<string, Record<string, EditableValue>>>(
     {}
   );
@@ -145,6 +155,21 @@ export function WorkspaceApp() {
     setFieldNameDrafts(
       Object.fromEntries(
         next.blocks.flatMap((block) => block.view.fields.map((field) => [field.id, field.name]))
+      )
+    );
+    setFieldPropertyDrafts(
+      Object.fromEntries(
+        next.blocks.flatMap((block) =>
+          block.view.fields.map((field) => [
+            field.id,
+            {
+              name: field.name,
+              type: field.type,
+              options: field.config.options?.map((option) => ({ ...option })) ?? [],
+              completedOptionIds: [...(field.config.completion?.completedOptionIds ?? [])]
+            }
+          ])
+        )
       )
     );
     setRecordDrafts(
@@ -263,6 +288,96 @@ export function WorkspaceApp() {
       });
       await refresh();
     }, '重命名列失败。');
+  }
+
+  function updateFieldPropertyDraft(
+    fieldId: string,
+    update: (draft: FieldPropertyDraft) => FieldPropertyDraft
+  ) {
+    setFieldPropertyDrafts((current) => {
+      const draft = current[fieldId];
+      return draft ? { ...current, [fieldId]: update(draft) } : current;
+    });
+  }
+
+  function changeFieldPropertyType(fieldId: string, type: FieldType) {
+    updateFieldPropertyDraft(fieldId, (draft) => {
+      const options = optionFieldTypes.has(type)
+        ? draft.options.length > 0
+          ? draft.options
+          : defaultPropertyOptions()
+        : draft.options;
+      return {
+        ...draft,
+        type,
+        options,
+        completedOptionIds:
+          type === 'status'
+            ? draft.completedOptionIds.filter((optionId) =>
+                options.some((option) => option.id === optionId)
+              )
+            : []
+      };
+    });
+  }
+
+  async function saveFieldProperties(field: Field) {
+    const draft = fieldPropertyDrafts[field.id];
+    if (!draft?.name.trim()) return;
+    const options = draft.options
+      .map((option) => ({ ...option, label: option.label.trim() }))
+      .filter((option) => option.label);
+    if (optionFieldTypes.has(draft.type) && options.length === 0) {
+      setError('单选、多选和状态列至少需要一个选项。');
+      return;
+    }
+    const config = optionFieldTypes.has(draft.type)
+      ? {
+          version: 1,
+          options,
+          completion:
+            draft.type === 'status' && draft.completedOptionIds.length > 0
+              ? {
+                  completedOptionIds: draft.completedOptionIds.filter((optionId) =>
+                    options.some((option) => option.id === optionId)
+                  )
+                }
+              : undefined
+        }
+      : { version: 1 };
+
+    await runSaving(async () => {
+      const save = (clearValues: boolean) =>
+        request(`/api/fields/${field.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            name: draft.name.trim(),
+            type: draft.type,
+            config,
+            clearValues
+          })
+        });
+      try {
+        await save(false);
+      } catch (requestError) {
+        if (
+          !(requestError instanceof ApiRequestError) ||
+          requestError.code !== 'field_values_require_clear'
+        ) {
+          throw requestError;
+        }
+        const confirmed = window.confirm(
+          '修改这个属性会使该列的现有值失效。是否清空这一列并继续？此操作不会影响其他列。'
+        );
+        if (!confirmed) {
+          setNotice('已取消属性修改，现有数据未变化。');
+          return;
+        }
+        await save(true);
+      }
+      await refresh();
+      setNotice('列属性已保存。');
+    }, '保存列属性失败。');
   }
 
   async function addRecord(block: DashboardBlock) {
@@ -762,21 +877,165 @@ export function WorkspaceApp() {
                                 <input
                                   aria-label={`${field.name}列名称`}
                                   value={fieldNameDrafts[field.id] ?? field.name}
-                                  onChange={(event) =>
+                                  onChange={(event) => {
+                                    const name = event.target.value;
                                     setFieldNameDrafts((current) => ({
                                       ...current,
-                                      [field.id]: event.target.value
-                                    }))
-                                  }
+                                      [field.id]: name
+                                    }));
+                                    updateFieldPropertyDraft(field.id, (draft) => ({
+                                      ...draft,
+                                      name
+                                    }));
+                                  }}
                                   onBlur={() => void renameField(field)}
                                 />
                                 <details>
                                   <summary aria-label={`${field.name}列菜单`}>···</summary>
                                   <div className="column-menu">
-                                    <span>
-                                      {fieldTypes.find((type) => type.value === field.type)?.label}
-                                    </span>
-                                    <span>直接修改表头文字即可重命名</span>
+                                    {fieldPropertyDrafts[field.id] && (
+                                      <>
+                                        <strong>列属性</strong>
+                                        <label>
+                                          列名
+                                          <input
+                                            value={fieldPropertyDrafts[field.id].name}
+                                            onChange={(event) =>
+                                              updateFieldPropertyDraft(field.id, (draft) => ({
+                                                ...draft,
+                                                name: event.target.value
+                                              }))
+                                            }
+                                          />
+                                        </label>
+                                        <label>
+                                          属性类型
+                                          <select
+                                            value={fieldPropertyDrafts[field.id].type}
+                                            onChange={(event) =>
+                                              changeFieldPropertyType(
+                                                field.id,
+                                                event.target.value as FieldType
+                                              )
+                                            }
+                                          >
+                                            {fieldTypes.map((type) => (
+                                              <option key={type.value} value={type.value}>
+                                                {type.label}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </label>
+                                        {optionFieldTypes.has(
+                                          fieldPropertyDrafts[field.id].type
+                                        ) && (
+                                          <div className="property-options">
+                                            <span>选项</span>
+                                            {fieldPropertyDrafts[field.id].options.map(
+                                              (option, optionIndex) => (
+                                                <div
+                                                  className="property-option-row"
+                                                  key={option.id}
+                                                >
+                                                  <input
+                                                    aria-label={`选项 ${optionIndex + 1}`}
+                                                    value={option.label}
+                                                    onChange={(event) =>
+                                                      updateFieldPropertyDraft(
+                                                        field.id,
+                                                        (draft) => ({
+                                                          ...draft,
+                                                          options: draft.options.map((item) =>
+                                                            item.id === option.id
+                                                              ? {
+                                                                  ...item,
+                                                                  label: event.target.value
+                                                                }
+                                                              : item
+                                                          )
+                                                        })
+                                                      )
+                                                    }
+                                                  />
+                                                  <button
+                                                    aria-label={`删除选项 ${option.label}`}
+                                                    onClick={() =>
+                                                      updateFieldPropertyDraft(
+                                                        field.id,
+                                                        (draft) => ({
+                                                          ...draft,
+                                                          options: draft.options.filter(
+                                                            (item) => item.id !== option.id
+                                                          ),
+                                                          completedOptionIds:
+                                                            draft.completedOptionIds.filter(
+                                                              (optionId) => optionId !== option.id
+                                                            )
+                                                        })
+                                                      )
+                                                    }
+                                                    type="button"
+                                                  >
+                                                    ×
+                                                  </button>
+                                                </div>
+                                              )
+                                            )}
+                                            <button
+                                              onClick={() =>
+                                                updateFieldPropertyDraft(field.id, (draft) => ({
+                                                  ...draft,
+                                                  options: [
+                                                    ...draft.options,
+                                                    {
+                                                      id: `option-${crypto.randomUUID()}`,
+                                                      label: `选项 ${draft.options.length + 1}`
+                                                    }
+                                                  ]
+                                                }))
+                                              }
+                                              type="button"
+                                            >
+                                              ＋ 添加选项
+                                            </button>
+                                          </div>
+                                        )}
+                                        {fieldPropertyDrafts[field.id].type === 'status' && (
+                                          <div className="property-completion">
+                                            <span>代表“已完成”的状态</span>
+                                            {fieldPropertyDrafts[field.id].options.map((option) => (
+                                              <label className="property-check" key={option.id}>
+                                                <input
+                                                  checked={fieldPropertyDrafts[
+                                                    field.id
+                                                  ].completedOptionIds.includes(option.id)}
+                                                  onChange={(event) =>
+                                                    updateFieldPropertyDraft(field.id, (draft) => ({
+                                                      ...draft,
+                                                      completedOptionIds: event.target.checked
+                                                        ? [...draft.completedOptionIds, option.id]
+                                                        : draft.completedOptionIds.filter(
+                                                            (optionId) => optionId !== option.id
+                                                          )
+                                                    }))
+                                                  }
+                                                  type="checkbox"
+                                                />
+                                                {option.label || '未命名选项'}
+                                              </label>
+                                            ))}
+                                          </div>
+                                        )}
+                                        <button
+                                          className="primary-action property-save"
+                                          disabled={isSaving}
+                                          onClick={() => void saveFieldProperties(field)}
+                                          type="button"
+                                        >
+                                          {isSaving ? '保存中…' : '保存属性'}
+                                        </button>
+                                      </>
+                                    )}
                                   </div>
                                 </details>
                               </div>
@@ -1045,6 +1304,13 @@ function parseOptions(input: string) {
     .map((label, index) => ({ id: `option-${index + 1}`, label }));
 }
 
+function defaultPropertyOptions() {
+  return ['未开始', '进行中', '已完成'].map((label) => ({
+    id: `option-${crypto.randomUUID()}`,
+    label
+  }));
+}
+
 function filterOperatorsForField(type?: FieldType): FilterOperator[] {
   if (type === 'checkbox') return ['is_checked', 'is_not_checked'];
   if (type === 'number' || type === 'sequence')
@@ -1088,10 +1354,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!response.ok) {
     const payload = (await response.json().catch(() => undefined)) as
-      { message?: string } | undefined;
-    throw new Error(payload?.message ?? `请求失败（${response.status}）`);
+      { error?: string; message?: string } | undefined;
+    throw new ApiRequestError(
+      payload?.message ?? `请求失败（${response.status}）`,
+      payload?.error ?? 'request_failed'
+    );
   }
   return (await response.json()) as T;
+}
+
+class ApiRequestError extends Error {
+  constructor(
+    message: string,
+    readonly code: string
+  ) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
 }
 
 function downloadBlob(blob: Blob, filename: string) {

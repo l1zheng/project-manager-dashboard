@@ -82,6 +82,8 @@ This is appropriate for the first-release scale and preserves schema flexibility
 
 Never use field names as storage keys. A rename must be metadata-only.
 
+Field type and option edits are validated against every stored value for that field before commit. Values that remain valid under the new field definition are preserved. If any value would become invalid, the API returns an explicit conflict and performs no write; the browser may retry only after the user confirms clearing that one field. The confirmed clear, field-definition update, and any required saved-view filter repair run in one SQLite transaction. Option renames preserve stable option IDs, so records and completion semantics do not change merely because a label changes.
+
 Select, multi-select, and status values also use stable option IDs rather than mutable labels. Automatic sequence numbers are allocated transactionally per database and stored on the record rather than duplicated in dynamic JSON.
 
 All JSON payload types are versioned and validated at the persistence boundary. Normal user deletion is archival. Foreign keys are restrictive by default, and permanent purge is an explicit ordered transaction.

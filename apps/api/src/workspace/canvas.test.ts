@@ -39,11 +39,13 @@ describe('workspace canvas API', () => {
         })
       ).json() as { id: string };
 
-      await app.inject({
-        method: 'POST',
-        url: `/api/databases/${requirements.id}/fields`,
-        payload: { name: '需求名称', type: 'short_text' }
-      });
+      const requirementField = (
+        await app.inject({
+          method: 'POST',
+          url: `/api/databases/${requirements.id}/fields`,
+          payload: { name: '需求名称', type: 'short_text' }
+        })
+      ).json() as { id: string };
       await app.inject({
         method: 'POST',
         url: `/api/databases/${risks.id}/fields`,
@@ -71,6 +73,40 @@ describe('workspace canvas API', () => {
       });
       expect(renamed.statusCode).toBe(200);
       expect(renamed.json().name).toBe('重点风险');
+
+      await app.inject({
+        method: 'POST',
+        url: `/api/databases/${requirements.id}/records`,
+        payload: { values: { [requirementField.id]: '支持统一认证' } }
+      });
+      const preservedText = await app.inject({
+        method: 'PATCH',
+        url: `/api/fields/${requirementField.id}`,
+        payload: { type: 'long_text', config: { version: 1 } }
+      });
+      expect(preservedText.statusCode).toBe(200);
+      expect(preservedText.json().type).toBe('long_text');
+
+      const blockedConversion = await app.inject({
+        method: 'PATCH',
+        url: `/api/fields/${requirementField.id}`,
+        payload: { type: 'number', config: { version: 1 } }
+      });
+      expect(blockedConversion.statusCode).toBe(409);
+      expect(blockedConversion.json().error).toBe('field_values_require_clear');
+
+      const clearedConversion = await app.inject({
+        method: 'PATCH',
+        url: `/api/fields/${requirementField.id}`,
+        payload: { type: 'number', config: { version: 1 }, clearValues: true }
+      });
+      expect(clearedConversion.statusCode).toBe(200);
+      expect(clearedConversion.json().type).toBe('number');
+      const requirementsDetail = await app.inject({
+        method: 'GET',
+        url: `/api/databases/${requirements.id}`
+      });
+      expect(requirementsDetail.json().records[0].values).not.toHaveProperty(requirementField.id);
     } finally {
       await app.close();
       persistence.close();

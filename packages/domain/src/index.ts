@@ -105,12 +105,17 @@ export type CreateFieldInput = z.infer<typeof createFieldInputSchema>;
 export const updateFieldInputSchema = z
   .object({
     name: displayNameSchema.optional(),
+    type: fieldTypeSchema.optional(),
     description: optionalDescriptionSchema,
-    config: z.unknown().optional()
+    config: z.unknown().optional(),
+    clearValues: z.boolean().optional()
   })
   .refine(
     (input) =>
-      input.name !== undefined || input.description !== undefined || input.config !== undefined,
+      input.name !== undefined ||
+      input.type !== undefined ||
+      input.description !== undefined ||
+      input.config !== undefined,
     {
       message: 'At least one field property must be supplied.'
     }
