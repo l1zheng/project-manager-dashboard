@@ -68,6 +68,8 @@ Drizzle owns its internal applied-migration ledger; the product does not maintai
 
 Field definitions are normalized, while record values are stored as JSON keyed by stable field ID.
 
+The workspace interaction projection presents persisted short-text and long-text definitions as one user-facing `Text` property. This is a UI/domain projection rather than a destructive migration: existing field IDs and values remain unchanged. New text editing supports multiline content and wrapping, while width, report alignment, and title emphasis remain independent presentation metadata.
+
 Example:
 
 ```json

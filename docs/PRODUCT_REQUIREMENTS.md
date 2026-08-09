@@ -74,10 +74,9 @@ Acceptance criteria:
 
 ### FR-2 Field schema
 
-First-release field types:
+First-release user-facing field types:
 
-- Short text
-- Long text
+- Text, with multiline input and automatic wrapping
 - Number
 - Date
 - Single select
@@ -89,6 +88,8 @@ First-release field types:
 - Automatic sequence number
 
 The user can add, rename, reorder, configure, hide, and delete fields. Routine add/rename operations are available from the table header. Field values are stored against stable field IDs so renaming a field does not lose data.
+
+The routine property menu does not expose separate short-text and long-text types. Existing persisted short/long text definitions remain compatible and project to the unified `Text` property; wrapping, width, alignment, and title emphasis are presentation concerns rather than different business data types.
 
 Later field types:
 
@@ -104,7 +105,7 @@ The table interface supports:
 
 - Add, edit, duplicate, archive, and delete records.
 - Inline editing for common field types.
-- Expanded record editing for long text.
+- Multiline editing and expanded editing for text content.
 - Keyboard-friendly navigation.
 - Automatic text wrapping without changing other databases' layouts.
 - Explicit empty values instead of merged source cells.

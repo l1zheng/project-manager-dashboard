@@ -302,7 +302,8 @@
   user-select: none !important;
 }
 .v2-table td > input,
-.v2-table td > select {
+.v2-table td > select,
+.v2-table td > textarea {
   display: block;
   box-sizing: border-box;
   width: 100%;
@@ -317,14 +318,24 @@
   outline: none;
 }
 .v2-table td > input:focus,
-.v2-table td > select:focus {
+.v2-table td > select:focus,
+.v2-table td > textarea:focus {
   background: #f6f9ff;
   box-shadow: inset 0 0 0 2px #8aafea;
 }
-.v2-table td > input::placeholder {
+.v2-table td > textarea {
+  min-height: 38px;
+  padding: 9px;
+  overflow: hidden;
+  line-height: 20px;
+  resize: none;
+}
+.v2-table td > input::placeholder,
+.v2-table td > textarea::placeholder {
   color: transparent;
 }
-.v2-blank-row:hover input::placeholder {
+.v2-blank-row:hover input::placeholder,
+.v2-blank-row:hover textarea::placeholder {
   color: #b3b2ae;
 }
 .v2-sequence {

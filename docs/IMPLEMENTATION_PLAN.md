@@ -209,6 +209,7 @@ Tasks:
 - Prototype per-table column resizing and drag reordering. Completed.
 - Prototype automatic row creation from the bottom blank row. Completed.
 - Complete property, table, and row deletion/duplication actions so no overflow control is inert. Completed.
+- Consolidate short/long text into one multiline-capable user-facing text property while retaining a compatibility projection for existing persisted types. Prototype completed; production projection remains part of promotion.
 - Prototype a complete-page static report and Excel-layout preview. Completed.
 - Prototype per-field export alignment and row-title emphasis instead of guessing presentation from mutable field names. Completed.
 - Obtain hands-on user acceptance before reconnecting the shell to SQLite.

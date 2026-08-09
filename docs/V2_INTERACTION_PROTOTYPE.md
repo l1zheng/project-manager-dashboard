@@ -28,6 +28,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - The blank row becomes a real local row after the first non-empty value is committed.
 - Every visible overflow menu performs real actions; table and row menus must not remain inert placeholders.
 - Deleting a property, record, or table requires an in-context confirmation before the local data is removed.
+- The property menu exposes one multiline-capable `文本` type; it does not ask the user to choose between short and long text.
 - Export presentation is field metadata, not a field-name heuristic: all body cells are vertically centered, short metadata may also be horizontally centered, and a business-title field may be emphasized independently of its mutable label.
 - Empty tables remain visible in the export preview with their headers.
 - Internal terms such as database, saved view, dashboard block, and field ID are absent from the routine UI.
@@ -49,6 +50,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - [x] A property can be deleted from its anchored editor after explicit confirmation.
 - [x] All body cells are vertically centered; sequence, identifier, date, person, and status cells are also horizontally centered while narrative fields remain left-aligned.
 - [x] A field marked as the row title renders with stronger typography in the export preview.
+- [x] Text cells accept multiline content and grow with wrapping while the property type remains simply `文本`.
 
 The checklist above passed automated browser interaction and visual verification on 2026-08-09. Hands-on user acceptance remains the promotion gate.
 

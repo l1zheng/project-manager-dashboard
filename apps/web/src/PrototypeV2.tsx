@@ -11,8 +11,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-type PrototypeColumnType =
-  'sequence' | 'text' | 'long_text' | 'person' | 'date' | 'status' | 'number';
+type PrototypeColumnType = 'sequence' | 'text' | 'person' | 'date' | 'status' | 'number';
 
 type PrototypeColumn = {
   id: string;
@@ -64,7 +63,6 @@ type ExportSettings = {
 
 const typeOptions: Array<{ value: PrototypeColumnType; label: string; icon: string }> = [
   { value: 'text', label: '文本', icon: 'Aa' },
-  { value: 'long_text', label: '长文本', icon: '≡' },
   { value: 'number', label: '数字', icon: '#' },
   { value: 'date', label: '日期', icon: '◷' },
   { value: 'status', label: '状态', icon: '●' },
@@ -93,7 +91,7 @@ const initialTables: PrototypeTable[] = [
         width: 250,
         reportEmphasis: 'strong'
       },
-      { id: 'req-progress', name: '当前进展', type: 'long_text', width: 320 },
+      { id: 'req-progress', name: '当前进展', type: 'text', width: 320 },
       { id: 'req-plan', name: '交付计划', type: 'date', width: 150 },
       { id: 'req-owner', name: '责任人', type: 'person', width: 140 },
       {
@@ -135,8 +133,8 @@ const initialTables: PrototypeTable[] = [
     icon: '▤',
     columns: [
       { id: 'risk-sequence', name: '序号', type: 'sequence', width: 76 },
-      { id: 'risk-description', name: '风险描述', type: 'long_text', width: 290 },
-      { id: 'risk-mitigation', name: '风险消减措施', type: 'long_text', width: 380 },
+      { id: 'risk-description', name: '风险描述', type: 'text', width: 290 },
+      { id: 'risk-mitigation', name: '风险消减措施', type: 'text', width: 380 },
       { id: 'risk-owner', name: '责任人', type: 'person', width: 150 },
       {
         id: 'risk-status',
@@ -1344,6 +1342,46 @@ function ExportPreview({
   );
 }
 
+function resizeTextArea(element: HTMLTextAreaElement) {
+  element.style.height = '0px';
+  element.style.height = `${Math.max(38, element.scrollHeight)}px`;
+}
+
+function AutoTextCell({
+  label,
+  value,
+  width,
+  onChange,
+  onBlur
+}: {
+  label: string;
+  value: string;
+  width: number;
+  onChange: (value: string) => void;
+  onBlur?: (value: string) => void;
+}) {
+  const textAreaRef = useRef<HTMLTextAreaElement>(null);
+
+  useLayoutEffect(() => {
+    if (textAreaRef.current) resizeTextArea(textAreaRef.current);
+  }, [value, width]);
+
+  return (
+    <textarea
+      aria-label={label}
+      onBlur={(event) => onBlur?.(event.currentTarget.value)}
+      onChange={(event) => {
+        resizeTextArea(event.currentTarget);
+        onChange(event.target.value);
+      }}
+      placeholder="输入…"
+      ref={textAreaRef}
+      rows={1}
+      value={value}
+    />
+  );
+}
+
 function renderCell(
   column: PrototypeColumn,
   value: string,
@@ -1366,6 +1404,17 @@ function renderCell(
           </option>
         ))}
       </select>
+    );
+  }
+  if (column.type === 'text') {
+    return (
+      <AutoTextCell
+        label={column.name}
+        onBlur={onBlur}
+        onChange={onChange}
+        value={value}
+        width={column.width}
+      />
     );
   }
   return (
@@ -1416,6 +1465,5 @@ function reportCellClass(column: PrototypeColumn) {
 function excelWeight(column: PrototypeColumn) {
   if (column.type === 'sequence') return 0.7;
   if (column.type === 'status' || column.type === 'date' || column.type === 'person') return 1.1;
-  if (column.type === 'long_text') return 2.8;
   return Math.max(1.2, column.width / 130);
 }
