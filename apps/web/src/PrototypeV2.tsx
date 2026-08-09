@@ -813,7 +813,7 @@ export function PrototypeV2() {
                 </label>
               )}
               <label>
-                导出对齐
+                导出水平对齐
                 <select
                   value={propertyDraft.reportAlign ?? 'auto'}
                   onChange={(event) =>
