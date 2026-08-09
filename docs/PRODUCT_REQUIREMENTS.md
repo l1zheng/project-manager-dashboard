@@ -6,11 +6,11 @@ The product is a local project-management workspace for a single user. It preser
 
 Its defining workflow is:
 
-1. Open one workspace page that already contains all current tables.
-2. Create tables such as Requirement Tracking, Key Matters, and Key Risks directly on that page.
+1. Open one workspace page that already contains all current report modules.
+2. Create tables such as Requirement Tracking, Key Matters, and Key Risks directly on that page, or add explanatory text and local images between them.
 3. Add or rename each table's business-specific columns from the table header and edit records inline.
 4. Filter each table independently without leaving the page.
-5. Export the current page to a classic Outlook draft or to Excel without manually rebuilding the layout.
+5. Export the current mixed page to a classic Outlook draft or to Excel without manually rebuilding the layout.
 
 ## 2. User and environment
 
@@ -50,9 +50,9 @@ Databases, saved views, dashboards, and dashboard blocks remain valid internal c
 | Field | A typed column belonging to one database. |
 | Record | One row of values stored by field ID. |
 | View | Saved visible fields, widths, filters, sorting, and display options for a database. |
-| Dashboard | A page containing ordered view blocks from one or more databases. |
-| Dashboard block | One configured database view embedded in a dashboard. |
-| Report | A static rendering of selected dashboard blocks after filters and sorting are applied. |
+| Dashboard | A page containing ordered table, text, and image modules. |
+| Dashboard block | One ordered page module: a configured database view, editable text, or a local image with an optional caption. |
+| Report | A static rendering of selected dashboard blocks after table filters and sorting are applied. |
 
 ## 5. Functional requirements
 
@@ -134,21 +134,23 @@ Acceptance criteria:
 The user can:
 
 - Create and rename dashboards.
-- Add a database view as a dashboard block.
+- Add a table, editable text, or local image as a dashboard block.
 - Reorder blocks.
 - Configure a block title and optional description.
 - Collapse or expand blocks.
 - Choose whether a block is included in export by default.
 - Open the source database or edit the linked view.
 
-The first release uses vertically stacked full-width table blocks. Multi-column freeform layout is deferred until the basic reporting workflow is reliable.
+The first release uses vertically stacked full-width modules. A table module owns an independent database view, a text module is directly editable, and an image module accepts a supported local image plus an optional caption. Multi-column freeform layout is deferred until the basic reporting workflow is reliable.
 
 Primary-workflow acceptance criteria:
 
 - Opening the application displays the workspace dashboard, not a schema configuration page.
-- All tables assigned to the current workspace are visible together as vertically stacked editable blocks.
+- All modules assigned to the current workspace are visible together as vertically stacked editable blocks.
 - The system creates the default view and dashboard placement automatically; the user does not need to understand or assemble those entities.
 - Table title, column names, cell values, new rows, new columns, and per-table filters are editable in place.
+- Text modules can be edited inline, and image modules can select, replace, or remove a local image without exposing filesystem paths.
+- Editable table cells are vertically centered by default. Narrative text remains horizontally left-aligned; short metadata may be horizontally centered by field presentation settings.
 - Transient export, filter, and column-property menus close when the user clicks outside them or presses `Escape`; closing an unsaved property menu discards its local draft.
 
 ### FR-6 Report preview
@@ -164,7 +166,7 @@ Before exporting, the user can preview the static report and choose:
 
 Interactive browser controls must not appear in the rendered report.
 
-The primary workspace export defaults to every table on the page, including header-only empty tables. Before any report or workbook request begins, pending inline cell saves must finish successfully so the exported values cannot lag behind the visible table.
+The primary workspace export defaults to every module on the page, including header-only empty tables. Text and image modules retain their page order in static report and presentation exports. Before any report or workbook request begins, pending inline saves must finish successfully so the exported values cannot lag behind the visible page.
 
 ### FR-7 Outlook export
 
@@ -200,6 +202,7 @@ Two modes are required.
 - No merged cells in the data area.
 - Frozen headers, filters, wrapping, sensible widths, and typed dates/numbers.
 - Suitable for further sorting, filtering, and editing.
+- Text and image modules are presentation content and do not become artificial database sheets.
 
 #### Presentation workbook
 
@@ -208,6 +211,7 @@ Two modes are required.
 - Each visible business field receives an integer span based on field type, heading length, sampled content length, and optional user width preference.
 - Adjacent base cells are merged to form the calculated business-field width.
 - Module headings may span the entire report width.
+- Text modules span the report width; supported image modules are embedded in page order with their optional captions.
 - Styles, wrapping, row heights, borders, page orientation, print area, and repeated print headers are set automatically.
 
 Acceptance criteria:

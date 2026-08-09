@@ -4,8 +4,8 @@ Last updated: 2026-08-09
 
 ## Current state
 
-- Phase: Phase 9 V2 interaction prototype and browser checklist are complete. The existing Phase 8 workspace remains available, while the separate in-memory route awaits hands-on user acceptance before production integration.
-- Implementation: the default browser surface is now one workspace canvas containing all active tables. Default views/dashboard placements are assembled automatically; table titles, column titles, cells, new rows, new columns, and per-table filters are edited in place. The existing independent database/view/dashboard model and export pipeline remain intact.
+- Phase: Phase 9 V2 interaction prototype and browser checklist are complete, with iterative hands-on acceptance in progress. The existing Phase 8 workspace remains available; the separate in-memory route now validates mixed table/text/image modules before production integration.
+- Implementation: the V2 browser surface is one workspace canvas containing ordered table, text, and image modules. Tables retain independent schemas, inline editing, filters, and layout; text is edited inline; local images support selection/replacement and captions. The production independent database/view/dashboard model and export pipeline remain intact and have not yet adopted mixed-block persistence.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -17,6 +17,8 @@ Last updated: 2026-08-09
 - Independent custom databases retain their own schemas and terminology.
 - Multiple saved database views are displayed together on one dashboard.
 - Databases, views, and dashboard blocks are internal concepts; the routine UI presents them as editable inline tables on one page and automatically performs default view/dashboard assembly.
+- The routine page may mix table, text, and image modules in one ordered vertical canvas; users should not need a separate module-management surface.
+- Production images will use bounded validated bytes in local SQLite, referenced by stable asset IDs, so full-workspace backup remains self-contained.
 - View filters and layout drive all exports.
 - Outlook integration creates and displays a draft; it never sends.
 - Classic Outlook local automation is the primary integration, with rich-copy and HTML fallbacks.
@@ -33,13 +35,13 @@ Last updated: 2026-08-09
 
 ## Active task
 
-Collect hands-on acceptance for the isolated V2 interaction prototype before reconnecting it to SQLite.
+Collect hands-on acceptance for the expanded mixed-module V2 interaction before reconnecting it to SQLite.
 
 ## Next tasks
 
-1. Let the user exercise contextual property menus, column resize/reorder, automatic row creation, filters, and export preview on `/prototype-v2`.
+1. Let the user exercise contextual property menus, column resize/reorder, automatic row creation, filters, text/image modules, and mixed export preview on `/prototype-v2`.
 2. Record any interaction corrections from hands-on feedback.
-3. After acceptance, extract/reuse the V2 components in the SQLite-backed workspace and repeat Excel/Outlook regression.
+3. After acceptance, extract/reuse the V2 components in the SQLite-backed workspace, add mixed-block/media persistence, and repeat Excel/Outlook regression.
 
 ## Risks and validation items
 
@@ -52,8 +54,11 @@ Collect hands-on acceptance for the isolated V2 interaction prototype before rec
 | Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | ADR-0004 validation, injected rollback, offline restore, and upgrade journeys passed; retain manual backups before updates. |
 | Packaging | Corporate Windows policy may reject an unsigned portable launcher. | The canonical portable bundle passed the target environment; add signing only if another policy environment requires it. |
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
+| Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Prototype preview passed; production promotion must use validated SQLite assets, workbook embedding, generated Outlook CIDs, and regression on target Windows. |
 
 ## Verification log
+
+- 2026-08-09: Expanded the isolated V2 canvas from table-only blocks to ordered table, text, and image modules after hands-on feedback. `添加模块` now creates a custom table, directly editable multiline text, or a local PNG/JPEG/WebP/GIF image with replacement and caption controls; sidebar navigation and the static export preview preserve page order. Table cells now vertically center their editors and controls by default, including neighboring status controls when a narrative textarea wraps to multiple lines. Browser verification created text and image modules, uploaded a generated local test image through the real file chooser, confirmed balanced vertical gaps in a 59px multiline row, verified mixed preview content with zero editing controls, and regressed table creation and destructive confirmation. The prototype remains in-memory; production SQLite media persistence and Excel/Outlook image embedding are explicitly deferred to promotion.
 
 - 2026-08-09: User accepted consolidating `文本` and `长文本` in the Notion-style interaction. V2 now exposes only one `文本` property; requirement progress, risk descriptions, and mitigation measures use that same type. Text cells are multiline-capable textareas that automatically grow as content wraps or the column width changes. Export width continues to derive from the saved column width and sampled content rather than a visible short/long type choice. Product requirements and architecture now preserve existing persisted short/long definitions through a non-destructive unified-text projection for the future production integration.
 

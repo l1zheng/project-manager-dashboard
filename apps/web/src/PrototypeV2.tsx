@@ -42,15 +42,21 @@ type PrototypeTable = {
   filter?: PrototypeFilter;
 };
 
+type PrototypePageBlock =
+  | { id: string; kind: 'table'; tableId: string }
+  | { id: string; kind: 'text'; content: string }
+  | { id: string; kind: 'image'; src?: string; fileName?: string; caption: string };
+
 type PopoverState =
   | { kind: 'column'; anchor: HTMLElement; tableId: string; columnId: string }
   | { kind: 'filter'; anchor: HTMLElement; tableId: string }
   | { kind: 'table'; anchor: HTMLElement; tableId: string }
   | { kind: 'row'; anchor: HTMLElement; tableId: string; rowId: string }
+  | { kind: 'content'; anchor: HTMLElement; blockId: string }
   | { kind: 'export'; anchor: HTMLElement }
-  | { kind: 'new-table'; anchor: HTMLElement };
+  | { kind: 'add-module'; anchor: HTMLElement };
 
-type DestructiveConfirmation = 'column' | 'table' | 'row';
+type DestructiveConfirmation = 'column' | 'table' | 'row' | 'content';
 
 type PreviewMode = 'report' | 'excel';
 
@@ -158,12 +164,19 @@ const initialTables: PrototypeTable[] = [
   }
 ];
 
+const initialPageBlocks: PrototypePageBlock[] = [
+  { id: 'block-requirements', kind: 'table', tableId: 'requirements' },
+  { id: 'block-risks', kind: 'table', tableId: 'risks' }
+];
+
 export function PrototypeV2() {
   const [tables, setTables] = useState(initialTables);
+  const [pageBlocks, setPageBlocks] = useState(initialPageBlocks);
   const [popover, setPopover] = useState<PopoverState>();
   const [propertyDraft, setPropertyDraft] = useState<PrototypeColumn>();
   const [filterDraft, setFilterDraft] = useState<PrototypeFilter>({ columnId: '', keyword: '' });
   const [newTableName, setNewTableName] = useState('');
+  const [moduleComposer, setModuleComposer] = useState<'table'>();
   const [destructiveConfirmation, setDestructiveConfirmation] = useState<DestructiveConfirmation>();
   const [blankRowDrafts, setBlankRowDrafts] = useState<Record<string, Record<string, string>>>({});
   const [draggingColumn, setDraggingColumn] = useState<{ tableId: string; columnId: string }>();
@@ -182,6 +195,7 @@ export function PrototypeV2() {
     setPopover(undefined);
     setPropertyDraft(undefined);
     setDestructiveConfirmation(undefined);
+    setModuleComposer(undefined);
   };
 
   useEffect(() => {
@@ -260,41 +274,56 @@ export function PrototypeV2() {
   }
 
   function duplicateTable(tableId: string) {
+    const source = tables.find((table) => table.id === tableId);
+    if (!source) return;
+    const id = `table-${crypto.randomUUID()}`;
+    const columnIdMap = new Map(
+      source.columns.map((column) => [column.id, `column-${crypto.randomUUID()}`])
+    );
+    const copy: PrototypeTable = {
+      ...source,
+      id,
+      name: `${source.name} 副本`,
+      columns: source.columns.map((column) => ({
+        ...column,
+        id: columnIdMap.get(column.id)!,
+        options: column.options ? [...column.options] : undefined
+      })),
+      rows: source.rows.map((row) => ({
+        id: `row-${crypto.randomUUID()}`,
+        values: Object.fromEntries(
+          Object.entries(row.values).flatMap(([columnId, value]) => {
+            const copiedColumnId = columnIdMap.get(columnId);
+            return copiedColumnId ? [[copiedColumnId, value]] : [];
+          })
+        )
+      })),
+      filter: source.filter
+        ? {
+            ...source.filter,
+            columnId: columnIdMap.get(source.filter.columnId)!
+          }
+        : undefined
+    };
     setTables((current) => {
       const sourceIndex = current.findIndex((table) => table.id === tableId);
-      if (sourceIndex < 0) return current;
-      const source = current[sourceIndex]!;
-      const id = `table-${crypto.randomUUID()}`;
-      const columnIdMap = new Map(
-        source.columns.map((column) => [column.id, `column-${crypto.randomUUID()}`])
-      );
-      const copy: PrototypeTable = {
-        ...source,
-        id,
-        name: `${source.name} 副本`,
-        columns: source.columns.map((column) => ({
-          ...column,
-          id: columnIdMap.get(column.id)!,
-          options: column.options ? [...column.options] : undefined
-        })),
-        rows: source.rows.map((row) => ({
-          id: `row-${crypto.randomUUID()}`,
-          values: Object.fromEntries(
-            Object.entries(row.values).flatMap(([columnId, value]) => {
-              const copiedColumnId = columnIdMap.get(columnId);
-              return copiedColumnId ? [[copiedColumnId, value]] : [];
-            })
-          )
-        })),
-        filter: source.filter
-          ? {
-              ...source.filter,
-              columnId: columnIdMap.get(source.filter.columnId)!
-            }
-          : undefined
-      };
+      if (sourceIndex < 0) return [...current, copy];
       const next = [...current];
       next.splice(sourceIndex + 1, 0, copy);
+      return next;
+    });
+    setPageBlocks((current) => {
+      const sourceIndex = current.findIndex(
+        (block) => block.kind === 'table' && block.tableId === tableId
+      );
+      const copyBlock: PrototypePageBlock = {
+        id: `block-${crypto.randomUUID()}`,
+        kind: 'table',
+        tableId: id
+      };
+      if (sourceIndex < 0) return [...current, copyBlock];
+      const next = [...current];
+      next.splice(sourceIndex + 1, 0, copyBlock);
       return next;
     });
     setNotice('已复制表格，副本保留列结构和当前记录。');
@@ -304,6 +333,9 @@ export function PrototypeV2() {
   function deleteTable(tableId: string) {
     const tableName = tables.find((table) => table.id === tableId)?.name;
     setTables((current) => current.filter((table) => table.id !== tableId));
+    setPageBlocks((current) =>
+      current.filter((block) => block.kind !== 'table' || block.tableId !== tableId)
+    );
     setBlankRowDrafts((current) => {
       const next = { ...current };
       delete next[tableId];
@@ -381,11 +413,77 @@ export function PrototypeV2() {
         rows: []
       }
     ]);
+    setPageBlocks((current) => [
+      ...current,
+      { id: `block-${crypto.randomUUID()}`, kind: 'table', tableId: id }
+    ]);
     setNewTableName('');
+    setModuleComposer(undefined);
     closePopover();
     requestAnimationFrame(() =>
       document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
     );
+  }
+
+  function addTextBlock() {
+    const id = `block-${crypto.randomUUID()}`;
+    setPageBlocks((current) => [
+      ...current,
+      { id, kind: 'text', content: '在这里输入说明、结论或本周摘要。' }
+    ]);
+    setNotice('已添加文字模块。');
+    closePopover();
+    requestAnimationFrame(() =>
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    );
+  }
+
+  function addImageBlock() {
+    const id = `block-${crypto.randomUUID()}`;
+    setPageBlocks((current) => [...current, { id, kind: 'image', caption: '' }]);
+    setNotice('已添加图片模块，请从本机选择图片。');
+    closePopover();
+    requestAnimationFrame(() =>
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
+    );
+  }
+
+  function updatePageBlock(
+    blockId: string,
+    update: (block: PrototypePageBlock) => PrototypePageBlock
+  ) {
+    setPageBlocks((current) =>
+      current.map((block) => (block.id === blockId ? update(block) : block))
+    );
+  }
+
+  function loadImage(blockId: string, file?: File) {
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
+      setNotice('请选择 PNG、JPEG、WebP 或 GIF 图片。');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setNotice('原型中的图片不能超过 10 MB。');
+      return;
+    }
+    const reader = new FileReader();
+    reader.addEventListener('load', () => {
+      if (typeof reader.result !== 'string') return;
+      updatePageBlock(blockId, (block) =>
+        block.kind === 'image'
+          ? { ...block, src: reader.result as string, fileName: file.name }
+          : block
+      );
+      setNotice(`已载入图片“${file.name}” · 仅保存在当前页面`);
+    });
+    reader.readAsDataURL(file);
+  }
+
+  function deleteContentBlock(blockId: string) {
+    setPageBlocks((current) => current.filter((block) => block.id !== blockId));
+    setNotice('已删除页面模块。');
+    closePopover();
   }
 
   function addColumn(tableId: string) {
@@ -503,12 +601,22 @@ export function PrototypeV2() {
         <a className="v2-sidebar-home" href="#page-top">
           ⌗ 项目工作台
         </a>
-        <div className="v2-sidebar-label">页面内表格</div>
-        {tables.map((table) => (
-          <a href={`#${table.id}`} key={table.id}>
-            {table.icon} {table.name}
-          </a>
-        ))}
+        <div className="v2-sidebar-label">页面模块</div>
+        {pageBlocks.map((block) => {
+          if (block.kind === 'table') {
+            const table = tables.find((candidate) => candidate.id === block.tableId);
+            return table ? (
+              <a href={`#${table.id}`} key={block.id}>
+                {table.icon} {table.name}
+              </a>
+            ) : null;
+          }
+          return (
+            <a href={`#${block.id}`} key={block.id}>
+              {block.kind === 'text' ? '¶ 文字' : '▧ 图片'}
+            </a>
+          );
+        })}
         <div className="v2-prototype-badge">
           V2 交互原型
           <br />
@@ -535,11 +643,12 @@ export function PrototypeV2() {
             className="v2-button v2-button-quiet"
             onClick={(event) => {
               setNewTableName('');
-              setPopover({ kind: 'new-table', anchor: event.currentTarget });
+              setModuleComposer(undefined);
+              setPopover({ kind: 'add-module', anchor: event.currentTarget });
             }}
             type="button"
           >
-            ＋ 新建表格
+            ＋ 添加模块
           </button>
           <button
             className="v2-button v2-button-quiet"
@@ -549,8 +658,8 @@ export function PrototypeV2() {
             ↗ 导出
           </button>
           <span className="v2-page-summary">
-            {tables.length} 张表 · {tables.reduce((sum, table) => sum + table.rows.length, 0)}{' '}
-            条记录
+            {pageBlocks.length} 个模块 · {tables.length} 张表 ·{' '}
+            {tables.reduce((sum, table) => sum + table.rows.length, 0)} 条记录
           </span>
         </div>
 
@@ -561,189 +670,300 @@ export function PrototypeV2() {
         )}
 
         <div className="v2-table-stack">
-          {visibleTables.map((table) => (
-            <section className="v2-table-block" id={table.id} key={table.id}>
-              <div className="v2-table-title-row">
-                <div className="v2-table-title">
-                  <span>{table.icon}</span>
-                  <input
-                    aria-label={`${table.name}表格名称`}
-                    value={table.name}
+          {pageBlocks.map((block) => {
+            if (block.kind === 'text') {
+              return (
+                <section className="v2-content-block" id={block.id} key={block.id}>
+                  <div className="v2-content-block-toolbar">
+                    <span>¶ 文字</span>
+                    <button
+                      aria-label="文字模块更多操作"
+                      onClick={(event) => {
+                        setDestructiveConfirmation(undefined);
+                        setPopover({
+                          kind: 'content',
+                          anchor: event.currentTarget,
+                          blockId: block.id
+                        });
+                      }}
+                      type="button"
+                    >
+                      •••
+                    </button>
+                  </div>
+                  <textarea
+                    aria-label="文字模块内容"
+                    className="v2-page-text-editor"
                     onChange={(event) =>
-                      updateTable(table.id, (current) => ({ ...current, name: event.target.value }))
+                      updatePageBlock(block.id, (current) =>
+                        current.kind === 'text'
+                          ? { ...current, content: event.target.value }
+                          : current
+                      )
                     }
+                    placeholder="输入说明、结论或本周摘要…"
+                    rows={3}
+                    value={block.content}
                   />
+                </section>
+              );
+            }
+            if (block.kind === 'image') {
+              return (
+                <section className="v2-content-block" id={block.id} key={block.id}>
+                  <div className="v2-content-block-toolbar">
+                    <span>▧ 图片</span>
+                    <button
+                      aria-label="图片模块更多操作"
+                      onClick={(event) => {
+                        setDestructiveConfirmation(undefined);
+                        setPopover({
+                          kind: 'content',
+                          anchor: event.currentTarget,
+                          blockId: block.id
+                        });
+                      }}
+                      type="button"
+                    >
+                      •••
+                    </button>
+                  </div>
+                  {block.src ? (
+                    <img
+                      alt={block.caption || block.fileName || '页面图片'}
+                      className="v2-page-image"
+                      src={block.src}
+                    />
+                  ) : (
+                    <label className="v2-image-upload">
+                      <strong>选择本机图片</strong>
+                      <span>PNG、JPEG、WebP 或 GIF，最大 10 MB</span>
+                      <input
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        onChange={(event) => loadImage(block.id, event.target.files?.[0])}
+                        type="file"
+                      />
+                    </label>
+                  )}
+                  {block.src && (
+                    <label className="v2-image-replace">
+                      更换图片
+                      <input
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        onChange={(event) => loadImage(block.id, event.target.files?.[0])}
+                        type="file"
+                      />
+                    </label>
+                  )}
+                  <input
+                    aria-label="图片说明"
+                    className="v2-image-caption"
+                    onChange={(event) =>
+                      updatePageBlock(block.id, (current) =>
+                        current.kind === 'image'
+                          ? { ...current, caption: event.target.value }
+                          : current
+                      )
+                    }
+                    placeholder="添加图片说明…"
+                    value={block.caption}
+                  />
+                </section>
+              );
+            }
+            const table = visibleTables.find((candidate) => candidate.id === block.tableId);
+            if (!table) return null;
+            return (
+              <section className="v2-table-block" id={table.id} key={block.id}>
+                <div className="v2-table-title-row">
+                  <div className="v2-table-title">
+                    <span>{table.icon}</span>
+                    <input
+                      aria-label={`${table.name}表格名称`}
+                      value={table.name}
+                      onChange={(event) =>
+                        updateTable(table.id, (current) => ({
+                          ...current,
+                          name: event.target.value
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="v2-table-tools">
+                    <button
+                      className={table.filter ? 'is-active' : ''}
+                      onClick={(event) => openFilter(table, event.currentTarget)}
+                      type="button"
+                    >
+                      ⇅ {table.filter ? '筛选 · 1' : '筛选'}
+                    </button>
+                    <button onClick={() => addColumn(table.id)} type="button">
+                      ＋ 属性
+                    </button>
+                    <button
+                      aria-label={`${table.name}更多操作`}
+                      onClick={(event) => {
+                        setDestructiveConfirmation(undefined);
+                        setPopover({
+                          kind: 'table',
+                          anchor: event.currentTarget,
+                          tableId: table.id
+                        });
+                      }}
+                      type="button"
+                    >
+                      •••
+                    </button>
+                  </div>
                 </div>
-                <div className="v2-table-tools">
-                  <button
-                    className={table.filter ? 'is-active' : ''}
-                    onClick={(event) => openFilter(table, event.currentTarget)}
-                    type="button"
-                  >
-                    ⇅ {table.filter ? '筛选 · 1' : '筛选'}
-                  </button>
-                  <button onClick={() => addColumn(table.id)} type="button">
-                    ＋ 属性
-                  </button>
-                  <button
-                    aria-label={`${table.name}更多操作`}
-                    onClick={(event) => {
-                      setDestructiveConfirmation(undefined);
-                      setPopover({
-                        kind: 'table',
-                        anchor: event.currentTarget,
-                        tableId: table.id
-                      });
-                    }}
-                    type="button"
-                  >
-                    •••
-                  </button>
-                </div>
-              </div>
 
-              <div className="v2-table-scroll">
-                <table className="v2-table">
-                  <colgroup>
-                    {table.columns.map((column) => (
-                      <col key={column.id} style={{ width: column.width }} />
-                    ))}
-                    <col style={{ width: 42 }} />
-                  </colgroup>
-                  <thead>
-                    <tr>
+                <div className="v2-table-scroll">
+                  <table className="v2-table">
+                    <colgroup>
                       {table.columns.map((column) => (
-                        <th
-                          className={[
-                            draggingColumn?.tableId === table.id &&
-                            draggingColumn.columnId === column.id
-                              ? 'is-dragging'
-                              : '',
-                            resizingColumn?.tableId === table.id &&
-                            resizingColumn.columnId === column.id
-                              ? 'is-resizing'
-                              : ''
-                          ]
-                            .filter(Boolean)
-                            .join(' ')}
-                          data-v2-column-id={column.id}
-                          data-v2-table-id={table.id}
-                          key={column.id}
-                        >
-                          <button
-                            className="v2-column-header"
-                            onClick={(event) =>
-                              openColumnEditor(table, column, event.currentTarget)
-                            }
-                            type="button"
-                          >
-                            <span
-                              className="v2-drag-grip"
-                              onClick={(event) => event.stopPropagation()}
-                              onPointerDown={(event) =>
-                                startColumnReorder(event, table.id, column.id)
-                              }
-                            >
-                              ⋮⋮
-                            </span>
-                            <span className="v2-type-icon">{columnTypeIcon(column.type)}</span>
-                            <span>{column.name}</span>
-                            <span className="v2-header-caret">⌄</span>
-                          </button>
-                          <span
-                            aria-label={`调整${column.name}列宽`}
-                            className="v2-resize-handle"
-                            onPointerDown={(event) => startResize(event, table.id, column)}
-                            role="separator"
-                          />
-                        </th>
+                        <col key={column.id} style={{ width: column.width }} />
                       ))}
-                      <th className="v2-add-column">
-                        <button onClick={() => addColumn(table.id)} type="button">
-                          ＋
-                        </button>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {table.visibleRows.map((row, rowIndex) => (
-                      <tr key={row.id}>
+                      <col style={{ width: 42 }} />
+                    </colgroup>
+                    <thead>
+                      <tr>
                         {table.columns.map((column) => (
-                          <td key={column.id}>
-                            {renderCell(
-                              column,
-                              column.type === 'sequence'
-                                ? String(rowIndex + 1)
-                                : (row.values[column.id] ?? ''),
-                              (value) => updateCell(table.id, row.id, column.id, value)
-                            )}
-                          </td>
-                        ))}
-                        <td className="v2-row-more">
-                          <button
-                            aria-label={`第 ${rowIndex + 1} 行操作`}
-                            onClick={(event) => {
-                              setDestructiveConfirmation(undefined);
-                              setPopover({
-                                kind: 'row',
-                                anchor: event.currentTarget,
-                                tableId: table.id,
-                                rowId: row.id
-                              });
-                            }}
-                            type="button"
+                          <th
+                            className={[
+                              draggingColumn?.tableId === table.id &&
+                              draggingColumn.columnId === column.id
+                                ? 'is-dragging'
+                                : '',
+                              resizingColumn?.tableId === table.id &&
+                              resizingColumn.columnId === column.id
+                                ? 'is-resizing'
+                                : ''
+                            ]
+                              .filter(Boolean)
+                              .join(' ')}
+                            data-v2-column-id={column.id}
+                            data-v2-table-id={table.id}
+                            key={column.id}
                           >
-                            ⋯
+                            <button
+                              className="v2-column-header"
+                              onClick={(event) =>
+                                openColumnEditor(table, column, event.currentTarget)
+                              }
+                              type="button"
+                            >
+                              <span
+                                className="v2-drag-grip"
+                                onClick={(event) => event.stopPropagation()}
+                                onPointerDown={(event) =>
+                                  startColumnReorder(event, table.id, column.id)
+                                }
+                              >
+                                ⋮⋮
+                              </span>
+                              <span className="v2-type-icon">{columnTypeIcon(column.type)}</span>
+                              <span>{column.name}</span>
+                              <span className="v2-header-caret">⌄</span>
+                            </button>
+                            <span
+                              aria-label={`调整${column.name}列宽`}
+                              className="v2-resize-handle"
+                              onPointerDown={(event) => startResize(event, table.id, column)}
+                              role="separator"
+                            />
+                          </th>
+                        ))}
+                        <th className="v2-add-column">
+                          <button onClick={() => addColumn(table.id)} type="button">
+                            ＋
                           </button>
-                        </td>
+                        </th>
                       </tr>
-                    ))}
-                    <tr className="v2-blank-row">
-                      {table.columns.map((column) => {
-                        const value =
-                          column.type === 'sequence'
-                            ? ''
-                            : (blankRowDrafts[table.id]?.[column.id] ?? '');
-                        return (
-                          <td key={column.id}>
-                            {column.type === 'sequence' ? (
-                              <span className="v2-new-row-mark">＋</span>
-                            ) : (
-                              renderCell(
+                    </thead>
+                    <tbody>
+                      {table.visibleRows.map((row, rowIndex) => (
+                        <tr key={row.id}>
+                          {table.columns.map((column) => (
+                            <td key={column.id}>
+                              {renderCell(
                                 column,
-                                value,
-                                (nextValue) => {
-                                  const nextDraft = {
-                                    ...blankRowDrafts[table.id],
-                                    [column.id]: nextValue
-                                  };
-                                  updateBlankDraft(table.id, column.id, nextValue);
-                                  if (column.type === 'status') commitBlankRow(table.id, nextDraft);
-                                },
-                                (currentValue) =>
-                                  commitBlankRow(table.id, {
-                                    ...blankRowDrafts[table.id],
-                                    [column.id]: currentValue
-                                  })
-                              )
-                            )}
+                                column.type === 'sequence'
+                                  ? String(rowIndex + 1)
+                                  : (row.values[column.id] ?? ''),
+                                (value) => updateCell(table.id, row.id, column.id, value)
+                              )}
+                            </td>
+                          ))}
+                          <td className="v2-row-more">
+                            <button
+                              aria-label={`第 ${rowIndex + 1} 行操作`}
+                              onClick={(event) => {
+                                setDestructiveConfirmation(undefined);
+                                setPopover({
+                                  kind: 'row',
+                                  anchor: event.currentTarget,
+                                  tableId: table.id,
+                                  rowId: row.id
+                                });
+                              }}
+                              type="button"
+                            >
+                              ⋯
+                            </button>
                           </td>
-                        );
-                      })}
-                      <td />
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              {table.filter && (
-                <div className="v2-filter-note">
-                  当前筛选：
-                  {table.columns.find((column) => column.id === table.filter?.columnId)?.name} 包含“
-                  {table.filter.keyword}” · 显示 {table.visibleRows.length}/{table.rows.length}
+                        </tr>
+                      ))}
+                      <tr className="v2-blank-row">
+                        {table.columns.map((column) => {
+                          const value =
+                            column.type === 'sequence'
+                              ? ''
+                              : (blankRowDrafts[table.id]?.[column.id] ?? '');
+                          return (
+                            <td key={column.id}>
+                              {column.type === 'sequence' ? (
+                                <span className="v2-new-row-mark">＋</span>
+                              ) : (
+                                renderCell(
+                                  column,
+                                  value,
+                                  (nextValue) => {
+                                    const nextDraft = {
+                                      ...blankRowDrafts[table.id],
+                                      [column.id]: nextValue
+                                    };
+                                    updateBlankDraft(table.id, column.id, nextValue);
+                                    if (column.type === 'status')
+                                      commitBlankRow(table.id, nextDraft);
+                                  },
+                                  (currentValue) =>
+                                    commitBlankRow(table.id, {
+                                      ...blankRowDrafts[table.id],
+                                      [column.id]: currentValue
+                                    })
+                                )
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td />
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
-              )}
-            </section>
-          ))}
+                {table.filter && (
+                  <div className="v2-filter-note">
+                    当前筛选：
+                    {
+                      table.columns.find((column) => column.id === table.filter?.columnId)?.name
+                    }{' '}
+                    包含“
+                    {table.filter.keyword}” · 显示 {table.visibleRows.length}/{table.rows.length}
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       </main>
 
@@ -976,6 +1196,45 @@ export function PrototypeV2() {
               );
             })()}
 
+          {popover.kind === 'content' &&
+            (() => {
+              const block = pageBlocks.find((candidate) => candidate.id === popover.blockId);
+              if (!block || block.kind === 'table') return null;
+              return (
+                <div className="v2-popover-content v2-compact-menu">
+                  <div className="v2-popover-title">
+                    <span>{block.kind === 'text' ? '¶' : '▧'}</span>
+                    <strong>{block.kind === 'text' ? '文字模块' : '图片模块'}</strong>
+                  </div>
+                  {destructiveConfirmation === 'content' ? (
+                    <div className="v2-delete-confirm">
+                      <span>确认从页面中删除这个模块？</span>
+                      <div>
+                        <button onClick={() => setDestructiveConfirmation(undefined)} type="button">
+                          取消
+                        </button>
+                        <button
+                          className="is-danger"
+                          onClick={() => deleteContentBlock(block.id)}
+                          type="button"
+                        >
+                          确认删除
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      className="v2-menu-command is-danger"
+                      onClick={() => setDestructiveConfirmation('content')}
+                      type="button"
+                    >
+                      <span>⌫</span> 删除模块
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
           {popover.kind === 'filter' &&
             (() => {
               const table = tables.find((candidate) => candidate.id === popover.tableId)!;
@@ -1097,47 +1356,66 @@ export function PrototypeV2() {
             </div>
           )}
 
-          {popover.kind === 'new-table' && (
+          {popover.kind === 'add-module' && (
             <div className="v2-popover-content">
               <div className="v2-popover-title">
-                <span>▤</span>
-                <strong>新建内嵌表格</strong>
+                <span>{moduleComposer === 'table' ? '▤' : '＋'}</span>
+                <strong>{moduleComposer === 'table' ? '新建内嵌表格' : '添加页面模块'}</strong>
               </div>
-              <label>
-                表格名称
-                <input
-                  autoFocus
-                  placeholder="例如：关键事务跟踪"
-                  value={newTableName}
-                  onChange={(event) => setNewTableName(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') addTable();
-                  }}
-                />
-              </label>
-              <div className="v2-template-list">
-                <button onClick={() => setNewTableName('关键事务跟踪')} type="button">
-                  <strong>空白表格</strong>
-                  <small>名称、状态和自动编号</small>
-                </button>
-                <button onClick={() => setNewTableName('里程碑计划')} type="button">
-                  <strong>计划模板</strong>
-                  <small>稍后仍可自由修改列</small>
-                </button>
-              </div>
-              <div className="v2-popover-actions">
-                <button onClick={closePopover} type="button">
-                  取消
-                </button>
-                <button
-                  className="is-primary"
-                  disabled={!newTableName.trim()}
-                  onClick={addTable}
-                  type="button"
-                >
-                  创建表格
-                </button>
-              </div>
+              {moduleComposer === 'table' ? (
+                <>
+                  <label>
+                    表格名称
+                    <input
+                      autoFocus
+                      placeholder="例如：关键事务跟踪"
+                      value={newTableName}
+                      onChange={(event) => setNewTableName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') addTable();
+                      }}
+                    />
+                  </label>
+                  <div className="v2-template-list">
+                    <button onClick={() => setNewTableName('关键事务跟踪')} type="button">
+                      <strong>空白表格</strong>
+                      <small>名称、状态和自动编号</small>
+                    </button>
+                    <button onClick={() => setNewTableName('里程碑计划')} type="button">
+                      <strong>计划模板</strong>
+                      <small>稍后仍可自由修改列</small>
+                    </button>
+                  </div>
+                  <div className="v2-popover-actions">
+                    <button onClick={() => setModuleComposer(undefined)} type="button">
+                      返回
+                    </button>
+                    <button
+                      className="is-primary"
+                      disabled={!newTableName.trim()}
+                      onClick={addTable}
+                      type="button"
+                    >
+                      创建表格
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="v2-template-list v2-module-types">
+                  <button onClick={() => setModuleComposer('table')} type="button">
+                    <strong>▤ 表格</strong>
+                    <small>自定义属性、记录和筛选</small>
+                  </button>
+                  <button onClick={addTextBlock} type="button">
+                    <strong>¶ 文字</strong>
+                    <small>说明、结论或周报摘要</small>
+                  </button>
+                  <button onClick={addImageBlock} type="button">
+                    <strong>▧ 图片</strong>
+                    <small>从本机选择并添加说明</small>
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </AnchoredPopover>
@@ -1149,6 +1427,7 @@ export function PrototypeV2() {
           mode={previewMode}
           onClose={() => setPreviewMode(undefined)}
           onModeChange={setPreviewMode}
+          pageBlocks={pageBlocks}
           tables={tables}
         />
       )}
@@ -1211,12 +1490,14 @@ function AnchoredPopover({
 }
 
 function ExportPreview({
+  pageBlocks,
   tables,
   exportSettings,
   mode,
   onModeChange,
   onClose
 }: {
+  pageBlocks: PrototypePageBlock[];
   tables: PrototypeTable[];
   exportSettings: ExportSettings;
   mode: PreviewMode;
@@ -1244,6 +1525,9 @@ function ExportPreview({
       return { table, rows };
     })
     .filter(({ rows }) => exportSettings.includeEmpty || rows.length > 0);
+  const includedTableMap = new Map(
+    includedTables.map(({ table, rows }) => [table.id, { table, rows }])
+  );
   return createPortal(
     <div
       className="v2-preview-backdrop"
@@ -1286,44 +1570,70 @@ function ExportPreview({
           <div className="v2-report-page">
             <h1>{exportSettings.title || '项目工作台'}</h1>
             {exportSettings.period && <p>{exportSettings.period}</p>}
-            {includedTables.map(({ table, rows }) => (
-              <section className={mode === 'excel' ? 'is-excel' : ''} key={table.id}>
-                <h2>{table.name}</h2>
-                {mode === 'excel' && (
-                  <div className="v2-excel-grid-label">
-                    <span>60 列基础网格自动分配</span>
-                    <span>文本列更宽 · 状态列更窄</span>
-                  </div>
-                )}
-                <div
-                  className="v2-static-grid"
-                  style={
-                    {
-                      '--preview-columns': table.columns
-                        .map((column) => `${excelWeight(column)}fr`)
-                        .join(' ')
-                    } as CSSProperties
-                  }
-                >
-                  {table.columns.map((column) => (
-                    <strong key={column.id}>{column.name}</strong>
-                  ))}
-                  {rows.length === 0 &&
-                    table.columns.map((column) => (
-                      <span className="is-empty is-centered" key={column.id}>
-                        —
-                      </span>
-                    ))}
-                  {rows.map((row, rowIndex) =>
-                    table.columns.map((column) => (
-                      <span className={reportCellClass(column)} key={`${row.id}-${column.id}`}>
-                        {column.type === 'sequence' ? rowIndex + 1 : row.values[column.id] || '—'}
-                      </span>
-                    ))
+            {pageBlocks.map((block) => {
+              if (block.kind === 'text') {
+                if (!exportSettings.includeEmpty && !block.content.trim()) return null;
+                return (
+                  <section className="v2-static-text-block" key={block.id}>
+                    <p>{block.content.trim() || '—'}</p>
+                  </section>
+                );
+              }
+              if (block.kind === 'image') {
+                if (!block.src && !exportSettings.includeEmpty) return null;
+                return (
+                  <section className="v2-static-image-block" key={block.id}>
+                    {block.src ? (
+                      <img alt={block.caption || block.fileName || '页面图片'} src={block.src} />
+                    ) : (
+                      <div>未选择图片</div>
+                    )}
+                    {block.caption && <p>{block.caption}</p>}
+                  </section>
+                );
+              }
+              const included = includedTableMap.get(block.tableId);
+              if (!included) return null;
+              const { table, rows } = included;
+              return (
+                <section className={mode === 'excel' ? 'is-excel' : ''} key={block.id}>
+                  <h2>{table.name}</h2>
+                  {mode === 'excel' && (
+                    <div className="v2-excel-grid-label">
+                      <span>60 列基础网格自动分配</span>
+                      <span>文本列更宽 · 状态列更窄</span>
+                    </div>
                   )}
-                </div>
-              </section>
-            ))}
+                  <div
+                    className="v2-static-grid"
+                    style={
+                      {
+                        '--preview-columns': table.columns
+                          .map((column) => `${excelWeight(column)}fr`)
+                          .join(' ')
+                      } as CSSProperties
+                    }
+                  >
+                    {table.columns.map((column) => (
+                      <strong key={column.id}>{column.name}</strong>
+                    ))}
+                    {rows.length === 0 &&
+                      table.columns.map((column) => (
+                        <span className="is-empty is-centered" key={column.id}>
+                          —
+                        </span>
+                      ))}
+                    {rows.map((row, rowIndex) =>
+                      table.columns.map((column) => (
+                        <span className={reportCellClass(column)} key={`${row.id}-${column.id}`}>
+                          {column.type === 'sequence' ? rowIndex + 1 : row.values[column.id] || '—'}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         </div>
         <div className="v2-preview-footer">

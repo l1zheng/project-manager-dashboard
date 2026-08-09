@@ -195,7 +195,7 @@ Exit criteria:
 
 ## Phase 9 — V2 interaction-shell validation
 
-Status: prototype and browser checklist completed on 2026-08-09; hands-on user acceptance pending
+Status: prototype and browser checklist completed on 2026-08-09; iterative hands-on acceptance in progress
 
 Reason:
 
@@ -212,12 +212,15 @@ Tasks:
 - Consolidate short/long text into one multiline-capable user-facing text property while retaining a compatibility projection for existing persisted types. Prototype completed; production projection remains part of promotion.
 - Prototype a complete-page static report and Excel-layout preview. Completed.
 - Prototype per-field export alignment and row-title emphasis instead of guessing presentation from mutable field names. Completed.
+- Vertically center editable table cells so multiline narrative content does not leave neighboring metadata controls pinned to the top. Completed in the prototype.
+- Generalize the page from table-only blocks to ordered table, text, and image modules, with inline text editing, local image selection/replacement, captions, module navigation, and mixed export preview. Completed in the prototype.
+- On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, presentation-Excel image embedding, and a reviewed Outlook CID-image extension. Pending production integration.
 - Obtain hands-on user acceptance before reconnecting the shell to SQLite.
 
 Exit criteria:
 
 - The V2 acceptance checklist is completed in a browser.
-- The user confirms the interaction direction.
+- The user confirms the interaction direction, including mixed page modules.
 - Production integration can reuse the accepted components rather than rebuilding them independently.
 
 ## Phase 8 — Notion-style workspace correction

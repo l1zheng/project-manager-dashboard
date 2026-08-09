@@ -59,6 +59,7 @@ Initial persistent entities:
 - `views`
 - `dashboards`
 - `dashboard_blocks`
+- `media_assets`
 - `report_templates`
 - `app_settings`
 
@@ -123,7 +124,7 @@ The canonical operator, empty-value, nesting, and validation semantics are recor
 
 ### 5.1 Primary interaction projection
 
-The persistent domain model is intentionally richer than the normal UI. The browser's default surface is a single workspace canvas that projects the primary dashboard into vertically stacked editable tables:
+The persistent domain model is intentionally richer than the normal UI. The browser's default surface is a single workspace canvas that projects the primary dashboard into vertically stacked editable modules:
 
 ```text
 user creates a table
@@ -137,6 +138,10 @@ An idempotent workspace bootstrap operation repairs missing default views or das
 
 Routine schema and record operations are projected into the table itself: database names are table titles, fields are column headers, and records are rows. The legacy entity-by-entity configuration flow is not the default UI and may only reappear later as an explicitly advanced management surface.
 
+Dashboard blocks are polymorphic and ordered. Their stable `kind` is `table_view`, `text`, or `image`; versioned kind-specific configuration references a saved view, stores text content, or references a media asset. The normal UI calls them modules rather than exposing this persistence vocabulary. A table module continues to create its database/default view/placement as one user action.
+
+Production image content is stored in a local `media_assets` table under a stable asset ID, with validated MIME type, bounded byte length, SHA-256 digest, original filename metadata, and the encoded bytes. Dashboard blocks reference only the asset ID—never an arbitrary local path or external URL. The initial allowlist is decoded PNG, JPEG, WebP, and GIF with a 10 MB per-image limit; SVG is excluded because it is active document content. Keeping assets inside SQLite preserves transactionality and the existing full-workspace `.pmdbackup` boundary. The in-memory V2 prototype uses a data URL only to validate interaction and must not be mistaken for production persistence.
+
 ## 6. Report rendering
 
 ### 6.1 Canonical report model
@@ -144,7 +149,7 @@ Routine schema and record operations are projected into the table itself: databa
 The renderer first builds a format-neutral report model:
 
 - Report metadata
-- Ordered sections
+- Ordered table, text, and image blocks
 - Section title and description
 - Ordered visible fields
 - Typed rows
@@ -152,7 +157,9 @@ The renderer first builds a format-neutral report model:
 
 HTML and Excel adapters consume this model. Neither adapter queries the database directly.
 
-The model is assembled only from the dashboard's evaluated view payloads: a block's saved visible-field order, widths, filtered/sorted rows, title override, description, and export-inclusion flag. Adapters receive no database IDs and must not re-evaluate filters. Every generated text value is escaped by the rendering adapter.
+Table report blocks are assembled only from the dashboard's evaluated view payloads: saved visible-field order, widths, filtered/sorted rows, title override, description, and export-inclusion flag. Text blocks carry escaped plain text; image blocks carry validated internal asset metadata and bytes. Adapters receive no database IDs or filesystem paths and must not re-evaluate filters. Every generated text value is escaped by the rendering adapter.
+
+The browser preview and presentation Excel preserve the mixed dashboard order. The editable data workbook intentionally emits only table-view worksheets. Presentation Excel embeds decoded image bytes rather than links. Classic Outlook image support requires a narrowly scoped extension that materializes only validated internal assets to a temporary directory and attaches them with generated content IDs; the current bridge remains text/table-only and continues rejecting arbitrary attachments until that extension is implemented and reviewed.
 
 For the Notion-style primary canvas, a section without an explicit block title uses the database's mutable business name, never the internal default view name. Browser report actions default to including empty sections and pass through an export gate that waits for the per-record inline-save queues; a failed save blocks export instead of producing a stale workbook.
 

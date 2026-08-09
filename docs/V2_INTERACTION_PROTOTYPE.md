@@ -8,7 +8,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 
 ## Primary workflow
 
-1. Open one page containing several named table blocks.
+1. Open one page containing ordered table, text, and image modules.
 2. Click a column header to open a property menu anchored beside that header.
 3. Rename the column, change its type, or edit status options in that menu.
 4. Resize a column by dragging its right edge; only that table changes.
@@ -16,6 +16,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 6. Type in the bottom blank row; the row is created automatically without an extra `新增` action.
 7. Filter each table from a menu anchored to that table's toolbar.
 8. Open export from the page toolbar and preview the complete static report before choosing editable Excel, presentation Excel, or Outlook.
+9. Add explanatory text or a local image on the same page without creating an artificial database.
 
 ## Interaction rules
 
@@ -29,6 +30,9 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - Every visible overflow menu performs real actions; table and row menus must not remain inert placeholders.
 - Deleting a property, record, or table requires an in-context confirmation before the local data is removed.
 - The property menu exposes one multiline-capable `文本` type; it does not ask the user to choose between short and long text.
+- Editable table cells are vertically centered by default; multiline narrative text stays horizontally left-aligned while short metadata can remain horizontally centered.
+- The page-level `添加模块` menu creates a table, inline text, or a local image with an optional caption. These modules share one ordered page and one export preview.
+- Prototype image bytes are kept only in memory. Production promotion must use validated local assets rather than retaining arbitrary paths or external URLs.
 - Export presentation is field metadata, not a field-name heuristic: all body cells are vertically centered, short metadata may also be horizontally centered, and a business-title field may be emphasized independently of its mutable label.
 - Empty tables remain visible in the export preview with their headers.
 - Internal terms such as database, saved view, dashboard block, and field ID are absent from the routine UI.
@@ -51,6 +55,9 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - [x] All body cells are vertically centered; sequence, identifier, date, person, and status cells are also horizontally centered while narrative fields remain left-aligned.
 - [x] A field marked as the row title renders with stronger typography in the export preview.
 - [x] Text cells accept multiline content and grow with wrapping while the property type remains simply `文本`.
+- [x] Editable controls remain vertically centered when a neighboring narrative cell wraps to multiple lines.
+- [x] Text and image modules can be created, edited, navigated, and deleted alongside tables.
+- [x] The export preview preserves mixed module order and excludes all editing controls.
 
 The checklist above passed automated browser interaction and visual verification on 2026-08-09. Hands-on user acceptance remains the promotion gate.
 
@@ -59,6 +66,7 @@ The checklist above passed automated browser interaction and visual verification
 - No production data reads or writes.
 - No SQLite migration.
 - No real `.xlsx` download or Outlook automation from the prototype route.
+- No persisted image asset storage; selected prototype images are discarded on reload.
 - No relation, formula, calendar, board, or multi-user features.
 
 ## Promotion rule
