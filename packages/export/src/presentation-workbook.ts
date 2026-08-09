@@ -2,6 +2,7 @@ import ExcelJS from 'exceljs';
 import type { FieldType } from '@project-manager/domain';
 import { calculatePresentationGridLayout } from './layout.js';
 import { sanitizeExcelText } from './editable-workbook.js';
+import { dataCellBorder, EXCEL_THEME, solidFill, statusColors } from './excel-theme.js';
 import type { ReportCellValue, ReportField, ReportModel, ReportSection } from './report.js';
 
 const GRID_COLUMNS = 60;
@@ -15,7 +16,10 @@ export async function buildPresentationWorkbook(model: ReportModel): Promise<Uin
   workbook.created = new Date();
   workbook.modified = new Date();
 
-  const worksheet = workbook.addWorksheet('项目周报', { views: [{ showGridLines: false }] });
+  const worksheet = workbook.addWorksheet('项目周报', {
+    views: [{ state: 'frozen', ySplit: 2, showGridLines: false, zoomScale: 90 }],
+    properties: { tabColor: { argb: EXCEL_THEME.color.accent } }
+  });
   worksheet.properties.defaultRowHeight = model.density === 'compact' ? 20 : 24;
   worksheet.columns = Array.from({ length: GRID_COLUMNS }, () => ({ width: 2.35 }));
   worksheet.pageSetup = {
@@ -39,7 +43,11 @@ export async function buildPresentationWorkbook(model: ReportModel): Promise<Uin
   if (sections.length === 0) {
     mergeAndSet(worksheet, FIRST_SECTION_ROW, 1, GRID_COLUMNS, '没有符合当前导出条件的记录。');
     const cell = worksheet.getCell(FIRST_SECTION_ROW, 1);
-    cell.font = { name: 'Microsoft YaHei', size: 11, color: { argb: 'FF5F6B7C' } };
+    cell.font = {
+      name: EXCEL_THEME.font,
+      size: 11,
+      color: { argb: EXCEL_THEME.color.muted }
+    };
     cell.alignment = { vertical: 'middle', horizontal: 'center' };
     worksheet.getRow(FIRST_SECTION_ROW).height = 30;
   }
@@ -52,7 +60,12 @@ export async function buildPresentationWorkbook(model: ReportModel): Promise<Uin
 function writeReportHeading(worksheet: ExcelJS.Worksheet, model: ReportModel): void {
   mergeAndSet(worksheet, TITLE_ROW, 1, GRID_COLUMNS, sanitizeExcelText(model.title));
   const title = worksheet.getCell(TITLE_ROW, 1);
-  title.font = { name: 'Microsoft YaHei', size: 18, bold: true, color: { argb: 'FF17233C' } };
+  title.font = {
+    name: EXCEL_THEME.font,
+    size: 20,
+    bold: true,
+    color: { argb: EXCEL_THEME.color.inkStrong }
+  };
   title.alignment = { vertical: 'middle', horizontal: 'center' };
   worksheet.getRow(TITLE_ROW).height = 34;
 
@@ -64,7 +77,11 @@ function writeReportHeading(worksheet: ExcelJS.Worksheet, model: ReportModel): v
     model.period ? sanitizeExcelText(model.period) : null
   );
   const period = worksheet.getCell(PERIOD_ROW, 1);
-  period.font = { name: 'Microsoft YaHei', size: 10, color: { argb: 'FF657084' } };
+  period.font = {
+    name: EXCEL_THEME.font,
+    size: 10,
+    color: { argb: EXCEL_THEME.color.muted }
+  };
   period.alignment = { vertical: 'middle', horizontal: 'center' };
   worksheet.getRow(PERIOD_ROW).height = 22;
 }
@@ -78,25 +95,27 @@ function writePresentationSection(
   mergeAndSet(worksheet, startRow, 1, GRID_COLUMNS, sanitizeExcelText(section.title));
   const sectionTitle = worksheet.getCell(startRow, 1);
   sectionTitle.font = {
-    name: 'Microsoft YaHei',
+    name: EXCEL_THEME.font,
     size: 12,
     bold: true,
-    color: { argb: 'FFFFFFFF' }
+    color: { argb: EXCEL_THEME.color.accentDark }
   };
-  sectionTitle.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF315FCE' } };
+  sectionTitle.fill = solidFill(EXCEL_THEME.color.accentSoft);
   sectionTitle.alignment = { vertical: 'middle', horizontal: 'left' };
-  sectionTitle.border = outlineBorder('FF274EA7');
-  worksheet.getRow(startRow).height = 26;
+  sectionTitle.border = {
+    bottom: { style: 'medium', color: { argb: EXCEL_THEME.color.accent } }
+  };
+  worksheet.getRow(startRow).height = 28;
   let nextRow = startRow + 1;
 
   if (section.description) {
     mergeAndSet(worksheet, nextRow, 1, GRID_COLUMNS, sanitizeExcelText(section.description));
     const description = worksheet.getCell(nextRow, 1);
     description.font = {
-      name: 'Microsoft YaHei',
+      name: EXCEL_THEME.font,
       size: 10,
       italic: true,
-      color: { argb: 'FF5F6B7C' }
+      color: { argb: EXCEL_THEME.color.muted }
     };
     description.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
     worksheet.getRow(nextRow).height = 28;
@@ -115,15 +134,23 @@ function writePresentationSection(
     const field = section.fields.find((candidate) => candidate.id === fieldLayout.fieldId)!;
     mergeAndSet(worksheet, nextRow, fieldLayout.startColumn, fieldLayout.endColumn, field.name);
     const cell = worksheet.getCell(nextRow, fieldLayout.startColumn);
-    cell.font = { name: 'Microsoft YaHei', size: 10, bold: true, color: { argb: 'FF263244' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF0F8' } };
+    cell.font = {
+      name: EXCEL_THEME.font,
+      size: 10,
+      bold: true,
+      color: { argb: EXCEL_THEME.color.accentDark }
+    };
+    cell.fill = solidFill(EXCEL_THEME.color.headerFill);
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
-    cell.border = outlineBorder('FFC9D4E3');
+    cell.border = {
+      bottom: { style: 'medium', color: { argb: EXCEL_THEME.color.accent } },
+      right: { style: 'thin', color: { argb: EXCEL_THEME.color.white } }
+    };
   }
   worksheet.getRow(nextRow).height = 28;
   nextRow += 1;
 
-  for (const reportRow of section.rows) {
+  for (const [rowIndex, reportRow] of section.rows.entries()) {
     for (const fieldLayout of layout.fields) {
       const fieldIndex = section.fields.findIndex((field) => field.id === fieldLayout.fieldId);
       const field = section.fields[fieldIndex]!;
@@ -136,14 +163,26 @@ function writePresentationSection(
         toPresentationCell(field, value)
       );
       const cell = worksheet.getCell(nextRow, fieldLayout.startColumn);
-      cell.font = { name: 'Microsoft YaHei', size: 10, color: { argb: 'FF263244' } };
+      cell.font = {
+        name: EXCEL_THEME.font,
+        size: 10,
+        color: { argb: EXCEL_THEME.color.ink }
+      };
+      if (rowIndex % 2 === 1) cell.fill = solidFill(EXCEL_THEME.color.stripeFill);
       cell.alignment = alignmentForField(field.type);
-      cell.border = outlineBorder('FFD9E1EB');
+      cell.border = dataCellBorder();
       if (field.type === 'date' && cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd';
-      if (field.type === 'number' || field.type === 'sequence') cell.numFmt = '#,##0.########';
+      if (field.type === 'number') cell.numFmt = '#,##0.########';
+      if (field.type === 'sequence') cell.numFmt = '0';
       if (model.highlightStatus && field.type === 'status' && value !== null && value !== '') {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDF4FF' } };
-        cell.font = { name: 'Microsoft YaHei', size: 10, bold: true, color: { argb: 'FF315FCE' } };
+        const colors = statusColors(value);
+        cell.fill = solidFill(colors.fill);
+        cell.font = {
+          name: EXCEL_THEME.font,
+          size: 10,
+          bold: true,
+          color: { argb: colors.text }
+        };
       }
     }
     worksheet.getRow(nextRow).height = rowHeightForSection(section, model.density);
@@ -193,21 +232,18 @@ function parseDateValue(value: string): Date | undefined {
 }
 
 function alignmentForField(type: FieldType): Partial<ExcelJS.Alignment> {
-  if (type === 'number' || type === 'sequence') return { vertical: 'middle', horizontal: 'right' };
-  if (type === 'checkbox') return { vertical: 'middle', horizontal: 'center' };
-  if (type === 'date' || type === 'status' || type === 'single_select') {
+  if (type === 'number') return { vertical: 'middle', horizontal: 'right' };
+  if (
+    type === 'sequence' ||
+    type === 'checkbox' ||
+    type === 'date' ||
+    type === 'status' ||
+    type === 'single_select' ||
+    type === 'person'
+  ) {
     return { vertical: 'middle', horizontal: 'center', wrapText: true };
   }
   return { vertical: 'middle', horizontal: 'left', wrapText: true };
-}
-
-function outlineBorder(color: string): Partial<ExcelJS.Borders> {
-  return {
-    top: { style: 'thin', color: { argb: color } },
-    left: { style: 'thin', color: { argb: color } },
-    bottom: { style: 'thin', color: { argb: color } },
-    right: { style: 'thin', color: { argb: color } }
-  };
 }
 
 function rowHeightForSection(section: ReportSection, density: ReportModel['density']): number {

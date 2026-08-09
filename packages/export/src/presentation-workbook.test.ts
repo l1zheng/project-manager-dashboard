@@ -22,13 +22,23 @@ describe('presentation Excel workbook', () => {
     expect(worksheet.model.merges).toContain('A4:BH4');
     expect(worksheet.model.merges).toContain('A8:BH8');
     expect(worksheet.getCell('A6').value).toBe(1);
+    expect(worksheet.getCell('A6').numFmt).toBe('0');
+    expect(worksheet.getCell('A6').alignment.horizontal).toBe('center');
     const dateCell = findCell(worksheet, (value) => value instanceof Date);
     expect(dateCell.value).toBeInstanceOf(Date);
     expect((dateCell.value as Date).toISOString().slice(0, 10)).toBe('2026-08-14');
     expect(dateCell.numFmt).toBe('yyyy-mm-dd');
     const riskCell = findCell(worksheet, (value) => value === '登录延迟风险');
     expect(riskCell.value).toBe('登录延迟风险');
-    expect(riskCell.font.color?.argb).toBe('FF263244');
+    expect(riskCell.font.color?.argb).toBe('FF243447');
+    expect(worksheet.views[0]?.showGridLines).toBe(false);
+    expect(worksheet.getCell('A4').fill).toMatchObject({
+      fgColor: { argb: 'FFE8F0F5' }
+    });
+    expect(worksheet.getCell('A4').border.top).toBeUndefined();
+    expect(worksheet.getCell('A4').border.bottom?.style).toBe('medium');
+    const statusCell = findCell(worksheet, (value) => value === '进行中');
+    expect(statusCell.fill).toMatchObject({ fgColor: { argb: 'FFE8F1FB' } });
   });
 
   it('keeps formula-like presentation text literal and has an empty-report fallback', async () => {

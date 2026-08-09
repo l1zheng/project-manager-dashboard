@@ -1824,7 +1824,7 @@ function ExportPreview({
           </button>
         </div>
         <div className="v2-preview-canvas">
-          <div className="v2-report-page">
+          <div className={`v2-report-page ${mode === 'excel' ? 'is-excel-preview' : ''}`}>
             <h1>{exportSettings.title || '项目工作台'}</h1>
             {exportSettings.period && <p>{exportSettings.period}</p>}
             {pageBlocks.map((block) => {
@@ -1887,11 +1887,20 @@ function ExportPreview({
                         </span>
                       ))}
                     {rows.map((row, rowIndex) =>
-                      table.columns.map((column) => (
-                        <span className={reportCellClass(column)} key={`${row.id}-${column.id}`}>
-                          {column.type === 'sequence' ? rowIndex + 1 : row.values[column.id] || '—'}
-                        </span>
-                      ))
+                      table.columns.map((column) => {
+                        const value =
+                          column.type === 'sequence'
+                            ? String(rowIndex + 1)
+                            : row.values[column.id] || '—';
+                        return (
+                          <span
+                            className={reportCellClass(column, value, rowIndex)}
+                            key={`${row.id}-${column.id}`}
+                          >
+                            {value}
+                          </span>
+                        );
+                      })
                     )}
                   </div>
                 </section>
@@ -2021,13 +2030,14 @@ function statusTone(value: string) {
   return 'neutral';
 }
 
-function reportCellClass(column: PrototypeColumn) {
+function reportCellClass(column: PrototypeColumn, value: string, rowIndex: number) {
   const automaticCenterTypes: PrototypeColumnType[] = ['sequence', 'date', 'person', 'status'];
   const centered =
     column.reportAlign === 'center' ||
     (column.reportAlign !== 'left' && automaticCenterTypes.includes(column.type));
   return [
-    column.type === 'status' ? 'is-status' : '',
+    rowIndex % 2 === 1 ? 'is-alt-row' : '',
+    column.type === 'status' ? `is-status is-status-${statusTone(value)}` : '',
     centered ? 'is-centered' : '',
     column.reportEmphasis === 'strong' ? 'is-title' : ''
   ]

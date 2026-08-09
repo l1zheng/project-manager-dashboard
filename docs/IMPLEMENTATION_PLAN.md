@@ -217,6 +217,7 @@ Tasks:
 - Reorder every module kind from an in-context drag handle, with explicit up/down menu commands as the precise and keyboard-accessible fallback; sidebar and export order share the same state. Completed in the prototype.
 - Give text modules an editable large section title, reuse it in sidebar navigation, and render it at the same report hierarchy as a table title. Completed in the prototype.
 - Give image modules an optional editable section title; render the heading in navigation and static exports only when supplied, without inventing an export placeholder. Completed in the prototype.
+- Replace the saturated prototype/production Excel styling with one shared enterprise theme: restrained slate-blue hierarchy, light structural borders, banded rows, centered metadata, and low-saturation semantic status colors. Completed and visually verified in both the V2 preview and a real generated workbook.
 - On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, presentation-Excel image embedding, and a reviewed Outlook CID-image extension. Pending production integration.
 - Obtain hands-on user acceptance before reconnecting the shell to SQLite.
 

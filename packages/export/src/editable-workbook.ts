@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
 import type { FieldType } from '@project-manager/domain';
+import { dataCellBorder, EXCEL_THEME, solidFill, statusColors } from './excel-theme.js';
 import type { ReportCellValue, ReportField, ReportModel, ReportSection } from './report.js';
 
 export async function buildEditableWorkbook(model: ReportModel): Promise<Uint8Array> {
@@ -13,7 +14,12 @@ export async function buildEditableWorkbook(model: ReportModel): Promise<Uint8Ar
     (section) => section.includeInExport && (model.includeEmptySections || section.rows.length > 0)
   );
   for (const section of sections) {
-    writeEditableSection(workbook, section, uniqueWorksheetName(section.title, usedSheetNames));
+    writeEditableSection(
+      workbook,
+      section,
+      uniqueWorksheetName(section.title, usedSheetNames),
+      model.highlightStatus
+    );
   }
 
   if (sections.length === 0) {
@@ -28,10 +34,12 @@ export async function buildEditableWorkbook(model: ReportModel): Promise<Uint8Ar
 function writeEditableSection(
   workbook: ExcelJS.Workbook,
   section: ReportSection,
-  worksheetName: string
+  worksheetName: string,
+  highlightStatus: boolean
 ): void {
   const worksheet = workbook.addWorksheet(worksheetName, {
-    views: [{ state: 'frozen', ySplit: 1, showGridLines: false }]
+    views: [{ state: 'frozen', ySplit: 1, showGridLines: false, zoomScale: 95 }],
+    properties: { tabColor: { argb: EXCEL_THEME.color.accent } }
   });
   worksheet.properties.defaultRowHeight = 22;
   worksheet.columns = section.fields.map((field) => ({
@@ -46,12 +54,12 @@ function writeEditableSection(
   headerRow.height = 28;
   styleHeaderRow(headerRow);
 
-  for (const reportRow of section.rows) {
+  for (const [rowIndex, reportRow] of section.rows.entries()) {
     const row = worksheet.addRow(
       reportRow.values.map((value, index) => toEditableCell(section.fields[index]!, value))
     );
     row.height = section.fields.some((field) => field.type === 'long_text') ? 36 : 22;
-    styleDataRow(row, section.fields);
+    styleDataRow(row, section.fields, rowIndex, highlightStatus);
   }
 
   if (section.fields.length > 0) {
@@ -69,35 +77,61 @@ function writeEditableSection(
 function styleEmptyWorksheet(worksheet: ExcelJS.Worksheet): void {
   worksheet.properties.defaultRowHeight = 24;
   worksheet.getColumn(1).width = 36;
-  worksheet.getRow(1).font = { name: 'Microsoft YaHei', size: 11, color: { argb: 'FF5F6B7C' } };
+  worksheet.getRow(1).font = {
+    name: EXCEL_THEME.font,
+    size: 11,
+    color: { argb: EXCEL_THEME.color.muted }
+  };
   worksheet.getRow(1).alignment = { vertical: 'middle', wrapText: true };
   worksheet.views = [{ showGridLines: false }];
 }
 
 function styleHeaderRow(row: ExcelJS.Row): void {
   row.eachCell((cell) => {
-    cell.font = { name: 'Microsoft YaHei', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF315FCE' } };
+    cell.font = {
+      name: EXCEL_THEME.font,
+      size: 10,
+      bold: true,
+      color: { argb: EXCEL_THEME.color.white }
+    };
+    cell.fill = solidFill(EXCEL_THEME.color.accentDark);
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.border = {
-      top: { style: 'thin', color: { argb: 'FF274EA7' } },
-      left: { style: 'thin', color: { argb: 'FF274EA7' } },
-      bottom: { style: 'thin', color: { argb: 'FF274EA7' } },
-      right: { style: 'thin', color: { argb: 'FF274EA7' } }
+      bottom: { style: 'medium', color: { argb: EXCEL_THEME.color.accent } },
+      right: { style: 'thin', color: { argb: 'FF6F8DA4' } }
     };
   });
 }
 
-function styleDataRow(row: ExcelJS.Row, fields: ReportField[]): void {
+function styleDataRow(
+  row: ExcelJS.Row,
+  fields: ReportField[],
+  rowIndex: number,
+  highlightStatus: boolean
+): void {
   row.eachCell((cell, columnNumber) => {
     const field = fields[columnNumber - 1]!;
-    cell.font = { name: 'Microsoft YaHei', size: 10, color: { argb: 'FF263244' } };
-    cell.alignment = alignmentForField(field.type);
-    cell.border = {
-      bottom: { style: 'thin', color: { argb: 'FFE2E6EC' } }
+    cell.font = {
+      name: EXCEL_THEME.font,
+      size: 10,
+      color: { argb: EXCEL_THEME.color.ink }
     };
+    if (rowIndex % 2 === 1) cell.fill = solidFill(EXCEL_THEME.color.stripeFill);
+    cell.alignment = alignmentForField(field.type);
+    cell.border = dataCellBorder();
     if (field.type === 'date' && cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd';
-    if (field.type === 'number' || field.type === 'sequence') cell.numFmt = '#,##0.########';
+    if (field.type === 'number') cell.numFmt = '#,##0.########';
+    if (field.type === 'sequence') cell.numFmt = '0';
+    if (highlightStatus && field.type === 'status' && cell.value !== null && cell.value !== '') {
+      const colors = statusColors(cell.value);
+      cell.fill = solidFill(colors.fill);
+      cell.font = {
+        name: EXCEL_THEME.font,
+        size: 10,
+        bold: true,
+        color: { argb: colors.text }
+      };
+    }
   });
 }
 
@@ -158,9 +192,15 @@ function excelColumnWidth(field: ReportField): number {
 }
 
 function alignmentForField(type: FieldType): Partial<ExcelJS.Alignment> {
-  if (type === 'number' || type === 'sequence') return { vertical: 'middle', horizontal: 'right' };
-  if (type === 'checkbox') return { vertical: 'middle', horizontal: 'center' };
-  if (type === 'date' || type === 'status' || type === 'single_select') {
+  if (type === 'number') return { vertical: 'middle', horizontal: 'right' };
+  if (
+    type === 'sequence' ||
+    type === 'checkbox' ||
+    type === 'date' ||
+    type === 'status' ||
+    type === 'single_select' ||
+    type === 'person'
+  ) {
     return { vertical: 'middle', horizontal: 'center', wrapText: true };
   }
   return { vertical: 'middle', horizontal: 'left', wrapText: true };

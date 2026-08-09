@@ -6,6 +6,7 @@ build/
 coverage/
 .vite/
 artifacts/
+outputs/
 *.tsbuildinfo
 
 # Tests

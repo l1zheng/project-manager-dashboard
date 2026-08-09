@@ -61,11 +61,22 @@ describe('editable Excel workbook', () => {
       '工作量'
     ]);
     expect(worksheet.getCell('A2').value).toBe(1);
+    expect(worksheet.getCell('A2').numFmt).toBe('0');
+    expect(worksheet.getCell('A2').alignment.horizontal).toBe('center');
     expect(worksheet.getCell('B2').value).toBe(`'=HYPERLINK("https://unsafe.example")`);
     expect(worksheet.getCell('C2').value).toBeInstanceOf(Date);
     expect((worksheet.getCell('C2').value as Date).toISOString().slice(0, 10)).toBe('2026-08-14');
     expect(worksheet.getCell('C2').numFmt).toBe('yyyy-mm-dd');
     expect(worksheet.getCell('E2').value).toBe(3.5);
+    expect(worksheet.views[0]?.showGridLines).toBe(false);
+    expect(worksheet.getCell('A1').fill).toMatchObject({
+      fgColor: { argb: 'FF355E7A' }
+    });
+    expect(worksheet.getCell('A1').border.top).toBeUndefined();
+    expect(worksheet.getCell('A1').border.bottom?.style).toBe('medium');
+    expect(worksheet.getCell('D2').fill).toMatchObject({
+      fgColor: { argb: 'FFE8F1FB' }
+    });
   });
 
   it('creates an explanatory worksheet when nothing is exportable', async () => {
