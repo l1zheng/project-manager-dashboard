@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
+import ExcelJS from 'exceljs';
 import { buildApp } from '../app.js';
 import { openPersistence } from '../persistence/database.js';
 import { resolveDataPaths } from '../persistence/paths.js';
@@ -126,13 +127,16 @@ describe('workspace canvas API', () => {
         payload: {
           kind: 'image',
           mediaAssetId: null,
-          config: { version: 1, title: null, caption: null }
+          config: { version: 1, title: '项目架构图', caption: '当前架构基线' }
         }
       });
       expect(imageBlock.statusCode).toBe(201);
       expect(imageBlock.json()).toMatchObject({ kind: 'image', asset: null });
 
-      const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
+      const png = Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z9xkAAAAASUVORK5CYII=',
+        'base64'
+      );
       const uploadedImage = await app.inject({
         method: 'PUT',
         url: `/api/dashboard-blocks/${imageBlock.json().id}/image`,
@@ -211,6 +215,33 @@ describe('workspace canvas API', () => {
         'table'
       ]);
 
+      const presentation = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${first.json().dashboard.id}/export/presentation.xlsx?includeEmptySections=true`
+      });
+      expect(presentation.statusCode).toBe(200);
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(presentation.rawPayload as never);
+      const reportSheet = workbook.worksheets[0]!;
+      expect(reportSheet.getCell('A4').value).toBe('项目架构图');
+      expect(reportSheet.getImages()).toHaveLength(1);
+      expect(findWorkbookCellRow(reportSheet, '项目架构图')).toBeLessThan(
+        findWorkbookCellRow(reportSheet, '关键风险')
+      );
+      expect(findWorkbookCellRow(reportSheet, '关键风险')).toBeLessThan(
+        findWorkbookCellRow(reportSheet, '本周摘要')
+      );
+
+      const outlookHtml = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${first.json().dashboard.id}/export/outlook.html?includeEmptySections=true`
+      });
+      expect(outlookHtml.statusCode).toBe(200);
+      expect(outlookHtml.body).toContain('data:image/png;base64,');
+      expect(outlookHtml.body.indexOf('项目架构图')).toBeLessThan(
+        outlookHtml.body.indexOf('关键风险')
+      );
+
       const second = await app.inject({ method: 'POST', url: '/api/workspace/primary-dashboard' });
       expect(second.statusCode).toBe(200);
       expect(second.json().blocks).toHaveLength(4);
@@ -262,3 +293,12 @@ describe('workspace canvas API', () => {
     }
   });
 });
+
+function findWorkbookCellRow(worksheet: ExcelJS.Worksheet, value: string): number {
+  for (let row = 1; row <= worksheet.rowCount; row += 1) {
+    for (let column = 1; column <= worksheet.columnCount; column += 1) {
+      if (worksheet.getCell(row, column).value === value) return row;
+    }
+  }
+  throw new Error(`Expected workbook value: ${value}`);
+}

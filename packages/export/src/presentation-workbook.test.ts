@@ -30,7 +30,10 @@ describe('presentation Excel workbook', () => {
     expect(dateCell.numFmt).toBe('yyyy-mm-dd');
     const riskCell = findCell(worksheet, (value) => value === '登录延迟风险');
     expect(riskCell.value).toBe('登录延迟风险');
+    expect(riskCell.alignment.horizontal).toBe('center');
     expect(riskCell.font.color?.argb).toBe('FF243447');
+    const requirementCell = findCell(worksheet, (value) => value === '支持统一认证');
+    expect(requirementCell.font.bold).toBe(true);
     expect(worksheet.views[0]?.showGridLines).toBe(false);
     expect(worksheet.getCell('A4').fill).toMatchObject({
       fgColor: { argb: 'FFE8F0F5' }
@@ -83,6 +86,55 @@ describe('presentation Excel workbook', () => {
     expect(worksheet.getCell('A4').value).toBe('关键风险');
     expect(findCell(worksheet, (value) => value === '风险消减措施').value).toBe('风险消减措施');
   });
+
+  it('preserves mixed text, table, and embedded-image order', async () => {
+    const source = reportModel();
+    const imageBytes = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z9xkAAAAASUVORK5CYII=',
+      'base64'
+    );
+    const model: ReportModel = {
+      ...source,
+      blocks: [
+        {
+          kind: 'text',
+          blockId: 'summary',
+          title: '本周摘要',
+          body: '需求联调按计划推进。',
+          includeInExport: true
+        },
+        source.sections[0]!,
+        {
+          kind: 'image',
+          blockId: 'architecture',
+          title: '项目架构图',
+          caption: '本周架构基线',
+          includeInExport: true,
+          asset: {
+            id: 'asset-1',
+            mimeType: 'image/png',
+            byteLength: imageBytes.length,
+            originalFilename: '架构图.png',
+            contentUrl: '/api/media-assets/asset-1/content'
+          }
+        }
+      ]
+    };
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(
+      (await buildPresentationWorkbook(model, {
+        resolveImage: async () => ({ bytes: imageBytes, mimeType: 'image/png' })
+      })) as never
+    );
+    const worksheet = workbook.worksheets[0]!;
+
+    expect(worksheet.getCell('A4').value).toBe('本周摘要');
+    expect(worksheet.getCell('A5').value).toBe('需求联调按计划推进。');
+    expect(worksheet.getCell('A7').value).toBe('需求跟踪');
+    expect(worksheet.getCell('A11').value).toBe('项目架构图');
+    expect(worksheet.getCell('A13').value).toBe('本周架构基线');
+    expect(worksheet.getImages()).toHaveLength(1);
+  });
 });
 
 function findCell(
@@ -115,7 +167,13 @@ function reportModel(): ReportModel {
         includeInExport: true,
         fields: [
           { id: 'sequence', name: '序号', type: 'sequence', width: 80 },
-          { id: 'name', name: '需求名称', type: 'short_text', width: 220 },
+          {
+            id: 'name',
+            name: '需求名称',
+            type: 'short_text',
+            width: 220,
+            reportEmphasis: 'strong'
+          },
           { id: 'plan', name: '交付计划', type: 'date', width: 120 },
           { id: 'status', name: '状态', type: 'status', width: 120 }
         ],
@@ -127,7 +185,13 @@ function reportModel(): ReportModel {
         description: '需要重点跟踪的风险与消减措施。',
         includeInExport: true,
         fields: [
-          { id: 'risk', name: '风险描述', type: 'long_text', width: 260 },
+          {
+            id: 'risk',
+            name: '风险描述',
+            type: 'long_text',
+            width: 260,
+            reportAlign: 'center'
+          },
           { id: 'mitigation', name: '风险消减措施', type: 'long_text', width: 300 },
           { id: 'owner', name: '责任人', type: 'person', width: 120 },
           { id: 'status', name: '状态', type: 'status', width: 120 }

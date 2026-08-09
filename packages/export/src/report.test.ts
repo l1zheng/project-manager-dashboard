@@ -64,6 +64,7 @@ describe('report model', () => {
       blocks: [
         {
           id: 'b1',
+          kind: 'table_view',
           titleOverride: null,
           description: '<说明>',
           includeInExport: true,
@@ -91,6 +92,7 @@ describe('report model', () => {
       blocks: [
         {
           id: 'b1',
+          kind: 'table_view',
           titleOverride: null,
           description: null,
           includeInExport: true,
@@ -124,6 +126,7 @@ describe('report model', () => {
       blocks: [
         {
           id: 'b1',
+          kind: 'table_view' as const,
           titleOverride: null,
           description: null,
           includeInExport: true,

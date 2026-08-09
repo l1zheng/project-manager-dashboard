@@ -1,12 +1,7 @@
 import { createHash } from 'node:crypto';
 
 export const maximumImageAssetBytes = 10 * 1024 * 1024;
-export const supportedImageMimeTypes = [
-  'image/png',
-  'image/jpeg',
-  'image/webp',
-  'image/gif'
-] as const;
+export const supportedImageMimeTypes = ['image/png', 'image/jpeg', 'image/gif'] as const;
 
 export type SupportedImageMimeType = (typeof supportedImageMimeTypes)[number];
 
@@ -40,10 +35,7 @@ export function validateImageAsset(input: {
   }
   const mimeType = input.mimeType.toLowerCase().split(';', 1)[0]?.trim();
   if (!supportedImageMimeTypes.includes(mimeType as SupportedImageMimeType)) {
-    throw new ImageAssetValidationError(
-      'image_type_unsupported',
-      '仅支持 PNG、JPEG、WebP 和 GIF 图片。'
-    );
+    throw new ImageAssetValidationError('image_type_unsupported', '仅支持 PNG、JPEG 和 GIF 图片。');
   }
   if (!hasExpectedSignature(input.content, mimeType as SupportedImageMimeType)) {
     throw new ImageAssetValidationError(
@@ -74,12 +66,6 @@ function hasExpectedSignature(content: Buffer, mimeType: SupportedImageMimeType)
       return (
         content.subarray(0, 6).toString('ascii') === 'GIF87a' ||
         content.subarray(0, 6).toString('ascii') === 'GIF89a'
-      );
-    case 'image/webp':
-      return (
-        content.length >= 12 &&
-        content.subarray(0, 4).toString('ascii') === 'RIFF' &&
-        content.subarray(8, 12).toString('ascii') === 'WEBP'
       );
   }
 }

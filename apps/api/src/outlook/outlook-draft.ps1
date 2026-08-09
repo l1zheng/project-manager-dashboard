@@ -30,6 +30,30 @@ try {
   $mail.Subject = [string]$payload.subject
   $mail.Display($false)
 
+  $requestRoot = [System.IO.Path]::GetFullPath((Split-Path -Parent $InputPath))
+  $requestPrefix = $requestRoot.TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+  foreach ($image in @($payload.inlineImages)) {
+    $contentId = [string]$image.contentId
+    $mimeType = [string]$image.mimeType
+    $imagePath = [System.IO.Path]::GetFullPath([string]$image.path)
+    if (-not $imagePath.StartsWith($requestPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+      exit 11
+    }
+    if (-not (Test-Path -LiteralPath $imagePath -PathType Leaf)) {
+      exit 11
+    }
+    if ($contentId -notmatch '^pm-[a-zA-Z0-9-]{1,100}@local$') {
+      exit 11
+    }
+    if ($mimeType -notin @('image/png', 'image/jpeg', 'image/gif')) {
+      exit 11
+    }
+    $attachment = $mail.Attachments.Add($imagePath, 1, 0)
+    $attachment.PropertyAccessor.SetProperty('http://schemas.microsoft.com/mapi/proptag/0x3712001F', $contentId)
+    $attachment.PropertyAccessor.SetProperty('http://schemas.microsoft.com/mapi/proptag/0x370E001F', $mimeType)
+    $attachment.PropertyAccessor.SetProperty('http://schemas.microsoft.com/mapi/proptag/0x7FFE000B', $true)
+  }
+
   $existingBody = [string]$mail.HTMLBody
   $bodyTag = [regex]::Match($existingBody, '<body\b[^>]*>', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
   if ($bodyTag.Success) {

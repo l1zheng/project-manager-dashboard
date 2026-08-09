@@ -140,7 +140,7 @@ Routine schema and record operations are projected into the table itself: databa
 
 Dashboard blocks are polymorphic and ordered. Their stable `kind` is `table_view`, `text`, or `image`; versioned kind-specific configuration references a saved view, stores a text section title and body, or references a media asset with optional display title and caption. The normal UI calls them modules rather than exposing this persistence vocabulary. A table module continues to create its database/default view/placement as one user action.
 
-Production image content is stored in a local `media_assets` table under a stable asset ID, with validated MIME type, bounded byte length, SHA-256 digest, original filename metadata, and the encoded bytes. Dashboard blocks reference only the asset ID—never an arbitrary local path or external URL. The initial allowlist is decoded PNG, JPEG, WebP, and GIF with a 10 MB per-image limit; SVG is excluded because it is active document content. Keeping assets inside SQLite preserves transactionality and the existing full-workspace `.pmdbackup` boundary. The in-memory V2 prototype uses a data URL only to validate interaction and must not be mistaken for production persistence.
+Production image content is stored in a local `media_assets` table under a stable asset ID, with validated MIME type, bounded byte length, SHA-256 digest, original filename metadata, and the encoded bytes. Dashboard blocks reference only the asset ID—never an arbitrary local path or external URL. The initial allowlist is decoded PNG, JPEG, and GIF with a 10 MB per-image limit; SVG is excluded because it is active document content, and WebP is excluded until the production workbook adapter has a deterministic conversion path. Keeping assets inside SQLite preserves transactionality and the existing full-workspace `.pmdbackup` boundary.
 
 ## 6. Report rendering
 
@@ -159,7 +159,7 @@ HTML and Excel adapters consume this model. Neither adapter queries the database
 
 Table report blocks are assembled only from the dashboard's evaluated view payloads: saved visible-field order, widths, filtered/sorted rows, title override, description, and export-inclusion flag. Text blocks carry escaped plain text; image blocks carry validated internal asset metadata and bytes. Adapters receive no database IDs or filesystem paths and must not re-evaluate filters. Every generated text value is escaped by the rendering adapter.
 
-The browser preview and presentation Excel preserve the mixed dashboard order. The editable data workbook intentionally emits only table-view worksheets. Presentation Excel embeds decoded image bytes rather than links. Classic Outlook image support requires a narrowly scoped extension that materializes only validated internal assets to a temporary directory and attaches them with generated content IDs; the current bridge remains text/table-only and continues rejecting arbitrary attachments until that extension is implemented and reviewed.
+The browser preview and presentation Excel preserve the mixed dashboard order. The editable data workbook intentionally emits only table-view worksheets. Presentation Excel embeds decoded image bytes rather than links. Classic Outlook materializes only validated internal image assets into its unique request directory, attaches them with server-generated content IDs, and deletes the directory after the bridge returns. The bridge does not accept client-authored paths or general attachments.
 
 For the Notion-style primary canvas, a section without an explicit block title uses the database's mutable business name, never the internal default view name. Browser report actions default to including empty sections and pass through an export gate that waits for the per-record inline-save queues; a failed save blocks export instead of producing a stale workbook.
 
@@ -185,11 +185,19 @@ Outlook automation is isolated behind an interface:
 ```ts
 interface MailDraftAdapter {
   probe(): Promise<{ available: boolean; reason?: string }>;
-  createDraft(input: { subject: string; htmlFragment: string }): Promise<{ status: 'displayed' }>;
+  createDraft(input: {
+    subject: string;
+    htmlFragment: string;
+    inlineImages?: Array<{
+      contentId: string;
+      mimeType: 'image/png' | 'image/jpeg' | 'image/gif';
+      content: Uint8Array;
+    }>;
+  }): Promise<{ status: 'displayed' }>;
 }
 ```
 
-The Windows implementation invokes a committed, narrowly scoped PowerShell script using a fixed executable, `shell: false`, and a temporary UTF-8 JSON request. User content never appears in a command string or command-line argument. The script creates a classic Outlook `MailItem`, calls `Display(false)` so Outlook initializes the compose editor and configured signature, then inserts the escaped report fragment immediately after the existing opening `<body>` tag. It never accepts recipients or calls `Save` or `Send`.
+The Windows implementation invokes a committed, narrowly scoped PowerShell script using a fixed executable, `shell: false`, and a temporary UTF-8 JSON request. User content never appears in a command string or command-line argument. The Node adapter accepts only bounded, signature-matching PNG/JPEG/GIF bytes already resolved from internal media assets, writes them beside the request under generated filenames, and provides only those server paths to PowerShell. The script revalidates that every path remains within the request directory, adds the files as hidden CID attachments, creates a classic Outlook `MailItem`, calls `Display(false)` so Outlook initializes the compose editor and configured signature, then inserts the escaped report fragment immediately after the existing opening `<body>` tag. It never accepts recipients or calls `Save` or `Send`.
 
 The Microsoft Outlook Object Model supports creating an item through `Application.CreateItem`, setting the HTML body, and displaying the item. This is the compatibility basis for the first-release integration.
 
@@ -226,7 +234,7 @@ The implemented allocator uses 60 columns by default and returns one-based inclu
 - Escape all user content in report HTML.
 - Do not execute formulas or user-authored scripts.
 - Prefix potentially dangerous Excel values that begin with `=`, `+`, `-`, or `@` when exporting user text unless the field is explicitly a formula-capable type in a future release.
-- Outlook integration receives a bounded generated fragment through a unique temporary JSON file; it must not execute arbitrary command text or accept client-authored HTML, recipients, attachments, or script paths.
+- Outlook integration receives a bounded generated fragment and validated internal CID images through a unique temporary request directory; it must not execute arbitrary command text or accept client-authored HTML, recipients, arbitrary attachments, external paths, or script paths.
 - Never automate the final Send action.
 
 ## 8. Backup and portability

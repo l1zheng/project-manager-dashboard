@@ -69,7 +69,7 @@ The migration copies every legacy block as `table_view`, retains its IDs/order/f
 `media_assets` stores workspace-owned, immutable image content:
 
 - stable asset ID and workspace foreign key;
-- validated MIME type from the allowlist PNG, JPEG, WebP, and GIF;
+- validated MIME type from the allowlist PNG, JPEG, and GIF; WebP is deferred until deterministic workbook conversion exists;
 - bounded decoded byte length, initially 10 MB;
 - SHA-256 digest, original filename metadata, and raw bytes;
 - timestamps and archive state.
@@ -145,4 +145,3 @@ Rejected because view and asset references require relational integrity and effi
 - Complete the V2 browser checklist against SQLite data rather than in-memory fixtures.
 - Export the same mixed order to preview and presentation Excel; editable Excel contains only table sheets.
 - Repeat classic Outlook image/signature/no-send acceptance on Windows.
-

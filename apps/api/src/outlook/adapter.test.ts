@@ -8,6 +8,10 @@ import {
 } from './adapter.js';
 
 const scriptPath = fileURLToPath(new URL('./outlook-draft.ps1', import.meta.url));
+const onePixelPng = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64'
+);
 
 describe('Windows classic Outlook adapter', () => {
   it('uses a JSON request file instead of putting report content in PowerShell arguments', async () => {
@@ -27,11 +31,76 @@ describe('Windows classic Outlook adapter', () => {
     await expect(
       adapter.createDraft({ subject: '第32周周报', htmlFragment: '<main>支持单点登录</main>' })
     ).resolves.toEqual({ status: 'displayed' });
-    expect(request).toEqual({ subject: '第32周周报', htmlFragment: '<main>支持单点登录</main>' });
+    expect(request).toEqual({
+      subject: '第32周周报',
+      htmlFragment: '<main>支持单点登录</main>',
+      inlineImages: []
+    });
     expect(invocation?.args).toContain('-NoProfile');
     expect(invocation?.args).toContain('-File');
     expect(invocation?.args.join(' ')).not.toContain('支持单点登录');
     expect(invocation?.args).not.toContain('-Command');
+  });
+
+  it('materializes only validated server images beside the JSON request for CID attachment', async () => {
+    let request:
+      | {
+          inlineImages: Array<{ contentId: string; mimeType: string; path: string }>;
+        }
+      | undefined;
+    let materializedImage: Buffer | undefined;
+    const adapter = new WindowsClassicOutlookAdapter({
+      platform: 'win32',
+      scriptPath,
+      processRunner: async (invocation) => {
+        const requestPath = invocation.args[invocation.args.indexOf('-InputPath') + 1]!;
+        request = JSON.parse(await readFile(requestPath, 'utf8')) as typeof request;
+        materializedImage = await readFile(request!.inlineImages[0]!.path);
+        expect(request!.inlineImages[0]!.path).not.toBe(requestPath);
+        expect(invocation.args.join(' ')).not.toContain('pm-asset-1@local');
+        return { exitCode: 0, stdout: '{"status":"displayed"}', stderr: '', timedOut: false };
+      }
+    });
+
+    await adapter.createDraft({
+      subject: '第32周周报',
+      htmlFragment: '<img src="cid:pm-asset-1@local">',
+      inlineImages: [
+        {
+          contentId: 'pm-asset-1@local',
+          mimeType: 'image/png',
+          content: onePixelPng
+        }
+      ]
+    });
+
+    expect(request?.inlineImages[0]).toMatchObject({
+      contentId: 'pm-asset-1@local',
+      mimeType: 'image/png'
+    });
+    expect(materializedImage).toEqual(onePixelPng);
+  });
+
+  it('rejects image bytes that do not match the declared MIME type', async () => {
+    const adapter = new WindowsClassicOutlookAdapter({
+      platform: 'win32',
+      scriptPath,
+      processRunner: async () => ({ exitCode: 0, stdout: '', stderr: '', timedOut: false })
+    });
+
+    await expect(
+      adapter.createDraft({
+        subject: '第32周周报',
+        htmlFragment: '<img src="cid:pm-asset-1@local">',
+        inlineImages: [
+          {
+            contentId: 'pm-asset-1@local',
+            mimeType: 'image/png',
+            content: Buffer.from('not-an-image')
+          }
+        ]
+      })
+    ).rejects.toMatchObject({ code: 'automation_failed' } satisfies Partial<OutlookDraftError>);
   });
 
   it('returns a safe fallback result on macOS and maps Outlook absence', async () => {
@@ -61,6 +130,8 @@ describe('Windows classic Outlook adapter', () => {
     const script = await readFile(scriptPath, 'utf8');
     expect(script).toContain('$mail.Display($false)');
     expect(script).toContain('New-Object -ComObject Outlook.Application');
+    expect(script).toContain('$mail.Attachments.Add($imagePath, 1, 0)');
+    expect(script).toContain('0x3712001F');
     expect(script).not.toMatch(/\.(?:Send|Save|Recipients|To|CC|BCC)\b/i);
     expect(script).not.toMatch(/Invoke-Expression|\s-Command\s/i);
   });

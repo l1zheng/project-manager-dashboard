@@ -1,16 +1,36 @@
 import ExcelJS from 'exceljs';
-import type { FieldType } from '@project-manager/domain';
 import { calculatePresentationGridLayout } from './layout.js';
 import { sanitizeExcelText } from './editable-workbook.js';
 import { dataCellBorder, EXCEL_THEME, solidFill, statusColors } from './excel-theme.js';
-import type { ReportCellValue, ReportField, ReportModel, ReportSection } from './report.js';
+import {
+  isReportSection,
+  type ReportBlock,
+  type ReportCellValue,
+  type ReportField,
+  type ReportImageBlock,
+  type ReportModel,
+  type ReportSection,
+  type ReportTextBlock
+} from './report.js';
 
 const GRID_COLUMNS = 60;
 const TITLE_ROW = 1;
 const PERIOD_ROW = 2;
 const FIRST_SECTION_ROW = 4;
 
-export async function buildPresentationWorkbook(model: ReportModel): Promise<Uint8Array> {
+export type PresentationImage = {
+  bytes: Uint8Array;
+  mimeType: string;
+};
+
+export type PresentationWorkbookOptions = {
+  resolveImage?: (assetId: string) => Promise<PresentationImage>;
+};
+
+export async function buildPresentationWorkbook(
+  model: ReportModel,
+  options: PresentationWorkbookOptions = {}
+): Promise<Uint8Array> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Project Manager Dashboard';
   workbook.created = new Date();
@@ -34,13 +54,17 @@ export async function buildPresentationWorkbook(model: ReportModel): Promise<Uin
 
   writeReportHeading(worksheet, model);
   let nextRow = FIRST_SECTION_ROW;
-  const sections = model.sections.filter(
-    (section) => section.includeInExport && (model.includeEmptySections || section.rows.length > 0)
-  );
-  for (const section of sections) {
-    nextRow = writePresentationSection(worksheet, section, model, nextRow);
+  const blocks = includedBlocks(model);
+  for (const block of blocks) {
+    if (isReportSection(block)) {
+      nextRow = writePresentationSection(worksheet, block, model, nextRow);
+    } else if (block.kind === 'text') {
+      nextRow = writeTextBlock(worksheet, block, model, nextRow);
+    } else {
+      nextRow = await writeImageBlock(workbook, worksheet, block, options, nextRow);
+    }
   }
-  if (sections.length === 0) {
+  if (blocks.length === 0) {
     mergeAndSet(worksheet, FIRST_SECTION_ROW, 1, GRID_COLUMNS, '没有符合当前导出条件的记录。');
     const cell = worksheet.getCell(FIRST_SECTION_ROW, 1);
     cell.font = {
@@ -168,10 +192,11 @@ function writePresentationSection(
       cell.font = {
         name: EXCEL_THEME.font,
         size: 10,
+        bold: field.reportEmphasis === 'strong',
         color: { argb: EXCEL_THEME.color.ink }
       };
       if (rowIndex % 2 === 1) cell.fill = solidFill(EXCEL_THEME.color.stripeFill);
-      cell.alignment = alignmentForField(field.type);
+      cell.alignment = alignmentForField(field);
       cell.border = dataCellBorder();
       if (field.type === 'date' && cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd';
       if (field.type === 'number') cell.numFmt = '#,##0.########';
@@ -191,6 +216,182 @@ function writePresentationSection(
     nextRow += 1;
   }
   return nextRow + 1;
+}
+
+function writeTextBlock(
+  worksheet: ExcelJS.Worksheet,
+  block: ReportTextBlock,
+  model: ReportModel,
+  startRow: number
+): number {
+  let nextRow = startRow;
+  if (block.title.trim()) {
+    writeBlockTitle(worksheet, nextRow, block.title);
+    nextRow += 1;
+  }
+  mergeAndSet(worksheet, nextRow, 1, GRID_COLUMNS, sanitizeExcelText(block.body));
+  const body = worksheet.getCell(nextRow, 1);
+  body.font = { name: EXCEL_THEME.font, size: 10, color: { argb: EXCEL_THEME.color.ink } };
+  body.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+  body.border = dataCellBorder();
+  const visualLines = Math.max(
+    1,
+    block.body.split(/\r?\n/).length,
+    Math.ceil(block.body.length / 90)
+  );
+  worksheet.getRow(nextRow).height = Math.min(
+    model.density === 'compact' ? 120 : 180,
+    Math.max(model.density === 'compact' ? 26 : 34, visualLines * 17)
+  );
+  return nextRow + 2;
+}
+
+async function writeImageBlock(
+  workbook: ExcelJS.Workbook,
+  worksheet: ExcelJS.Worksheet,
+  block: ReportImageBlock,
+  options: PresentationWorkbookOptions,
+  startRow: number
+): Promise<number> {
+  let nextRow = startRow;
+  if (block.title?.trim()) {
+    writeBlockTitle(worksheet, nextRow, block.title);
+    nextRow += 1;
+  }
+  if (block.asset && options.resolveImage) {
+    const image = await options.resolveImage(block.asset.id);
+    const extension = excelImageExtension(image.mimeType);
+    const dimensions = imageDimensions(image.bytes, image.mimeType) ?? { width: 1200, height: 675 };
+    const fitted = fitImage(dimensions, { width: 900, height: 420 });
+    const imageId = workbook.addImage({
+      base64: Buffer.from(image.bytes).toString('base64'),
+      extension
+    });
+    worksheet.addImage(imageId, {
+      tl: { col: 0, row: nextRow - 1 },
+      ext: fitted,
+      editAs: 'oneCell'
+    });
+    worksheet.getRow(nextRow).height = fitted.height * 0.75 + 8;
+    nextRow += 1;
+  } else if (block.asset) {
+    mergeAndSet(worksheet, nextRow, 1, GRID_COLUMNS, '图片未包含在当前导出中。');
+    const placeholder = worksheet.getCell(nextRow, 1);
+    placeholder.font = {
+      name: EXCEL_THEME.font,
+      size: 10,
+      color: { argb: EXCEL_THEME.color.muted }
+    };
+    placeholder.alignment = { vertical: 'middle', horizontal: 'center' };
+    placeholder.border = dataCellBorder();
+    worksheet.getRow(nextRow).height = 30;
+    nextRow += 1;
+  }
+  if (block.caption?.trim()) {
+    mergeAndSet(worksheet, nextRow, 1, GRID_COLUMNS, sanitizeExcelText(block.caption));
+    const caption = worksheet.getCell(nextRow, 1);
+    caption.font = {
+      name: EXCEL_THEME.font,
+      size: 9,
+      italic: true,
+      color: { argb: EXCEL_THEME.color.muted }
+    };
+    caption.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    worksheet.getRow(nextRow).height = 24;
+    nextRow += 1;
+  }
+  return nextRow + 1;
+}
+
+function writeBlockTitle(worksheet: ExcelJS.Worksheet, row: number, title: string): void {
+  mergeAndSet(worksheet, row, 1, GRID_COLUMNS, sanitizeExcelText(title));
+  const cell = worksheet.getCell(row, 1);
+  cell.font = {
+    name: EXCEL_THEME.font,
+    size: 12,
+    bold: true,
+    color: { argb: EXCEL_THEME.color.accentDark }
+  };
+  cell.fill = solidFill(EXCEL_THEME.color.accentSoft);
+  cell.alignment = { vertical: 'middle', horizontal: 'left' };
+  cell.border = { bottom: { style: 'medium', color: { argb: EXCEL_THEME.color.accent } } };
+  worksheet.getRow(row).height = 28;
+}
+
+function includedBlocks(model: ReportModel): ReportBlock[] {
+  const blocks = model.blocks ?? model.sections;
+  return blocks.filter((block) => {
+    if (!block.includeInExport) return false;
+    if (isReportSection(block)) return model.includeEmptySections || block.rows.length > 0;
+    if (block.kind === 'text')
+      return model.includeEmptySections || Boolean(block.title.trim() || block.body.trim());
+    return (
+      model.includeEmptySections ||
+      Boolean(block.asset || block.title?.trim() || block.caption?.trim())
+    );
+  });
+}
+
+function excelImageExtension(mimeType: string): 'png' | 'jpeg' | 'gif' {
+  if (mimeType === 'image/png') return 'png';
+  if (mimeType === 'image/jpeg') return 'jpeg';
+  if (mimeType === 'image/gif') return 'gif';
+  throw new Error(`Unsupported presentation image type: ${mimeType}`);
+}
+
+function fitImage(
+  source: { width: number; height: number },
+  bounds: { width: number; height: number }
+): { width: number; height: number } {
+  const scale = Math.min(1, bounds.width / source.width, bounds.height / source.height);
+  return {
+    width: Math.max(1, Math.round(source.width * scale)),
+    height: Math.max(1, Math.round(source.height * scale))
+  };
+}
+
+function imageDimensions(
+  bytes: Uint8Array,
+  mimeType: string
+): { width: number; height: number } | undefined {
+  if (mimeType === 'image/png' && bytes.length >= 24) {
+    return { width: readUint32Be(bytes, 16), height: readUint32Be(bytes, 20) };
+  }
+  if (mimeType === 'image/gif' && bytes.length >= 10) {
+    return {
+      width: bytes[6]! | (bytes[7]! << 8),
+      height: bytes[8]! | (bytes[9]! << 8)
+    };
+  }
+  if (mimeType === 'image/jpeg') return jpegDimensions(bytes);
+  return undefined;
+}
+
+function jpegDimensions(bytes: Uint8Array): { width: number; height: number } | undefined {
+  let offset = 2;
+  while (offset + 8 < bytes.length) {
+    if (bytes[offset] !== 0xff) return undefined;
+    const marker = bytes[offset + 1]!;
+    const length = (bytes[offset + 2]! << 8) | bytes[offset + 3]!;
+    if (length < 2 || offset + length + 2 > bytes.length) return undefined;
+    if ((marker >= 0xc0 && marker <= 0xc3) || (marker >= 0xc5 && marker <= 0xc7)) {
+      return {
+        height: (bytes[offset + 5]! << 8) | bytes[offset + 6]!,
+        width: (bytes[offset + 7]! << 8) | bytes[offset + 8]!
+      };
+    }
+    offset += length + 2;
+  }
+  return undefined;
+}
+
+function readUint32Be(bytes: Uint8Array, offset: number): number {
+  return (
+    bytes[offset]! * 0x1000000 +
+    (bytes[offset + 1]! << 16) +
+    (bytes[offset + 2]! << 8) +
+    bytes[offset + 3]!
+  );
 }
 
 function mergeAndSet(
@@ -233,15 +434,19 @@ function parseDateValue(value: string): Date | undefined {
     : undefined;
 }
 
-function alignmentForField(type: FieldType): Partial<ExcelJS.Alignment> {
-  if (type === 'number') return { vertical: 'middle', horizontal: 'right' };
+function alignmentForField(field: ReportField): Partial<ExcelJS.Alignment> {
+  if (field.reportAlign) {
+    return { vertical: 'middle', horizontal: field.reportAlign, wrapText: true };
+  }
+  if (field.type === 'number') return { vertical: 'middle', horizontal: 'right' };
   if (
-    type === 'sequence' ||
-    type === 'checkbox' ||
-    type === 'date' ||
-    type === 'status' ||
-    type === 'single_select' ||
-    type === 'person'
+    field.type === 'sequence' ||
+    field.type === 'checkbox' ||
+    field.type === 'date' ||
+    field.type === 'status' ||
+    field.type === 'single_select' ||
+    field.type === 'multi_select' ||
+    field.type === 'person'
   ) {
     return { vertical: 'middle', horizontal: 'center', wrapText: true };
   }

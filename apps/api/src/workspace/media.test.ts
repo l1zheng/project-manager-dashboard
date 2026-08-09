@@ -24,6 +24,6 @@ describe('local image asset validation', () => {
     );
     expect(() =>
       validateImageAsset({ content: Buffer.from('<svg/>'), mimeType: 'image/svg+xml' })
-    ).toThrowError(/PNG、JPEG、WebP 和 GIF/);
+    ).toThrowError(/PNG、JPEG 和 GIF/);
   });
 });

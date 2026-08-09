@@ -796,18 +796,35 @@ body.v2-is-dragging-module {
 .v2-preview-button {
   width: 100%;
 }
-.v2-export-hints {
+.v2-export-actions {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 5px;
 }
-.v2-export-hints span {
+.v2-export-actions button,
+.v2-export-fallback {
+  border: 0;
   border-radius: 5px;
   padding: 7px 5px;
   color: #787774;
   background: #f7f7f5;
+  font: inherit;
   font-size: 10px;
   text-align: center;
+  cursor: pointer;
+}
+.v2-export-actions button:hover,
+.v2-export-fallback:hover {
+  color: #37352f;
+  background: #efefed;
+}
+.v2-export-actions button:disabled,
+.v2-export-fallback:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.v2-export-fallback {
+  width: 100%;
 }
 .v2-template-list {
   display: grid;

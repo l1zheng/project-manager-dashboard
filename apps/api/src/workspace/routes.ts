@@ -5,13 +5,15 @@ import {
   buildPresentationWorkbook,
   buildReportModel,
   renderOutlookReport,
-  renderReportHtml
+  renderReportHtml,
+  type ReportModel
 } from '@project-manager/export';
 import type { Persistence } from '../persistence/database.js';
 import {
   createDefaultMailDraftAdapter,
   OutlookDraftError,
-  type MailDraftAdapter
+  type MailDraftAdapter,
+  type MailDraftInlineImage
 } from '../outlook/adapter.js';
 import { createWorkspaceBackup } from '../persistence/backups.js';
 import {
@@ -172,7 +174,12 @@ export function registerWorkspaceRoutes(
   });
   app.get('/api/dashboards/:dashboardId/export/presentation.xlsx', async (request, reply) => {
     const model = reportModelForRequest(service, request);
-    const workbook = await buildPresentationWorkbook(model);
+    const workbook = await buildPresentationWorkbook(model, {
+      resolveImage: async (assetId) => {
+        const asset = service.getMediaAssetContent(assetId);
+        return { bytes: asset.content, mimeType: asset.mimeType };
+      }
+    });
     return reply
       .header(
         'content-disposition',
@@ -183,7 +190,16 @@ export function registerWorkspaceRoutes(
   });
   app.get('/api/integrations/outlook', async () => mailDraftAdapter.probe());
   app.get('/api/dashboards/:dashboardId/export/outlook.html', async (request, reply) => {
-    const report = renderOutlookReport(reportModelForRequest(service, request));
+    const model = reportModelForRequest(service, request);
+    const images = resolveReportImages(model, service);
+    const report = renderOutlookReport(model, {
+      imageSource: (block) => {
+        const image = block.asset ? images.get(block.asset.id) : undefined;
+        return image
+          ? `data:${image.mimeType};base64,${image.content.toString('base64')}`
+          : undefined;
+      }
+    });
     return reply
       .header(
         'content-disposition',
@@ -203,10 +219,19 @@ export function registerWorkspaceRoutes(
         message: '创建 Outlook 草稿需要来自本应用的明确操作。'
       });
     }
-    const report = renderOutlookReport(reportModelForRequest(service, request));
+    const model = reportModelForRequest(service, request);
+    const images = resolveReportImages(model, service);
+    const report = renderOutlookReport(model, {
+      imageSource: (block) => (block.asset ? `cid:${contentIdForAsset(block.asset.id)}` : undefined)
+    });
     return mailDraftAdapter.createDraft({
       subject: report.subject,
-      htmlFragment: report.htmlFragment
+      htmlFragment: report.htmlFragment,
+      inlineImages: [...images.entries()].map(([assetId, image]) => ({
+        contentId: contentIdForAsset(assetId),
+        mimeType: image.mimeType,
+        content: image.content
+      }))
     });
   });
   app.patch('/api/dashboards/:dashboardId', async (request) =>
@@ -408,6 +433,44 @@ function safeExportFilename(title: string): string {
       .trim()
       .slice(0, 100) || '项目周报'
   );
+}
+
+function resolveReportImages(
+  model: ReportModel,
+  service: WorkspaceService
+): Map<string, { content: Buffer; mimeType: MailDraftInlineImage['mimeType'] }> {
+  const assets = new Map<string, { content: Buffer; mimeType: MailDraftInlineImage['mimeType'] }>();
+  for (const block of model.blocks ?? []) {
+    if (block.kind !== 'image' || !block.includeInExport || !block.asset) continue;
+    if (assets.has(block.asset.id)) continue;
+    const asset = service.getMediaAssetContent(block.asset.id);
+    assets.set(block.asset.id, {
+      content: asset.content,
+      mimeType: toInlineImageMimeType(asset.mimeType)
+    });
+  }
+  const totalBytes = [...assets.values()].reduce((total, image) => total + image.content.length, 0);
+  if (assets.size > 20 || totalBytes > 30 * 1024 * 1024) {
+    throw new ImageAssetValidationError(
+      'image_too_large',
+      '导出的图片总量超过安全限制，请减少图片数量或压缩图片。'
+    );
+  }
+  return assets;
+}
+
+function toInlineImageMimeType(mimeType: string): MailDraftInlineImage['mimeType'] {
+  if (mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/gif') {
+    return mimeType;
+  }
+  throw new ImageAssetValidationError(
+    'image_type_unsupported',
+    '该图片格式无法用于 Excel 或 Outlook 导出。'
+  );
+}
+
+function contentIdForAsset(assetId: string): string {
+  return `pm-${assetId.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 100)}@local`;
 }
 
 function isWorkspaceMutation(method: string, url: string): boolean {

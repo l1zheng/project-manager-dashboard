@@ -209,7 +209,7 @@ Tasks:
 - Prototype per-table column resizing and drag reordering. Completed.
 - Prototype automatic row creation from the bottom blank row. Completed.
 - Complete property, table, and row deletion/duplication actions so no overflow control is inert. Completed.
-- Consolidate short/long text into one multiline-capable user-facing text property while retaining a compatibility projection for existing persisted types. Prototype completed; production projection remains part of promotion.
+- Consolidate short/long text into one multiline-capable user-facing text property. Prototype completed; the production UI now presents one text property while the domain keeps its existing persisted field types.
 - Prototype a complete-page static report and Excel-layout preview. Completed.
 - Prototype per-field export alignment and row-title emphasis instead of guessing presentation from mutable field names. Completed.
 - Vertically center editable table cells so multiline narrative content does not leave neighboring metadata controls pinned to the top. Completed in the prototype.
@@ -232,18 +232,18 @@ Exit criteria:
 
 ## Phase 10 — Accepted V2 production integration
 
-Status: in progress — architecture and migration contract accepted in ADR-0005 on 2026-08-09
+Status: in progress — macOS production promotion verified; Windows classic Outlook CID acceptance remains
 
 Tasks:
 
 - Rebuild `dashboard_blocks` as a backward-compatible polymorphic table and migrate every legacy block losslessly. Completed in the Phase 10 foundation slice with a real legacy upgrade fixture and verified pre-migration backup.
-- Add bounded, signature-validated SQLite media assets and transactional image-block creation/replacement. Foundation completed for PNG/JPEG/WebP/GIF raw-body upload, replacement, metadata projection, and same-origin content reads.
+- Add bounded, signature-validated SQLite media assets and transactional image-block creation/replacement. Foundation completed for PNG/JPEG/GIF raw-body upload, replacement, metadata projection, and same-origin content reads; WebP is deferred until deterministic workbook conversion exists.
 - Extend saved-view configuration with field-level export alignment and title-emphasis metadata while parsing old configurations unchanged. Completed with default-empty backward compatibility and stable-field validation.
-- Evolve the canonical report into ordered table/text/image blocks; retain table-only projection for editable Excel. Canonical mixed ordering and the table-only compatibility projection are complete; mixed output adapters remain pending.
-- Extend presentation Excel with embedded validated images and extend Outlook with server-generated CID attachments without relaxing the no-send boundary.
-- Extract/reuse the accepted V2 components in the production workspace and connect them to the SQLite APIs. In progress: `/` now uses the accepted V2 surface backed by the workspace API, including legacy-response compatibility while a running local server has not yet restarted onto the block migration.
-- Implement atomic module reorder, blank-row creation, view-specific column resize/reorder, and the accepted duplicate/archive actions. In progress: the API now provides atomic full module order plus duplicate/archive for table modules and duplicate/archive for records; the V2 UI is wired to these operations, with final isolated browser regression pending.
-- Repeat the complete V2 checklist against isolated SQLite data, then run export and Windows Outlook regression.
+- Evolve the canonical report into ordered table/text/image blocks; retain a table-only projection for editable Excel. Completed.
+- Extend presentation Excel with embedded validated images and extend Outlook with server-generated CID attachments without relaxing the no-send boundary. Completed in code; classic Outlook CID rendering remains a Windows acceptance gate.
+- Extract/reuse the accepted V2 components in the production workspace and connect them to the SQLite APIs. Completed: `/` uses the accepted V2 surface and the strict polymorphic block response. Debug data is disposable during this promotion, so the UI does not contain a pre-migration service-response compatibility branch.
+- Implement atomic module reorder, blank-row creation, view-specific column resize/reorder, and the accepted duplicate/archive actions. Completed in the production UI and API, with browser and API regression coverage.
+- Repeat the complete V2 checklist against SQLite data and visually inspect the mixed presentation workbook. Completed on macOS against the normal application-data workspace; only the Windows Outlook CID regression remains.
 
 Exit criteria:
 

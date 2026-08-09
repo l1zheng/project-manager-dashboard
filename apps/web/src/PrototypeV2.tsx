@@ -84,10 +84,9 @@ type ServerContentBlock =
       config: { title: string | null; caption: string | null };
       asset: { contentUrl: string; originalFilename: string } | null;
     };
-type ServerLegacyTableBlock = Omit<ServerTableBlock, 'kind'> & { kind?: undefined };
 type ServerDashboard = {
   dashboard: { id: string; name: string };
-  blocks: Array<ServerTableBlock | ServerLegacyTableBlock | ServerContentBlock>;
+  blocks: Array<ServerTableBlock | ServerContentBlock>;
 };
 
 type PopoverState =
@@ -244,6 +243,7 @@ export function PrototypeV2() {
     includeCompleted: true,
     includeEmpty: true
   });
+  const [isExporting, setIsExporting] = useState(false);
   const [notice, setNotice] = useState('');
   const popoverRef = useRef<HTMLDivElement>(null);
 
@@ -266,7 +266,7 @@ export function PrototypeV2() {
         : await api<ServerDashboard>('/api/workspace/primary-dashboard', { method: 'POST' });
       setDashboardId(next.dashboard.id);
       const nextTables = next.blocks.flatMap((block) => {
-        if (block.kind !== 'table_view' && !('view' in block)) return [];
+        if (block.kind !== 'table_view') return [];
         const { database, fields, records, view } = block.view;
         return [
           {
@@ -328,7 +328,7 @@ export function PrototypeV2() {
       tablesRef.current = nextTables;
       setPageBlocks(
         next.blocks.map((block) => {
-          if (block.kind === 'table_view' || 'view' in block)
+          if (block.kind === 'table_view')
             return { id: block.id, kind: 'table', tableId: block.view.database.id };
           if (block.kind === 'text')
             return {
@@ -400,8 +400,8 @@ export function PrototypeV2() {
       ? await api<ServerDashboard>(`/api/dashboards/${dashboardId}`)
       : await api<ServerDashboard>('/api/workspace/primary-dashboard', { method: 'POST' });
     const tableBlock = server.blocks.find(
-      (candidate): candidate is ServerTableBlock | ServerLegacyTableBlock =>
-        candidate.id === block.id && 'view' in candidate
+      (candidate): candidate is ServerTableBlock =>
+        candidate.kind === 'table_view' && candidate.id === block.id
     );
     if (!tableBlock) return;
     const config: ViewConfig = {
@@ -784,6 +784,106 @@ export function PrototypeV2() {
     }
   }
 
+  function reportQuery() {
+    const query = new URLSearchParams();
+    if (exportSettings.title.trim()) query.set('title', exportSettings.title.trim());
+    if (exportSettings.period.trim()) query.set('period', exportSettings.period.trim());
+    query.set('includeCompleted', String(exportSettings.includeCompleted));
+    query.set('includeEmptySections', String(exportSettings.includeEmpty));
+    query.set('highlightStatus', 'true');
+    query.set('density', 'comfortable');
+    return query.toString();
+  }
+
+  async function prepareReportExport() {
+    await Promise.all([
+      ...tables.flatMap((table) => [
+        api(`/api/databases/${table.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name: table.name.trim() || '未命名表格' })
+        }),
+        saveTableView(table.id, table),
+        ...table.rows.map((row) =>
+          api(`/api/records/${row.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ values: serializeValues(table, row.values) })
+          })
+        )
+      ]),
+      ...pageBlocks.flatMap((block) => {
+        if (block.kind === 'table') return [];
+        const config =
+          block.kind === 'text'
+            ? { version: 1, title: block.title, body: block.content }
+            : {
+                version: 1,
+                title: block.title.trim() || null,
+                caption: block.caption.trim() || null
+              };
+        return [
+          api(`/api/dashboard-blocks/${block.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ config })
+          })
+        ];
+      })
+    ]);
+  }
+
+  async function runExport(action: () => Promise<void>, successMessage: string) {
+    if (!dashboardId || isExporting) return;
+    setIsExporting(true);
+    try {
+      await prepareReportExport();
+      await action();
+      setNotice(successMessage);
+      closePopover();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '导出失败。');
+    } finally {
+      setIsExporting(false);
+    }
+  }
+
+  async function downloadWorkbook(kind: 'editable' | 'presentation') {
+    await runExport(
+      async () => {
+        const response = await fetch(
+          `/api/dashboards/${dashboardId}/export/${kind}.xlsx?${reportQuery()}`
+        );
+        if (!response.ok) throw new Error(await responseError(response, '导出 Excel 失败。'));
+        const label = kind === 'editable' ? '可编辑数据' : '展示版';
+        downloadBlob(
+          await response.blob(),
+          `${exportSettings.title.trim() || '项目工作台'}-${label}.xlsx`
+        );
+      },
+      kind === 'editable' ? '已导出可编辑 Excel。' : '已导出展示版 Excel。'
+    );
+  }
+
+  async function createOutlookDraft() {
+    await runExport(async () => {
+      await api(`/api/dashboards/${dashboardId}/export/outlook-draft?${reportQuery()}`, {
+        method: 'POST',
+        headers: { 'x-project-manager-action': 'create-outlook-draft' }
+      });
+    }, '已打开 Outlook 草稿，请检查后自行发送。');
+  }
+
+  async function downloadOutlookHtml() {
+    await runExport(async () => {
+      const response = await fetch(
+        `/api/dashboards/${dashboardId}/export/outlook.html?${reportQuery()}`
+      );
+      if (!response.ok) throw new Error(await responseError(response, '导出邮件 HTML 失败。'));
+      downloadBlob(
+        await response.blob(),
+        `${exportSettings.title.trim() || '项目工作台'}-Outlook报告.html`
+      );
+    }, '已导出 Outlook HTML。');
+  }
+
   async function saveTableName(tableId: string) {
     const table = tables.find((candidate) => candidate.id === tableId);
     if (!table || !table.name.trim()) return;
@@ -929,8 +1029,8 @@ export function PrototypeV2() {
 
   async function loadImage(blockId: string, file?: File) {
     if (!file) return;
-    if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
-      setNotice('请选择 PNG、JPEG、WebP 或 GIF 图片。');
+    if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+      setNotice('请选择 PNG、JPEG 或 GIF 图片。');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
@@ -1328,9 +1428,9 @@ export function PrototypeV2() {
                   ) : (
                     <label className="v2-image-upload">
                       <strong>选择本机图片</strong>
-                      <span>PNG、JPEG、WebP 或 GIF，最大 10 MB</span>
+                      <span>PNG、JPEG 或 GIF，最大 10 MB</span>
                       <input
-                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        accept="image/png,image/jpeg,image/gif"
                         onChange={(event) => loadImage(block.id, event.target.files?.[0])}
                         type="file"
                       />
@@ -1340,7 +1440,7 @@ export function PrototypeV2() {
                     <label className="v2-image-replace">
                       更换图片
                       <input
-                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        accept="image/png,image/jpeg,image/gif"
                         onChange={(event) => loadImage(block.id, event.target.files?.[0])}
                         type="file"
                       />
@@ -2000,11 +2100,37 @@ export function PrototypeV2() {
               >
                 预览完整导出效果
               </button>
-              <div className="v2-export-hints">
-                <span>可编辑 Excel</span>
-                <span>展示版 Excel</span>
-                <span>Outlook 邮件</span>
+              <div className="v2-export-actions">
+                <button
+                  disabled={isExporting}
+                  onClick={() => void downloadWorkbook('editable')}
+                  type="button"
+                >
+                  可编辑 Excel
+                </button>
+                <button
+                  disabled={isExporting}
+                  onClick={() => void downloadWorkbook('presentation')}
+                  type="button"
+                >
+                  展示版 Excel
+                </button>
+                <button
+                  disabled={isExporting}
+                  onClick={() => void createOutlookDraft()}
+                  type="button"
+                >
+                  Outlook 草稿
+                </button>
               </div>
+              <button
+                className="v2-export-fallback"
+                disabled={isExporting}
+                onClick={() => void downloadOutlookHtml()}
+                type="button"
+              >
+                下载 Outlook HTML 备用文件
+              </button>
             </div>
           )}
 
@@ -2490,4 +2616,18 @@ async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T
   if (response.ok) return (await response.json()) as T;
   const body = (await response.json().catch(() => null)) as { message?: string } | null;
   throw new Error(body?.message ?? `请求失败（${response.status}）`);
+}
+
+async function responseError(response: Response, fallback: string) {
+  const body = (await response.json().catch(() => null)) as { message?: string } | null;
+  return body?.message ?? fallback;
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }

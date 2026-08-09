@@ -1,11 +1,11 @@
 # Project Status
 
-Last updated: 2026-08-09
+Last updated: 2026-08-10
 
 ## Current state
 
 - Phase: Phase 10 accepted V2 production integration. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is now active under ADR-0005.
-- Implementation: the accepted V2 browser surface is now the production `/` route. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, and per-view layout through the Phase 10 APIs. A compatibility reader keeps the UI usable until an already-running older local service is restarted onto the new block migration; isolated API verification is complete, while the final isolated browser checklist and mixed output adapters remain pending.
+- Implementation: the accepted V2 browser surface is the production `/` route and consumes only the strict polymorphic block API. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, and per-view layout. Its export controls call the real editable/presentation Excel and Outlook endpoints after persisting current page state. Presentation Excel, browser HTML, and Outlook HTML preserve the mixed module order; presentation Excel embeds validated internal images and classic Outlook receives them through bounded server-generated CID attachments. Full regression, workbook visual inspection, and live macOS browser verification passed; Windows Outlook CID acceptance remains.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -35,13 +35,13 @@ Last updated: 2026-08-09
 
 ## Active task
 
-Finish the isolated browser regression of the V2 production route, then connect the canonical mixed block order to presentation Excel and Outlook output without redesigning the accepted interaction.
+Complete the remaining Windows classic Outlook acceptance for inline CID images while keeping the reviewed no-send boundary intact.
 
 ## Next tasks
 
-1. Run the accepted V2 interaction checklist against an isolated migrated SQLite workspace, including text/image modules and all destructive/duplicate actions.
-2. Extend presentation Excel with embedded validated images and Outlook with safe generated CID attachments.
-3. Restart the local service when the user is ready, then verify the migrated production route against the existing local workspace.
+1. On the Windows target, verify PNG/JPEG/GIF inline images, signature retention, Chinese text, and visible compose-window behavior in classic Outlook.
+2. Run the existing no-send script scan and full release regression on Windows after that acceptance.
+3. Remove the temporary `/prototype-v2` route only after the user confirms the production `/` route remains satisfactory.
 
 ## Risks and validation items
 
@@ -54,9 +54,11 @@ Finish the isolated browser regression of the V2 production route, then connect 
 | Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | ADR-0004 validation, injected rollback, offline restore, and upgrade journeys passed; retain manual backups before updates. |
 | Packaging | Corporate Windows policy may reject an unsigned portable launcher. | The canonical portable bundle passed the target environment; add signing only if another policy environment requires it. |
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
-| Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Prototype preview passed; production promotion must use validated SQLite assets, workbook embedding, generated Outlook CIDs, and regression on target Windows. |
+| Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes; generated Outlook CIDs are implemented and isolated, with target-Windows rendering still pending. |
 
 ## Verification log
+
+- 2026-08-10: Completed the high-model Phase 10 mixed-output promotion and removed the temporary old-service response compatibility branch at the user's direction. The production browser now consumes only strict `table_view`/`text`/`image` blocks. Browser/report HTML, presentation Excel, and Outlook HTML preserve one canonical mixed order; presentation Excel embeds validated PNG/JPEG/GIF bytes, while the classic Outlook bridge materializes only signature-matching internal assets into its unique request directory and attaches them with generated CIDs. Client-authored paths, general attachments, recipients, `Save`, and `Send` remain forbidden. The V2 export popover was reconnected to real editable/presentation Excel and Outlook draft/HTML actions, with a pre-export persistence gate for current tables, records, views, and content modules. The stale port-4300 process was stopped, migration `0002` applied to the normal macOS workspace, and the freshly built strict service was started. Live browser verification created, edited, reloaded, previewed, exported, and then deleted text/image acceptance modules; outside-click dismissal, anchored column properties, image upload, optional image title/caption, and cleanup all passed. A real live presentation workbook preserved `需求跟踪 → 关键风险 → 验收摘要 → 导出链路示意图`, contained one embedded image, used the accepted black all-border table grid, and had no formulas or formula errors. Artifact-tool and LibreOffice inspections confirmed the workbook structure and image payload. Automated verification passed 69 application tests, 3 release tests, TypeScript builds, Vite production build, ESLint, Prettier, and `git diff --check`. The only remaining platform gate is classic Outlook CID rendering on Windows.
 
 - 2026-08-09: Started the medium-model V2 production UI connection. The production root now mounts the accepted V2 interaction shell instead of the rejected form-style workspace. It hydrates table/text/image modules from the local workspace API, includes a compatibility projection for a still-running pre-restart service response, and persists direct table titles, property edits/deletion, per-view widths/order/filter, bottom blank-row creation, row/table duplicate/archive, text/image content, local image bytes, and block ordering. Added transactional duplicate-record and duplicate-table endpoints plus dashboard-block archive semantics that archive a table's database when its view is no longer used. Isolated API coverage proves duplicate IDs are fresh, copied data/configuration survives, and archiving a copied table does not reappear during primary-dashboard assembly. A freshly compiled API plus production web build was launched against a newly created temporary SQLite directory on port 4310; its `/` page rendered the V2 production shell successfully, then the service and temporary directory were removed. TypeScript, lint, Vite production build, `git diff --check`, and the isolated canvas test passed. The currently running local service predates the new backend and returns the legacy block response; no local user data was modified while diagnosing that compatibility state.
 

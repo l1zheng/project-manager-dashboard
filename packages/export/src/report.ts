@@ -69,7 +69,7 @@ export type ReportBuildOptions = {
 
 type DashboardTableBlockSource = {
   id: string;
-  kind?: 'table_view';
+  kind: 'table_view';
   titleOverride: string | null;
   description: string | null;
   includeInExport: boolean;
@@ -228,17 +228,47 @@ export function renderReportHtml(model: ReportModel): string {
 
 function renderOutlookDocument(model: ReportModel): string {
   const cellPadding = model.density === 'compact' ? '5px 7px' : '9px 10px';
-  const sections = model.sections
-    .filter(
-      (section) =>
-        section.includeInExport && (model.includeEmptySections || section.rows.length > 0)
-    )
-    .map(
-      (section) =>
-        `<section style="margin:0 0 24px 0"><h2 style="margin:0 0 8px 0;font-size:18px;color:#24324a">${escapeHtml(section.title)}</h2>${section.description ? `<p style="margin:0 0 10px 0;color:#5f6b7c">${escapeHtml(section.description)}</p>` : ''}<table role="table" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed"><thead><tr>${section.fields.map((field) => `<th style="${field.width ? `width:${field.width}px;` : ''}padding:${cellPadding};border:1px solid #cfd7e3;background:#eef2f7;color:#344054;text-align:left;font-size:12px">${escapeHtml(field.name)}</th>`).join('')}</tr></thead><tbody>${section.rows.map((row) => `<tr>${row.values.map((value, index) => `<td style="padding:${cellPadding};border:1px solid #d9dfe8;vertical-align:top;overflow-wrap:anywhere;${model.highlightStatus && section.fields[index]?.type === 'status' && displayValue(value) ? 'background:#edf4ff;color:#315fce;font-weight:600;' : ''}">${escapeHtml(displayValue(value))}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`
-    )
+  const blocks = includedReportBlocks(model)
+    .map((block) => {
+      if (isReportSection(block)) return renderTableBlock(block, model, cellPadding);
+      if (block.kind === 'text') {
+        return `<section style="margin:0 0 24px 0">${block.title.trim() ? `<h2 style="margin:0 0 8px 0;font-size:18px;color:#24324a">${escapeHtml(block.title)}</h2>` : ''}<div style="margin:0;color:#263244;line-height:1.65;white-space:pre-wrap">${escapeHtml(block.body)}</div></section>`;
+      }
+      return `<section style="margin:0 0 24px 0;text-align:center">${block.title?.trim() ? `<h2 style="margin:0 0 8px 0;font-size:18px;color:#24324a;text-align:left">${escapeHtml(block.title)}</h2>` : ''}${block.asset ? `<img src="${escapeHtml(block.asset.contentUrl)}" alt="${escapeHtml(block.title || block.caption || block.asset.originalFilename || '页面图片')}" style="display:block;max-width:100%;height:auto;margin:0 auto;border:0">` : ''}${block.caption?.trim() ? `<p style="margin:8px 0 0;color:#657084;font-size:12px">${escapeHtml(block.caption)}</p>` : ''}</section>`;
+    })
     .join('');
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>${escapeHtml(model.title)}</title></head><body style="margin:0;padding:28px;background:#ffffff;color:#263244;font-family:'Segoe UI','Microsoft YaHei',Arial,sans-serif"><main style="max-width:1100px;margin:0 auto"><h1 style="margin:0 0 6px 0;font-size:26px;color:#17233c">${escapeHtml(model.title)}</h1>${model.period ? `<p style="margin:0 0 24px 0;color:#657084">${escapeHtml(model.period)}</p>` : ''}${sections}</main></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="color-scheme" content="light"><title>${escapeHtml(model.title)}</title></head><body style="margin:0;padding:28px;background:#ffffff;color:#263244;font-family:'Segoe UI','Microsoft YaHei',Arial,sans-serif"><main style="max-width:1100px;margin:0 auto"><h1 style="margin:0 0 6px 0;font-size:26px;color:#17233c">${escapeHtml(model.title)}</h1>${model.period ? `<p style="margin:0 0 24px 0;color:#657084">${escapeHtml(model.period)}</p>` : ''}${blocks || '<p style="margin:0;color:#5f6b7c">没有符合当前导出条件的记录。</p>'}</main></body></html>`;
+}
+
+function includedReportBlocks(model: ReportModel): ReportBlock[] {
+  return (model.blocks ?? model.sections).filter((block) => {
+    if (!block.includeInExport) return false;
+    if (isReportSection(block)) return model.includeEmptySections || block.rows.length > 0;
+    if (block.kind === 'text')
+      return model.includeEmptySections || Boolean(block.title.trim() || block.body.trim());
+    return (
+      model.includeEmptySections ||
+      Boolean(block.asset || block.title?.trim() || block.caption?.trim())
+    );
+  });
+}
+
+function renderTableBlock(section: ReportSection, model: ReportModel, cellPadding: string): string {
+  return `<section style="margin:0 0 24px 0"><h2 style="margin:0 0 8px 0;font-size:18px;color:#24324a">${escapeHtml(section.title)}</h2>${section.description ? `<p style="margin:0 0 10px 0;color:#5f6b7c">${escapeHtml(section.description)}</p>` : ''}<table role="table" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed"><thead><tr>${section.fields.map((field) => `<th style="${field.width ? `width:${field.width}px;` : ''}padding:${cellPadding};border:1px solid #000000;background:#eef2f7;color:#344054;text-align:center;font-size:12px">${escapeHtml(field.name)}</th>`).join('')}</tr></thead><tbody>${section.rows.map((row) => `<tr>${row.values.map((value, index) => `<td style="padding:${cellPadding};border:1px solid #000000;vertical-align:middle;overflow-wrap:anywhere;${horizontalStyle(section.fields[index])}${section.fields[index]?.reportEmphasis === 'strong' ? 'font-weight:700;' : ''}${model.highlightStatus && section.fields[index]?.type === 'status' && displayValue(value) ? 'background:#edf4ff;color:#315fce;font-weight:600;' : ''}">${escapeHtml(displayValue(value))}</td>`).join('')}</tr>`).join('')}</tbody></table></section>`;
+}
+
+function horizontalStyle(field: ReportField | undefined): string {
+  const centerTypes: FieldType[] = [
+    'sequence',
+    'checkbox',
+    'date',
+    'status',
+    'single_select',
+    'person'
+  ];
+  const alignment =
+    field?.reportAlign ?? (field && centerTypes.includes(field.type) ? 'center' : 'left');
+  return `text-align:${alignment};`;
 }
 
 function displayValue(value: ReportCellValue): string {

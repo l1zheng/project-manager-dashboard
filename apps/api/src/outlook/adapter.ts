@@ -5,10 +5,21 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
 const MAX_REQUEST_BYTES = 5 * 1024 * 1024;
+const MAX_INLINE_IMAGE_BYTES = 30 * 1024 * 1024;
+const MAX_INLINE_IMAGE_COUNT = 20;
 const BRIDGE_TIMEOUT_MS = 20_000;
 const MAX_OUTPUT_BYTES = 64 * 1024;
 
-export type MailDraftInput = { subject: string; htmlFragment: string };
+export type MailDraftInlineImage = {
+  contentId: string;
+  mimeType: 'image/png' | 'image/jpeg' | 'image/gif';
+  content: Uint8Array;
+};
+export type MailDraftInput = {
+  subject: string;
+  htmlFragment: string;
+  inlineImages?: MailDraftInlineImage[];
+};
 export type OutlookProbeResult =
   { available: true } | { available: false; reason: OutlookFailureCode };
 export type OutlookFailureCode =
@@ -84,7 +95,28 @@ export class WindowsClassicOutlookAdapter implements MailDraftAdapter {
     const requestDirectory = await mkdtemp(join(this.tempDirectory, 'project-manager-outlook-'));
     try {
       const requestPath = join(requestDirectory, 'draft-request.json');
-      await writeFile(requestPath, JSON.stringify(input), 'utf8');
+      const inlineImages = [];
+      for (const [index, image] of (input.inlineImages ?? []).entries()) {
+        const imagePath = join(
+          requestDirectory,
+          `inline-${index + 1}.${imageExtension(image.mimeType)}`
+        );
+        await writeFile(imagePath, image.content);
+        inlineImages.push({
+          contentId: image.contentId,
+          mimeType: image.mimeType,
+          path: imagePath
+        });
+      }
+      await writeFile(
+        requestPath,
+        JSON.stringify({
+          subject: input.subject,
+          htmlFragment: input.htmlFragment,
+          inlineImages
+        }),
+        'utf8'
+      );
       const result = await this.run('CreateDraft', requestPath);
       if (result.exitCode !== 0) throw new OutlookDraftError(failureCodeFromResult(result));
       return { status: 'displayed' };
@@ -142,12 +174,51 @@ function validateDraftInput(input: MailDraftInput): void {
   if (!input.htmlFragment.trim()) {
     throw new OutlookDraftError('automation_failed', '报告内容为空，无法创建 Outlook 草稿。');
   }
-  if (Buffer.byteLength(JSON.stringify(input), 'utf8') > MAX_REQUEST_BYTES) {
+  if (
+    Buffer.byteLength(
+      JSON.stringify({ subject: input.subject, htmlFragment: input.htmlFragment }),
+      'utf8'
+    ) > MAX_REQUEST_BYTES
+  ) {
     throw new OutlookDraftError(
       'automation_failed',
       '报告过大，无法安全地创建 Outlook 草稿。请缩小导出范围。'
     );
   }
+  const images = input.inlineImages ?? [];
+  if (
+    images.length > MAX_INLINE_IMAGE_COUNT ||
+    images.reduce((total, image) => total + image.content.byteLength, 0) > MAX_INLINE_IMAGE_BYTES ||
+    images.some(
+      (image) =>
+        !/^pm-[a-zA-Z0-9-]{1,100}@local$/.test(image.contentId) ||
+        image.content.byteLength === 0 ||
+        image.content.byteLength > 10 * 1024 * 1024 ||
+        !hasImageSignature(image.mimeType, image.content)
+    )
+  ) {
+    throw new OutlookDraftError(
+      'automation_failed',
+      '内嵌图片数量、大小或内容 ID 不符合安全限制。'
+    );
+  }
+}
+
+function hasImageSignature(
+  mimeType: MailDraftInlineImage['mimeType'],
+  content: Uint8Array
+): boolean {
+  const prefix = (...bytes: number[]) =>
+    content.byteLength >= bytes.length && bytes.every((byte, index) => content[index] === byte);
+  if (mimeType === 'image/png') return prefix(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+  if (mimeType === 'image/jpeg') return prefix(0xff, 0xd8, 0xff);
+  return prefix(0x47, 0x49, 0x46, 0x38, 0x37, 0x61) || prefix(0x47, 0x49, 0x46, 0x38, 0x39, 0x61);
+}
+
+function imageExtension(mimeType: MailDraftInlineImage['mimeType']): string {
+  if (mimeType === 'image/jpeg') return 'jpg';
+  if (mimeType === 'image/gif') return 'gif';
+  return 'png';
 }
 
 function failureCodeFromResult(result: BridgeResult): OutlookFailureCode {
