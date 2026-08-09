@@ -956,14 +956,14 @@ body.v2-is-dragging-module {
 .v2-static-grid {
   display: grid;
   grid-template-columns: var(--preview-columns);
-  border-top: 1px solid #d7e0e7;
-  border-left: 1px solid #d7e0e7;
-  border-right: 1px solid #e8edf1;
+  border-top: 1px solid #000;
+  border-left: 1px solid #000;
+  border-right: 1px solid #000;
 }
 .v2-static-grid > * {
   min-width: 0;
-  border-right: 1px solid #e8edf1;
-  border-bottom: 1px solid #d7e0e7;
+  border-right: 1px solid #000;
+  border-bottom: 1px solid #000;
   padding: 8px 9px;
   overflow-wrap: anywhere;
   font-size: 11px;
@@ -973,7 +973,7 @@ body.v2-is-dragging-module {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-bottom: 2px solid #4f7693;
+  border-bottom: 1px solid #000;
   color: #355e7a;
   background: #f0f4f7;
   font-weight: 700;

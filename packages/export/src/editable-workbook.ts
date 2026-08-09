@@ -97,10 +97,10 @@ function styleHeaderRow(row: ExcelJS.Row): void {
     cell.fill = solidFill(EXCEL_THEME.color.accentDark);
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.border = {
-      top: { style: 'thin', color: { argb: EXCEL_THEME.color.accent } },
-      left: { style: 'thin', color: { argb: EXCEL_THEME.color.accent } },
-      bottom: { style: 'medium', color: { argb: EXCEL_THEME.color.accent } },
-      right: { style: 'thin', color: { argb: EXCEL_THEME.color.accent } }
+      top: { style: 'thin', color: { argb: EXCEL_THEME.color.tableBorder } },
+      left: { style: 'thin', color: { argb: EXCEL_THEME.color.tableBorder } },
+      bottom: { style: 'thin', color: { argb: EXCEL_THEME.color.tableBorder } },
+      right: { style: 'thin', color: { argb: EXCEL_THEME.color.tableBorder } }
     };
   });
 }

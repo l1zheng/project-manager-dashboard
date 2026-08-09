@@ -74,13 +74,15 @@ describe('editable Excel workbook', () => {
     });
     expect(worksheet.getCell('A1').border.top?.style).toBe('thin');
     expect(worksheet.getCell('A1').border.left?.style).toBe('thin');
-    expect(worksheet.getCell('A1').border.bottom?.style).toBe('medium');
+    expect(worksheet.getCell('A1').border.bottom?.style).toBe('thin');
+    expect(worksheet.getCell('A1').border.bottom?.color?.argb).toBe('FF000000');
     expect(worksheet.getCell('A2').border).toMatchObject({
       top: { style: 'thin' },
       left: { style: 'thin' },
       bottom: { style: 'thin' },
       right: { style: 'thin' }
     });
+    expect(worksheet.getCell('A2').border.right?.color?.argb).toBe('FF000000');
     expect(worksheet.getCell('D2').fill).toMatchObject({
       fgColor: { argb: 'FFE8F1FB' }
     });

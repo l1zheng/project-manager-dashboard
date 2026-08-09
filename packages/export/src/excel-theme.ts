@@ -13,6 +13,7 @@ export const EXCEL_THEME = {
     stripeFill: 'FFF8FAFB',
     border: 'FFD7E0E7',
     borderSoft: 'FFE8EDF1',
+    tableBorder: 'FF000000',
     white: 'FFFFFFFF',
     statusActiveFill: 'FFE8F1FB',
     statusActiveText: 'FF245A8D',
@@ -68,7 +69,7 @@ export function solidFill(argb: string): ExcelJS.Fill {
 }
 
 export function dataCellBorder(): Partial<ExcelJS.Borders> {
-  const border = { style: 'thin' as const, color: { argb: EXCEL_THEME.color.border } };
+  const border = { style: 'thin' as const, color: { argb: EXCEL_THEME.color.tableBorder } };
   return {
     top: border,
     left: border,

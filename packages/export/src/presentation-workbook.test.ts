@@ -38,12 +38,14 @@ describe('presentation Excel workbook', () => {
     expect(worksheet.getCell('A4').border.top).toBeUndefined();
     expect(worksheet.getCell('A4').border.bottom?.style).toBe('medium');
     expect(worksheet.getCell('A6').border.top?.style).toBe('thin');
+    expect(worksheet.getCell('A6').border.top?.color?.argb).toBe('FF000000');
     expect(riskCell.border).toMatchObject({
       top: { style: 'thin' },
       left: { style: 'thin' },
       bottom: { style: 'thin' },
       right: { style: 'thin' }
     });
+    expect(riskCell.border.left?.color?.argb).toBe('FF000000');
     const statusCell = findCell(worksheet, (value) => value === '进行中');
     expect(statusCell.fill).toMatchObject({ fgColor: { argb: 'FFE8F1FB' } });
   });

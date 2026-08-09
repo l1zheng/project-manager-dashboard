@@ -219,6 +219,8 @@ Tasks:
 - Give image modules an optional editable section title; render the heading in navigation and static exports only when supplied, without inventing an export placeholder. Completed in the prototype.
 - Replace the saturated prototype/production Excel styling with one shared enterprise theme: restrained slate-blue hierarchy, light structural borders, banded rows, centered metadata, and low-saturation semantic status colors. Completed and visually verified in both the V2 preview and a real generated workbook.
 - Apply explicit all-side borders to every populated business table cell and merged presentation span, matching Excel's “所有框线” expectation while retaining the accepted color hierarchy. Completed after hands-on review.
+- Match Excel's manual “所有框线” command exactly by rendering those table borders as uniform black thin lines rather than theme-colored or gray lines. Completed after direct comparison with Excel.
+- Keep table-module descriptions strictly opt-in in presentation exports: no example copy, database-description fallback, or empty subtitle row. Completed after export review.
 - On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, presentation-Excel image embedding, and a reviewed Outlook CID-image extension. Pending production integration.
 - Obtain hands-on user acceptance before reconnecting the shell to SQLite.
 

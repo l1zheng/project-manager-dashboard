@@ -58,6 +58,7 @@ describe('report model', () => {
         }
       ]
     });
+    expect(model.sections[0]?.description).toBeNull();
     expect(model.sections[0]?.rows[0]?.values).toEqual([7, '已完成']);
   });
 
