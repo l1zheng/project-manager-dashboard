@@ -2,6 +2,8 @@
 
 Run this checklist on the Windows PC intended to build and use the first release. It validates both the source build and the self-contained portable artifact before Outlook integration is accepted.
 
+Status for 0.1.0: accepted on 2026-08-09. The Windows x64 build and native SQLite checks were recorded in commit `fd1901b`; the user subsequently confirmed the remaining offline launch, persistence, start/stop, tamper rejection, Excel, classic Outlook, backup/restore, injected rollback, and upgrade journeys passed. Keep this document as the regression checklist for future releases.
+
 ## Prerequisites
 
 - Windows 10 or Windows 11.

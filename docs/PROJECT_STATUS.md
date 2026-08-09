@@ -1,11 +1,11 @@
 # Project Status
 
-Last updated: 2026-08-05
+Last updated: 2026-08-09
 
 ## Current state
 
-- Phase: Phases 0 through 5 are implementation-complete; Phase 6 Outlook implementation is complete pending target-Windows classic Outlook verification; Phase 7 implementation is complete through the P7-06 portable-release pipeline. The P7-07 clean-Windows/offline/recovery matrix and desktop Excel verification remain manual.
-- Implementation: the local TypeScript/SQLite application now supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, report display options, both Excel downloads, Outlook HTML/clipboard fallbacks, a Windows classic Outlook draft bridge, and verified full-workspace backup/restore with startup rollback.
+- Phase: Phases 0 through 7 are complete for the 0.1.0 personal release. The Windows x64 portable artifact, offline/recovery matrix, desktop Excel, and classic Outlook acceptance were confirmed on 2026-08-09; P7-08 user and recovery documentation is complete.
+- Implementation: version 0.1.0 supports independent dynamic databases, typed saved views and filters, vertically composed dashboards, an escaped canonical report model, static HTML preview, explicit completed-status semantics, both Excel downloads, classic Outlook draft/HTML/clipboard paths, verified full-workspace backup/restore with startup rollback, and an integrity-checked offline Windows x64 portable package.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -32,26 +32,28 @@ Last updated: 2026-08-05
 
 ## Active task
 
-`P7-07`: Run the clean-Windows, offline, upgrade, Outlook/Excel, and restore-failure release matrix on the target x64 Windows machine.
+None for version 0.1.0. The personal release has completed implementation, Windows acceptance, user documentation, and recovery documentation.
 
 ## Next tasks
 
-1. `P7-07` — On the target Windows machine, build the x64 ZIP and run [the Windows verification checklist](WINDOWS_VERIFICATION.md), including `P6-03` and both generated Excel files.
-2. `P7-08` — Finish end-user installation, backup, restore, and recovery documentation after the Windows matrix is recorded.
+1. Use version 0.1.0 for real weekly work and record concrete defects or workflow friction.
+2. Prioritize deferred backlog items only after user feedback or a new explicit requirement.
 
 ## Risks and validation items
 
-| Item | Risk | Planned validation |
+| Item | Risk | Release result and future regression |
 | --- | --- | --- |
-| Classic Outlook HTML rendering | Browser-perfect CSS will not survive Outlook rendering. | Test conservative table/inline-style templates on real classic Outlook during Phase 6. |
-| Outlook COM availability | Corporate policy may restrict PowerShell or automation. | Add availability detection and validate on the target PC before Phase 6 is considered complete. |
-| Excel merged layout | Rounding or extreme field counts may create unusable spans. | Pure layout tests plus golden workbooks during Phase 5. |
+| Classic Outlook HTML rendering | Browser-perfect CSS will not survive Outlook rendering. | Conservative table/inline-style output passed 0.1.0 target-PC acceptance; repeat for template changes. |
+| Outlook COM availability | Corporate policy may restrict PowerShell or automation. | Target-PC automation passed; rich-copy and HTML fallbacks remain required for other policy environments. |
+| Excel merged layout | Rounding or extreme field counts may create unusable spans. | Pure layout/workbook tests and target desktop Excel passed; repeat for allocator changes. |
 | Dynamic filters | JSON-backed records may become slow at higher volumes. | Benchmark representative data before optimizing into SQLite JSON queries. |
-| Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | Enforce ADR-0004 staging, compatibility, pre-restore backup, startup-only swap, injected-failure rollback, and adversarial archive tests. |
-| Packaging | Corporate Windows policy may reject an unsigned portable launcher. | Validate the canonical portable bundle first, then add a signed thin installer/launcher only if the target policy requires it. |
-| Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Build on the matching Windows architecture and run persistence tests from the final portable artifact. |
+| Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | ADR-0004 validation, injected rollback, offline restore, and upgrade journeys passed; retain manual backups before updates. |
+| Packaging | Corporate Windows policy may reject an unsigned portable launcher. | The canonical portable bundle passed the target environment; add signing only if another policy environment requires it. |
+| Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
 
 ## Verification log
+
+- 2026-08-09: Completed P7-07 and P7-08. The user confirmed the remaining Windows x64 acceptance matrix passed: clean/offline first launch, repeat launch and persistence, authenticated stop/start, release tamper rejection, both desktop Excel exports without repair, classic Outlook visible-draft/signature behavior and fallbacks, full-workspace backup/restore, injected-failure rollback, and the upgrade journey. Added the Chinese 0.1.0 user guide covering installation, daily operation, report exports, backup, restore, upgrade, computer migration, data locations, and recovery; added release notes and converted the Windows checklist into the regression baseline. After integrating the Windows hardening commit, the Mac cross-check passed all 57 tests, lint, and production build; the final formatting pass and repository checks are recorded with the P7-08 closeout commit.
 
 - 2026-08-05: P7-07 Windows x64 build validation exposed and fixed three release blockers: pnpm 11 was configured to force a `better-sqlite3` source build despite its bundled Win32 x64 prebuild; cross-platform tests constructed Windows paths through the host path implementation; and CMD launchers passed `%~dp0` trailing backslashes into PowerShell quoted arguments. The dependency is now prebuild-only, path resolution selects the requested platform implementation, and launcher commands use `RemoteSigned` (never `Bypass`) with a trailing-slash-safe release root. On Windows x64 with the SHA-verified Node 24.19.0 runtime, frozen install completed without a C/C++ toolchain and native SQLite returned `{ ok: 1 }`; release/API tests, lint, build, physical production deployment, packaged native SQLite, manifest generation/verification, and `ProjectManagerDashboard-0.1.0-win-x64.zip` creation all passed. The remaining manual P7-07 matrix items are offline first launch, interactive Excel/Outlook rendering, and restore/upgrade journeys.
 
@@ -107,4 +109,4 @@ Last updated: 2026-08-05
 
 ## Blockers
 
-None for Phase 0.
+None for version 0.1.0.

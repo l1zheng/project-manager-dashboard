@@ -26,7 +26,7 @@ Exit criteria:
 
 ## Phase 0 — Repository and engineering foundation
 
-Status: implementation complete on 2026-08-03 — Windows Node 24 LTS verification remains a manual target-machine check
+Status: completed — implementation completed on 2026-08-03 and Windows x64 runtime verification accepted on 2026-08-09
 
 Tasks:
 
@@ -124,7 +124,7 @@ Exit criteria:
 
 ## Phase 5 — Excel exports
 
-Status: implementation complete — P5-01 through P5-03 completed on 2026-08-04; Windows desktop Excel verification remains manual.
+Status: completed — P5-01 through P5-03 completed on 2026-08-04 and Windows desktop Excel verification accepted on 2026-08-09.
 
 Tasks:
 
@@ -133,7 +133,7 @@ Tasks:
 - Implement presentation workbook generation with merged spans. Completed in P5-03 with one 60-column report worksheet and independently allocated section spans.
 - Add styles, wrapping, row heights, print settings, and filenames. Completed in P5-03 for both download modes.
 - Add workbook validation tests and golden fixtures. Completed in P5-02/P5-03 with workbook reload tests and independent rendered workbook checks.
-- Open generated files in desktop Excel on Windows for manual verification.
+- Open generated files in desktop Excel on Windows for manual verification. Completed during P7-07 acceptance on 2026-08-09.
 
 Exit criteria:
 
@@ -143,7 +143,7 @@ Exit criteria:
 
 ## Phase 6 — Classic Outlook draft integration
 
-Status: in progress — P6-01 security and compatibility boundary accepted on 2026-08-04 in ADR-0003.
+Status: completed — implementation completed on 2026-08-04 and Windows classic Outlook acceptance completed on 2026-08-09.
 
 Tasks:
 
@@ -152,8 +152,8 @@ Tasks:
 - Implement rich-HTML clipboard fallback. Completed in P6-02 with browser `text/html` plus `text/plain` clipboard data after a direct user gesture.
 - Implement the Windows PowerShell/COM draft adapter. Completed in P6-02 with a packaged PowerShell bridge, JSON request file, timeout, and no-send script scan.
 - Detect Outlook integration availability and show actionable fallback errors. Completed in P6-02; macOS returns a safe platform-unsupported response with HTML/clipboard fallback.
-- Verify preservation of the user's existing Outlook signature policy. Pending target-Windows manual verification.
-- Test classic Outlook with Chinese text, long content, multiple tables, and status colors. Pending target-Windows manual verification.
+- Verify preservation of the user's existing Outlook signature policy. Completed during P7-07 acceptance on 2026-08-09.
+- Test classic Outlook with Chinese text, long content, multiple tables, and status colors. Completed during P7-07 acceptance on 2026-08-09.
 
 Exit criteria:
 
@@ -163,7 +163,7 @@ Exit criteria:
 
 ## Phase 7 — Backup, packaging, and release hardening
 
-Status: in progress — P7-01 through P7-04 completed on 2026-08-04; production serving, packaging, and release validation remain.
+Status: completed — P7-01 through P7-08 and the Windows x64 acceptance matrix completed by 2026-08-09.
 
 Tasks:
 
@@ -173,8 +173,8 @@ Tasks:
 - Generalize and test automatic pre-migration and pre-restore retention. Completed in P7-04 with separate 10-item groups, strict generated-filename recognition, bounded deletion diagnostics, and adversarial retention tests.
 - Serve the production web build from the loopback API and add first-run/data-directory diagnostics. Completed in P7-05 with same-origin static assets, safe client-route fallback, and a no-record-content runtime diagnostics view.
 - Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies. Completed in P7-06 with a Windows-only frozen build pipeline, pinned Node 24.19.0 archives, physical production deployment, native SQLite self-test, authenticated launcher restart, and full-file integrity manifest; final artifact execution remains in the P7-07 Windows matrix.
-- Test clean-machine installation, offline operation, upgrade migrations, and injected restore failure. P7-07.
-- Write user documentation and recovery instructions. P7-08.
+- Test clean-machine installation, offline operation, upgrade migrations, and injected restore failure. Completed in P7-07 on 2026-08-09.
+- Write user documentation and recovery instructions. Completed in P7-08 with the 0.1.0 user guide and release notes on 2026-08-09.
 
 Exit criteria:
 

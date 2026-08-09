@@ -45,15 +45,16 @@ test('rejects tampered, unexpected, and linked release entries', async () => {
 });
 
 test('release scripts pin runtime, loopback, frozen deployment, local data, and a safe PowerShell policy', async () => {
-  const [builder, launcher, verifier, startCommand, stopCommand, verifyCommand, configText] = await Promise.all([
-    readFile(new URL('./build-windows-portable.ps1', import.meta.url), 'utf8'),
-    readFile(new URL('./windows/start-dashboard.ps1', import.meta.url), 'utf8'),
-    readFile(new URL('./windows/verify-release.ps1', import.meta.url), 'utf8'),
-    readFile(new URL('./windows/start-dashboard.cmd', import.meta.url), 'utf8'),
-    readFile(new URL('./windows/stop-dashboard.cmd', import.meta.url), 'utf8'),
-    readFile(new URL('./windows/verify-release.cmd', import.meta.url), 'utf8'),
-    readFile(new URL('./windows-portable.config.json', import.meta.url), 'utf8')
-  ]);
+  const [builder, launcher, verifier, startCommand, stopCommand, verifyCommand, configText] =
+    await Promise.all([
+      readFile(new URL('./build-windows-portable.ps1', import.meta.url), 'utf8'),
+      readFile(new URL('./windows/start-dashboard.ps1', import.meta.url), 'utf8'),
+      readFile(new URL('./windows/verify-release.ps1', import.meta.url), 'utf8'),
+      readFile(new URL('./windows/start-dashboard.cmd', import.meta.url), 'utf8'),
+      readFile(new URL('./windows/stop-dashboard.cmd', import.meta.url), 'utf8'),
+      readFile(new URL('./windows/verify-release.cmd', import.meta.url), 'utf8'),
+      readFile(new URL('./windows-portable.config.json', import.meta.url), 'utf8')
+    ]);
   const config = JSON.parse(configText);
   assert.equal(config.nodeVersion, '24.19.0');
   assert.match(config.runtimeArchives.x64.url, /\/v24\.19\.0\/node-v24\.19\.0-win-x64\.zip$/);
@@ -66,9 +67,18 @@ test('release scripts pin runtime, loopback, frozen deployment, local data, and 
   assert.match(launcher, /project-manager-api/);
   assert.doesNotMatch(launcher, /0\.0\.0\.0/);
   assert.doesNotMatch(`${builder}\n${launcher}\n${verifier}`, /ExecutionPolicy|EncodedCommand/i);
-  assert.match(`${startCommand}\n${stopCommand}\n${verifyCommand}`, /-ExecutionPolicy RemoteSigned/i);
-  assert.doesNotMatch(`${startCommand}\n${stopCommand}\n${verifyCommand}`, /ExecutionPolicy Bypass|EncodedCommand/i);
-  assert.match(`${startCommand}\n${stopCommand}\n${verifyCommand}`, /ReleaseRoot "%RELEASE_ROOT:~0,-1%"/i);
+  assert.match(
+    `${startCommand}\n${stopCommand}\n${verifyCommand}`,
+    /-ExecutionPolicy RemoteSigned/i
+  );
+  assert.doesNotMatch(
+    `${startCommand}\n${stopCommand}\n${verifyCommand}`,
+    /ExecutionPolicy Bypass|EncodedCommand/i
+  );
+  assert.match(
+    `${startCommand}\n${stopCommand}\n${verifyCommand}`,
+    /ReleaseRoot "%RELEASE_ROOT:~0,-1%"/i
+  );
 });
 
 async function fixture() {

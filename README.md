@@ -8,12 +8,14 @@ A local-first, single-user project-management workspace with independent custom 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Implementation plan](docs/IMPLEMENTATION_PLAN.md)
 - [Current project status](docs/PROJECT_STATUS.md)
+- [0.1.0 用户手册](docs/USER_GUIDE.md)
+- [0.1.0 发布说明](docs/RELEASE_NOTES_0.1.0.md)
 - [Windows verification checklist](docs/WINDOWS_VERIFICATION.md)
 - [Model routing agreement](docs/MODEL_ROUTING.md)
 - [Agent working agreement](AGENTS.md)
 - [Interactive prototype](prototype/README.md)
 
-The Phase 0A prototype is accepted. The repository now includes the production TypeScript foundation, local SQLite persistence, and the first version-controlled migration.
+Version 0.1.0 has completed its Windows x64 acceptance matrix. It is the first local, single-user portable release; see the user guide for installation, daily operation, backup, restore, upgrade, and recovery instructions.
 
 ## Development
 
@@ -41,4 +43,4 @@ The release artifact must be built on matching Windows hardware because `better-
 powershell.exe -NoLogo -NoProfile -File .\release\build-windows-portable.ps1 -Architecture x64 -ApplicationVersion 0.1.0
 ```
 
-The resulting ZIP contains its own Node runtime, physical production dependencies, browser/API builds, migrations, Outlook bridge, loopback launcher, and an exact SHA-256 file manifest. The target PC needs neither Node nor pnpm and can remain offline. See [the Windows verification checklist](docs/WINDOWS_VERIFICATION.md) before treating the artifact as production-ready.
+The resulting ZIP contains its own Node runtime, physical production dependencies, browser/API builds, migrations, Outlook bridge, loopback launcher, and an exact SHA-256 file manifest. The target PC needs neither Node nor pnpm and can remain offline. Version 0.1.0 passed the Windows x64 acceptance matrix on 2026-08-09. See the [user guide](docs/USER_GUIDE.md) for normal use and the [Windows verification checklist](docs/WINDOWS_VERIFICATION.md) for release regression testing.
