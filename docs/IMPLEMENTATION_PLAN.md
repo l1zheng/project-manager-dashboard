@@ -193,6 +193,30 @@ Exit criteria:
 - Additional Outlook variants
 - Multi-user and LAN deployment
 
+## Phase 9 — V2 interaction-shell validation
+
+Status: prototype and browser checklist completed on 2026-08-09; hands-on user acceptance pending
+
+Reason:
+
+Phase 8 hid the internal entity workflow but retained several non-contextual controls, including a fixed-corner column property editor and explicit row creation. Hands-on feedback confirmed that matching the information architecture is insufficient; the production shell must also match the direct interaction model of an inline database.
+
+Tasks:
+
+- Write a concrete interaction and acceptance specification. Tracked in `docs/V2_INTERACTION_PROTOTYPE.md`.
+- Build an in-memory `/prototype-v2` route that cannot mutate production data. Completed.
+- Anchor column, filter, and export popovers to their initiating controls with outside-click and `Escape` dismissal. Completed.
+- Prototype per-table column resizing and drag reordering. Completed.
+- Prototype automatic row creation from the bottom blank row. Completed.
+- Prototype a complete-page static report and Excel-layout preview. Completed.
+- Obtain hands-on user acceptance before reconnecting the shell to SQLite.
+
+Exit criteria:
+
+- The V2 acceptance checklist is completed in a browser.
+- The user confirms the interaction direction.
+- Production integration can reuse the accepted components rather than rebuilding them independently.
+
 ## Phase 8 — Notion-style workspace correction
 
 Status: implementation and active Mac workspace browser verification complete; user workflow acceptance pending

@@ -4,7 +4,7 @@ Last updated: 2026-08-09
 
 ## Current state
 
-- Phase: Phase 8 Notion-style workspace correction is implemented and running against the user's active Mac workspace after real-use feedback exposed a severe primary-flow mismatch in 0.1.0. User workflow acceptance is pending.
+- Phase: Phase 9 V2 interaction prototype and browser checklist are complete. The existing Phase 8 workspace remains available, while the separate in-memory route awaits hands-on user acceptance before production integration.
 - Implementation: the default browser surface is now one workspace canvas containing all active tables. Default views/dashboard placements are assembled automatically; table titles, column titles, cells, new rows, new columns, and per-table filters are edited in place. The existing independent database/view/dashboard model and export pipeline remain intact.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
@@ -33,13 +33,13 @@ Last updated: 2026-08-09
 
 ## Active task
 
-Collect the user's hands-on acceptance of the Phase 8 workspace, then publish the corrective release.
+Collect hands-on acceptance for the isolated V2 interaction prototype before reconnecting it to SQLite.
 
 ## Next tasks
 
-1. Let the user verify creating a second differently shaped table, inline field rename, inline record save, independent filtering, and both Excel exports.
-2. Address any remaining workflow friction without re-exposing internal entities.
-3. Publish the corrective release and repeat the Windows browser regression before the next portable package.
+1. Let the user exercise contextual property menus, column resize/reorder, automatic row creation, filters, and export preview on `/prototype-v2`.
+2. Record any interaction corrections from hands-on feedback.
+3. After acceptance, extract/reuse the V2 components in the SQLite-backed workspace and repeat Excel/Outlook regression.
 
 ## Risks and validation items
 
@@ -54,6 +54,8 @@ Collect the user's hands-on acceptance of the Phase 8 workspace, then publish th
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
 
 ## Verification log
+
+- 2026-08-09: Completed the isolated `/prototype-v2` Notion-style interaction shell without production API reads or writes. It shows independently shaped `需求跟踪` and `关键风险` tables together, opens field/filter/export menus beside their initiating controls, dismisses transient UI on outside interaction or `Escape`, discards unsaved field drafts, supports direct field editing, per-table column resize and pointer drag reordering, creates records from the bottom blank row, and filters each table independently. The static report/Excel preview contains every selected table, applies the current per-table filters and completion choice, removes editing controls, and weights descriptive columns wider than status/sequence columns. Browser verification covered every checklist item, including unchanged widths in the non-resized table, filter isolation, preview keyboard dismissal, and automatic row creation; lint, TypeScript, production build, and full repository tests are recorded in the final verification pass. Hands-on user acceptance is the remaining promotion gate.
 
 - 2026-08-09: Corrected export completeness and popover interaction after hands-on feedback. The primary canvas had hard-coded `includeEmptySections=false`, so the empty `关键风险` table disappeared, while report sections used the internal default view name `表格` instead of database names. Workspace exports now default to including empty tables, expose the choice, use database business names, and wait for serialized per-record cell-save queues before every Excel/Outlook action; a failed save blocks stale output. Export, filter, and column-property popovers now close on outside pointer interaction or `Escape`, only one remains open, and closing an unsaved property editor restores persisted values. Real-workspace verification produced editable sheets named `需求跟踪` and `关键风险` plus a presentation sheet containing both sections and all persisted values; artifact inspection/rendering found no formula errors or clipping. Also changed an omitted presentation period from an empty shared string to a truly blank cell for broader renderer compatibility. Verified 57 application tests, 3 release tests, lint, TypeScript builds, production build, live browser behavior, and both real export modes without changing user data.
 - 2026-08-09: Fixed two hands-on workspace defects. The export popover had opened leftward beneath the fixed sidebar; it now opens rightward above the workspace stacking context and was visually verified at the production viewport. Column menus now provide a complete fixed-position property editor for name, type, select/multi-select/status options, and completed-status markers, without being clipped by wide-table scrolling or the sticky toolbar. Field updates validate existing stored values against the proposed definition: compatible values and stable option IDs are preserved, incompatible changes return a 409 without writes, and only an explicit browser confirmation retries with a transactional clear of that field plus saved-view filter repair. Automated coverage proves compatible text conversion, blocked incompatible conversion, and confirmed single-field clearing. Verified release tests (3), domain tests (11), export tests (15), API tests (29), lint, TypeScript builds, production build, and production-browser layout; the user's live records were not changed during UI verification.
