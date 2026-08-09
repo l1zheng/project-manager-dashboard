@@ -241,8 +241,8 @@ Tasks:
 - Extend saved-view configuration with field-level export alignment and title-emphasis metadata while parsing old configurations unchanged. Completed with default-empty backward compatibility and stable-field validation.
 - Evolve the canonical report into ordered table/text/image blocks; retain table-only projection for editable Excel. Canonical mixed ordering and the table-only compatibility projection are complete; mixed output adapters remain pending.
 - Extend presentation Excel with embedded validated images and extend Outlook with server-generated CID attachments without relaxing the no-send boundary.
-- Extract/reuse the accepted V2 components in the production workspace and connect them to the SQLite APIs.
-- Implement atomic module reorder, blank-row creation, view-specific column resize/reorder, and the accepted duplicate/archive actions. Atomic complete-order persistence is implemented; UI connection and remaining actions are pending.
+- Extract/reuse the accepted V2 components in the production workspace and connect them to the SQLite APIs. In progress: `/` now uses the accepted V2 surface backed by the workspace API, including legacy-response compatibility while a running local server has not yet restarted onto the block migration.
+- Implement atomic module reorder, blank-row creation, view-specific column resize/reorder, and the accepted duplicate/archive actions. In progress: the API now provides atomic full module order plus duplicate/archive for table modules and duplicate/archive for records; the V2 UI is wired to these operations, with final isolated browser regression pending.
 - Repeat the complete V2 checklist against isolated SQLite data, then run export and Windows Outlook regression.
 
 Exit criteria:

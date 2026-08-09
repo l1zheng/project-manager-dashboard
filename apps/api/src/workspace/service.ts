@@ -20,7 +20,8 @@ import {
   type CreateRecordInput,
   type DashboardBlockConfig,
   type FieldDefinitionForValidation,
-  type FilterExpression
+  type FilterExpression,
+  type ViewConfig
 } from '@project-manager/domain';
 import { and, asc, eq, isNull } from 'drizzle-orm';
 import { ZodError } from 'zod';
@@ -315,6 +316,175 @@ export class WorkspaceService {
       return this.getDashboard(dashboard.id);
     });
     return reorder();
+  }
+
+  archiveDashboardBlock(blockId: string) {
+    const block = this.requireDashboardBlock(blockId);
+    this.requireActiveDashboard(block.dashboardId);
+    const archive = this.persistence.sqlite.transaction(() => {
+      const updatedAt = new Date();
+      this.persistence.db
+        .update(schema.dashboardBlocks)
+        .set({ archivedAt: updatedAt, updatedAt })
+        .where(eq(schema.dashboardBlocks.id, block.id))
+        .run();
+      if (block.kind === 'table_view' && block.viewId) {
+        const view = this.requireActiveView(block.viewId);
+        const anotherReference = this.persistence.db
+          .select({ id: schema.dashboardBlocks.id })
+          .from(schema.dashboardBlocks)
+          .where(
+            and(
+              eq(schema.dashboardBlocks.viewId, block.viewId),
+              isNull(schema.dashboardBlocks.archivedAt)
+            )
+          )
+          .get();
+        if (!anotherReference) {
+          this.persistence.db
+            .update(schema.databases)
+            .set({ archivedAt: updatedAt, updatedAt })
+            .where(eq(schema.databases.id, view.databaseId))
+            .run();
+        }
+      }
+      return this.persistence.db
+        .select()
+        .from(schema.dashboardBlocks)
+        .where(eq(schema.dashboardBlocks.id, block.id))
+        .get();
+    });
+    return archive();
+  }
+
+  duplicateRecord(recordId: string) {
+    const record = this.requireActiveRecord(recordId);
+    const values = parseJsonObject(record.valuesJson) as CreateRecordInput['values'];
+    return this.insertRecord(record.databaseId, { values });
+  }
+
+  duplicateTableBlock(blockId: string) {
+    const sourceBlock = this.requireDashboardBlock(blockId);
+    if (sourceBlock.kind !== 'table_view' || !sourceBlock.viewId) {
+      throw new ResourceNotFoundError('Table module');
+    }
+    const sourceView = this.requireActiveView(sourceBlock.viewId);
+    const sourceDatabase = this.requireActiveDatabase(sourceView.databaseId);
+    const sourceFields = this.listActiveFields(sourceDatabase.id);
+    const sourceRecords = this.persistence.db
+      .select()
+      .from(schema.records)
+      .where(
+        and(eq(schema.records.databaseId, sourceDatabase.id), isNull(schema.records.archivedAt))
+      )
+      .orderBy(asc(schema.records.sortOrder))
+      .all();
+
+    const duplicate = this.persistence.sqlite.transaction(() => {
+      const now = new Date();
+      const databaseId = randomUUID();
+      const fieldIds = new Map(sourceFields.map((field) => [field.id, randomUUID()]));
+      const database = {
+        id: databaseId,
+        workspaceId: sourceDatabase.workspaceId,
+        name: `${sourceDatabase.name} 副本`,
+        description: sourceDatabase.description,
+        color: sourceDatabase.color,
+        sortOrder: this.nextDatabaseSortOrder(sourceDatabase.workspaceId),
+        nextSequence: 1,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now
+      };
+      this.persistence.db.insert(schema.databases).values(database).run();
+      for (const field of sourceFields) {
+        this.persistence.db
+          .insert(schema.fields)
+          .values({
+            ...field,
+            id: fieldIds.get(field.id)!,
+            databaseId,
+            createdAt: now,
+            updatedAt: now
+          })
+          .run();
+      }
+      const duplicateFields = this.listActiveFields(databaseId).map((field) =>
+        this.toValidationField(field)
+      );
+      const copiedConfig = remapViewConfig(
+        parseViewConfig(
+          parseJsonObject(sourceView.configJson),
+          sourceFields.map((field) => this.toValidationField(field))
+        ),
+        fieldIds
+      );
+      const viewId = randomUUID();
+      this.persistence.db
+        .insert(schema.views)
+        .values({
+          id: viewId,
+          databaseId,
+          name: sourceView.name,
+          type: sourceView.type,
+          sortOrder: this.nextSortOrder('views', 'database_id', databaseId),
+          configVersion: copiedConfig.version,
+          configJson: JSON.stringify(copiedConfig),
+          archivedAt: null,
+          createdAt: now,
+          updatedAt: now
+        })
+        .run();
+      for (const [index, record] of sourceRecords.entries()) {
+        const sourceValues = parseJsonObject(record.valuesJson) as Record<
+          string,
+          string | number | boolean | string[]
+        >;
+        const copiedValues = Object.fromEntries(
+          Object.entries(sourceValues).flatMap(([fieldId, value]) => {
+            const copiedFieldId = fieldIds.get(fieldId);
+            return copiedFieldId ? [[copiedFieldId, value]] : [];
+          })
+        );
+        const values = validateRecordValues(duplicateFields, copiedValues);
+        this.persistence.db
+          .insert(schema.records)
+          .values({
+            id: randomUUID(),
+            databaseId,
+            sequenceNumber: index + 1,
+            sortOrder: (index + 1) * sortOrderStep,
+            valuesJson: JSON.stringify(values),
+            archivedAt: null,
+            createdAt: now,
+            updatedAt: now
+          })
+          .run();
+      }
+      this.persistence.db
+        .update(schema.databases)
+        .set({ nextSequence: sourceRecords.length + 1, updatedAt: now })
+        .where(eq(schema.databases.id, databaseId))
+        .run();
+      const copiedBlock = {
+        id: randomUUID(),
+        dashboardId: sourceBlock.dashboardId,
+        kind: 'table_view' as const,
+        viewId,
+        mediaAssetId: null,
+        configVersion: sourceBlock.configVersion,
+        configJson: sourceBlock.configJson,
+        sortOrder: this.nextSortOrder('dashboard_blocks', 'dashboard_id', sourceBlock.dashboardId),
+        isCollapsed: sourceBlock.isCollapsed,
+        includeInExport: sourceBlock.includeInExport,
+        archivedAt: null,
+        createdAt: now,
+        updatedAt: now
+      };
+      this.persistence.db.insert(schema.dashboardBlocks).values(copiedBlock).run();
+      return this.toDashboardBlockOutput(copiedBlock);
+    });
+    return duplicate();
   }
 
   createDatabase(input: unknown) {
@@ -1053,6 +1223,36 @@ function parseJsonObject(value: string): Record<string, unknown> {
     throw new Error('Expected a JSON object in local persistence.');
   }
   return parsed as Record<string, unknown>;
+}
+
+function remapViewConfig(config: ViewConfig, fieldIds: Map<string, string>): ViewConfig {
+  const remapId = (fieldId: string) => fieldIds.get(fieldId) ?? fieldId;
+  return {
+    ...config,
+    visibleFieldIds: config.visibleFieldIds.map(remapId),
+    fieldWidths: Object.fromEntries(
+      Object.entries(config.fieldWidths).map(([fieldId, width]) => [remapId(fieldId), width])
+    ),
+    fieldPresentation: Object.fromEntries(
+      Object.entries(config.fieldPresentation).map(([fieldId, presentation]) => [
+        remapId(fieldId),
+        presentation
+      ])
+    ),
+    sorts: config.sorts.map((sort) => ({ ...sort, fieldId: remapId(sort.fieldId) })),
+    filter: config.filter ? remapFilterFieldIds(config.filter, remapId) : null
+  };
+}
+
+function remapFilterFieldIds(
+  filter: FilterExpression,
+  remapId: (fieldId: string) => string
+): FilterExpression {
+  if (filter.kind === 'condition') return { ...filter, fieldId: remapId(filter.fieldId) };
+  return {
+    ...filter,
+    children: filter.children.map((child) => remapFilterFieldIds(child, remapId))
+  };
 }
 
 function removeFieldFromFilter(input: unknown, fieldId: string): FilterExpression | null {

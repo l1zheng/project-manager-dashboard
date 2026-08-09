@@ -5,7 +5,7 @@ Last updated: 2026-08-09
 ## Current state
 
 - Phase: Phase 10 accepted V2 production integration. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is now active under ADR-0005.
-- Implementation: the accepted V2 browser surface remains the visual baseline. Production persistence now has a tested Phase 10 foundation for polymorphic table/text/image blocks, validated SQLite media assets, view-owned export presentation metadata, atomic module order, and a canonical mixed report projection. The production React workspace and mixed output adapters have not yet been connected to this foundation.
+- Implementation: the accepted V2 browser surface is now the production `/` route. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, and per-view layout through the Phase 10 APIs. A compatibility reader keeps the UI usable until an already-running older local service is restarted onto the new block migration; isolated API verification is complete, while the final isolated browser checklist and mixed output adapters remain pending.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: private repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`.
 - Target user: one person.
@@ -35,13 +35,13 @@ Last updated: 2026-08-09
 
 ## Active task
 
-Implement the backward-compatible polymorphic block/media/view-presentation foundation, then reconnect the accepted V2 components to SQLite without redesigning their interaction.
+Finish the isolated browser regression of the V2 production route, then connect the canonical mixed block order to presentation Excel and Outlook output without redesigning the accepted interaction.
 
 ## Next tasks
 
-1. Add and upgrade-test the polymorphic `dashboard_blocks` and bounded `media_assets` persistence contract.
-2. Extend saved-view presentation metadata and the canonical mixed report model.
-3. Extract/reuse the accepted V2 workspace components against the new APIs, then repeat Excel/Outlook regression.
+1. Run the accepted V2 interaction checklist against an isolated migrated SQLite workspace, including text/image modules and all destructive/duplicate actions.
+2. Extend presentation Excel with embedded validated images and Outlook with safe generated CID attachments.
+3. Restart the local service when the user is ready, then verify the migrated production route against the existing local workspace.
 
 ## Risks and validation items
 
@@ -57,6 +57,8 @@ Implement the backward-compatible polymorphic block/media/view-presentation foun
 | Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Prototype preview passed; production promotion must use validated SQLite assets, workbook embedding, generated Outlook CIDs, and regression on target Windows. |
 
 ## Verification log
+
+- 2026-08-09: Started the medium-model V2 production UI connection. The production root now mounts the accepted V2 interaction shell instead of the rejected form-style workspace. It hydrates table/text/image modules from the local workspace API, includes a compatibility projection for a still-running pre-restart service response, and persists direct table titles, property edits/deletion, per-view widths/order/filter, bottom blank-row creation, row/table duplicate/archive, text/image content, local image bytes, and block ordering. Added transactional duplicate-record and duplicate-table endpoints plus dashboard-block archive semantics that archive a table's database when its view is no longer used. Isolated API coverage proves duplicate IDs are fresh, copied data/configuration survives, and archiving a copied table does not reappear during primary-dashboard assembly. TypeScript, lint, Vite production build, `git diff --check`, and the isolated canvas test passed. The currently running local service predates the new backend and returns the legacy block response; no local user data was modified while diagnosing that compatibility state.
 
 - 2026-08-09: Completed the high-risk Phase 10 production foundation. Migration `0001` creates bounded local media assets and rebuilds legacy dashboard blocks into validated `table_view`/`text`/`image` modules. A real one-migration fixture proved automatic verified backup plus lossless preservation of legacy block ID, dashboard/view references, order, collapse/export flags, timestamps, title, and description. Added strict versioned block schemas, old-view-compatible field presentation metadata, PNG/JPEG/WebP/GIF signature validation, transactional image replacement, same-origin no-store image reads, exact-set atomic module ordering, and an ordered mixed report projection with a table-only editable-Excel compatibility view. Full regression passed 65 application tests and 3 release tests; Drizzle migration history check passed. No live user database was migrated during this isolated verification.
 

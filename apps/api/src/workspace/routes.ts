@@ -225,6 +225,14 @@ export function registerWorkspaceRoutes(
   app.patch('/api/dashboard-blocks/:blockId', async (request) =>
     service.updateDashboardBlock(blockParamsSchema.parse(request.params).blockId, request.body)
   );
+  app.post('/api/dashboard-blocks/:blockId/archive', async (request) =>
+    service.archiveDashboardBlock(blockParamsSchema.parse(request.params).blockId)
+  );
+  app.post('/api/dashboard-blocks/:blockId/duplicate-table', async (request, reply) =>
+    reply
+      .code(201)
+      .send(service.duplicateTableBlock(blockParamsSchema.parse(request.params).blockId))
+  );
   app.put('/api/dashboards/:dashboardId/block-order', async (request) =>
     service.reorderDashboardBlocks(
       dashboardParamsSchema.parse(request.params).dashboardId,
@@ -309,6 +317,9 @@ export function registerWorkspaceRoutes(
   app.patch('/api/records/:recordId', async (request) => {
     return service.updateRecord(recordParamsSchema.parse(request.params).recordId, request.body);
   });
+  app.post('/api/records/:recordId/duplicate', async (request, reply) =>
+    reply.code(201).send(service.duplicateRecord(recordParamsSchema.parse(request.params).recordId))
+  );
   app.post('/api/databases/:databaseId/archive', async (request) =>
     service.archiveDatabase(databaseParamsSchema.parse(request.params).databaseId)
   );

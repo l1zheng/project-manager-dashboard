@@ -6,7 +6,6 @@ import './styles.css';
 import './workspace.css';
 import './prototype-v2.css';
 
-const application =
-  window.location.pathname === '/prototype-v2' ? <PrototypeV2 /> : <WorkspaceApp />;
+const application = window.location.pathname === '/advanced' ? <WorkspaceApp /> : <PrototypeV2 />;
 
 createRoot(document.getElementById('root')!).render(<StrictMode>{application}</StrictMode>);

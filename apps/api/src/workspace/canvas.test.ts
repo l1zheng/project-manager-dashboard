@@ -72,6 +72,39 @@ describe('workspace canvas API', () => {
       ).toEqual(['需求跟踪', '关键风险']);
       expect(report.json().model.includeEmptySections).toBe(true);
 
+      const sourceRecord = await app.inject({
+        method: 'POST',
+        url: `/api/databases/${requirements.id}/records`,
+        payload: { values: { [requirementField.id]: '支持周报导出模板' } }
+      });
+      expect(sourceRecord.statusCode).toBe(201);
+      const copiedRecord = await app.inject({
+        method: 'POST',
+        url: `/api/records/${sourceRecord.json().id}/duplicate`
+      });
+      expect(copiedRecord.statusCode).toBe(201);
+      expect(copiedRecord.json()).toMatchObject({
+        databaseId: requirements.id,
+        values: { [requirementField.id]: '支持周报导出模板' }
+      });
+
+      const copiedTable = await app.inject({
+        method: 'POST',
+        url: `/api/dashboard-blocks/${first.json().blocks[0].id}/duplicate-table`
+      });
+      expect(copiedTable.statusCode).toBe(201);
+      expect(copiedTable.json()).toMatchObject({
+        kind: 'table_view',
+        view: { database: { name: '需求跟踪 副本' } }
+      });
+      expect(copiedTable.json().view.records).toHaveLength(2);
+
+      const archivedCopy = await app.inject({
+        method: 'POST',
+        url: `/api/dashboard-blocks/${copiedTable.json().id}/archive`
+      });
+      expect(archivedCopy.statusCode).toBe(200);
+
       const textBlock = await app.inject({
         method: 'POST',
         url: `/api/dashboards/${first.json().dashboard.id}/blocks`,

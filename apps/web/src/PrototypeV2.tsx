@@ -10,6 +10,7 @@ import {
   type RefObject
 } from 'react';
 import { createPortal } from 'react-dom';
+import type { FieldType, ViewConfig } from '@project-manager/domain';
 
 type PrototypeColumnType = 'sequence' | 'text' | 'person' | 'date' | 'status' | 'number';
 
@@ -19,6 +20,7 @@ type PrototypeColumn = {
   type: PrototypeColumnType;
   width: number;
   options?: string[];
+  optionValues?: Array<{ id: string; label: string }>;
   reportAlign?: 'left' | 'center';
   reportEmphasis?: 'strong';
 };
@@ -53,6 +55,40 @@ type PrototypePageBlock =
       fileName?: string;
       caption: string;
     };
+
+type ServerField = {
+  id: string;
+  name: string;
+  type: FieldType;
+  config: {
+    options?: Array<{ id: string; label: string }>;
+    completion?: { completedOptionIds: string[] };
+  };
+};
+type ServerRecord = { id: string; sequenceNumber: number; values: Record<string, unknown> };
+type ServerTableBlock = {
+  id: string;
+  kind: 'table_view';
+  view: {
+    view: { id: string; config: ViewConfig };
+    database: { id: string; name: string };
+    fields: ServerField[];
+    records: ServerRecord[];
+  };
+};
+type ServerContentBlock =
+  | { id: string; kind: 'text'; config: { title: string; body: string } }
+  | {
+      id: string;
+      kind: 'image';
+      config: { title: string | null; caption: string | null };
+      asset: { contentUrl: string; originalFilename: string } | null;
+    };
+type ServerLegacyTableBlock = Omit<ServerTableBlock, 'kind'> & { kind?: undefined };
+type ServerDashboard = {
+  dashboard: { id: string; name: string };
+  blocks: Array<ServerTableBlock | ServerLegacyTableBlock | ServerContentBlock>;
+};
 
 type PopoverState =
   | { kind: 'column'; anchor: HTMLElement; tableId: string; columnId: string }
@@ -182,8 +218,14 @@ const initialPageBlocks: PrototypePageBlock[] = [
 ];
 
 export function PrototypeV2() {
-  const [tables, setTables] = useState(initialTables);
-  const [pageBlocks, setPageBlocks] = useState(initialPageBlocks);
+  void initialTables;
+  void initialPageBlocks;
+  void tableViewConfig;
+  const [tables, setTables] = useState<PrototypeTable[]>([]);
+  const [pageBlocks, setPageBlocks] = useState<PrototypePageBlock[]>([]);
+  const [dashboardId, setDashboardId] = useState<string>();
+  const [loadError, setLoadError] = useState<string>();
+  const tablesRef = useRef<PrototypeTable[]>([]);
   const [popover, setPopover] = useState<PopoverState>();
   const [propertyDraft, setPropertyDraft] = useState<PrototypeColumn>();
   const [filterDraft, setFilterDraft] = useState<PrototypeFilter>({ columnId: '', keyword: '' });
@@ -211,6 +253,189 @@ export function PrototypeV2() {
     setDestructiveConfirmation(undefined);
     setModuleComposer(undefined);
   };
+
+  useEffect(() => {
+    void refreshWorkspace();
+  }, []);
+
+  async function refreshWorkspace() {
+    try {
+      const dashboards = await api<Array<{ id: string }>>('/api/dashboards');
+      const next = dashboards[0]
+        ? await api<ServerDashboard>(`/api/dashboards/${dashboards[0].id}`)
+        : await api<ServerDashboard>('/api/workspace/primary-dashboard', { method: 'POST' });
+      setDashboardId(next.dashboard.id);
+      const nextTables = next.blocks.flatMap((block) => {
+        if (block.kind !== 'table_view' && !('view' in block)) return [];
+        const { database, fields, records, view } = block.view;
+        return [
+          {
+            id: database.id,
+            name: database.name,
+            icon: '▤',
+            columns: view.config.visibleFieldIds.flatMap((fieldId) => {
+              const field = fields.find((candidate) => candidate.id === fieldId);
+              return field
+                ? [
+                    {
+                      id: field.id,
+                      name: field.name,
+                      type: toPrototypeColumnType(field.type),
+                      width: view.config.fieldWidths?.[field.id] ?? defaultWidth(field.type),
+                      options: field.config.options?.map((option) => option.label),
+                      optionValues: field.config.options?.map((option) => ({ ...option })),
+                      reportAlign:
+                        view.config.fieldPresentation?.[field.id]?.reportAlign === 'center'
+                          ? ('center' as const)
+                          : undefined,
+                      reportEmphasis:
+                        view.config.fieldPresentation?.[field.id]?.reportEmphasis === 'strong'
+                          ? ('strong' as const)
+                          : undefined
+                    }
+                  ]
+                : [];
+            }),
+            rows: records.map((record) => ({
+              id: record.id,
+              values: Object.fromEntries(
+                Object.entries(record.values).map(([fieldId, value]) => {
+                  const field = fields.find((candidate) => candidate.id === fieldId);
+                  const option = field?.config.options?.find((candidate) => candidate.id === value);
+                  return [
+                    fieldId,
+                    option?.label ??
+                      (Array.isArray(value)
+                        ? value.join('，')
+                        : value === undefined || value === null
+                          ? ''
+                          : String(value))
+                  ];
+                })
+              )
+            })),
+            filter:
+              view.config.filter?.kind === 'condition' && view.config.filter.operator === 'contains'
+                ? {
+                    columnId: view.config.filter.fieldId,
+                    keyword: String(view.config.filter.value ?? '')
+                  }
+                : undefined
+          }
+        ];
+      });
+      setTables(nextTables);
+      tablesRef.current = nextTables;
+      setPageBlocks(
+        next.blocks.map((block) => {
+          if (block.kind === 'table_view' || 'view' in block)
+            return { id: block.id, kind: 'table', tableId: block.view.database.id };
+          if (block.kind === 'text')
+            return {
+              id: block.id,
+              kind: 'text',
+              title: block.config.title,
+              content: block.config.body
+            };
+          return {
+            id: block.id,
+            kind: 'image',
+            title: block.config.title ?? '',
+            caption: block.config.caption ?? '',
+            src: block.asset?.contentUrl,
+            fileName: block.asset?.originalFilename
+          };
+        })
+      );
+      setLoadError(undefined);
+    } catch (error) {
+      setLoadError(error instanceof Error ? error.message : '无法载入本地工作台。');
+    }
+  }
+
+  function tableBlockId(tableId: string) {
+    return pageBlocks.find((block) => block.kind === 'table' && block.tableId === tableId)?.id;
+  }
+
+  function tableViewConfig(tableId: string): ViewConfig | undefined {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return undefined;
+    return {
+      version: 1,
+      visibleFieldIds: table.columns.map((column) => column.id),
+      fieldWidths: Object.fromEntries(table.columns.map((column) => [column.id, column.width])),
+      fieldPresentation: Object.fromEntries(
+        table.columns.flatMap((column) =>
+          column.reportAlign || column.reportEmphasis
+            ? [
+                [
+                  column.id,
+                  { reportAlign: column.reportAlign, reportEmphasis: column.reportEmphasis }
+                ]
+              ]
+            : []
+        )
+      ),
+      filter: table.filter
+        ? {
+            kind: 'condition',
+            fieldId: table.filter.columnId,
+            operator: 'contains',
+            value: table.filter.keyword
+          }
+        : null,
+      sorts: [],
+      includeArchived: false
+    };
+  }
+
+  async function saveTableView(tableId: string, override?: PrototypeTable) {
+    const table = override ?? tablesRef.current.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    const block = pageBlocks.find(
+      (candidate) => candidate.kind === 'table' && candidate.tableId === tableId
+    );
+    if (!block || block.kind !== 'table') return;
+    const server = dashboardId
+      ? await api<ServerDashboard>(`/api/dashboards/${dashboardId}`)
+      : await api<ServerDashboard>('/api/workspace/primary-dashboard', { method: 'POST' });
+    const tableBlock = server.blocks.find(
+      (candidate): candidate is ServerTableBlock | ServerLegacyTableBlock =>
+        candidate.id === block.id && 'view' in candidate
+    );
+    if (!tableBlock) return;
+    const config: ViewConfig = {
+      version: 1,
+      visibleFieldIds: table.columns.map((column) => column.id),
+      fieldWidths: Object.fromEntries(table.columns.map((column) => [column.id, column.width])),
+      fieldPresentation: Object.fromEntries(
+        table.columns.flatMap((column) =>
+          column.reportAlign || column.reportEmphasis
+            ? [
+                [
+                  column.id,
+                  { reportAlign: column.reportAlign, reportEmphasis: column.reportEmphasis }
+                ]
+              ]
+            : []
+        )
+      ),
+      filter: table.filter
+        ? {
+            kind: 'condition',
+            fieldId: table.filter.columnId,
+            operator: 'contains',
+            value: table.filter.keyword
+          }
+        : null,
+      sorts: [],
+      includeArchived: false
+    };
+    await api(`/api/views/${tableBlock.view.view.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ config })
+    });
+  }
 
   useEffect(() => {
     if (!popover) return;
@@ -241,7 +466,11 @@ export function PrototypeV2() {
   );
 
   function updateTable(tableId: string, update: (table: PrototypeTable) => PrototypeTable) {
-    setTables((current) => current.map((table) => (table.id === tableId ? update(table) : table)));
+    setTables((current) => {
+      const next = current.map((table) => (table.id === tableId ? update(table) : table));
+      tablesRef.current = next;
+      return next;
+    });
   }
 
   function openColumnEditor(table: PrototypeTable, column: PrototypeColumn, anchor: HTMLElement) {
@@ -250,8 +479,21 @@ export function PrototypeV2() {
     setPopover({ kind: 'column', anchor, tableId: table.id, columnId: column.id });
   }
 
-  function saveColumnProperty() {
+  async function saveColumnProperty() {
     if (!popover || popover.kind !== 'column' || !propertyDraft?.name.trim()) return;
+    const table = tables.find((candidate) => candidate.id === popover.tableId);
+    const original = table?.columns.find((column) => column.id === popover.columnId);
+    if (!table || !original) return;
+    const type = toServerFieldType(propertyDraft.type);
+    const options =
+      propertyDraft.type === 'status'
+        ? (propertyDraft.options ?? []).map((label) => ({
+            id:
+              original.optionValues?.find((option) => option.label === label)?.id ??
+              crypto.randomUUID(),
+            label
+          }))
+        : undefined;
     updateTable(popover.tableId, (table) => ({
       ...table,
       columns: table.columns.map((column) =>
@@ -260,11 +502,32 @@ export function PrototypeV2() {
           : column
       )
     }));
+    try {
+      await api(`/api/fields/${original.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: propertyDraft.name.trim(),
+          type,
+          config: options
+            ? {
+                version: 1,
+                options,
+                completion: { completedOptionIds: options.slice(-1).map((option) => option.id) }
+              }
+            : { version: 1 }
+        })
+      });
+      await saveTableView(table.id);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '保存属性失败。');
+      await refreshWorkspace();
+      return;
+    }
     setNotice(`已更新属性“${propertyDraft.name.trim()}”`);
     closePopover();
   }
 
-  function deleteColumn(tableId: string, columnId: string) {
+  async function deleteColumn(tableId: string, columnId: string) {
     const columnName = tables
       .find((table) => table.id === tableId)
       ?.columns.find((column) => column.id === columnId)?.name;
@@ -285,66 +548,31 @@ export function PrototypeV2() {
     });
     setNotice(`已删除属性“${columnName ?? '未命名属性'}”`);
     closePopover();
+    try {
+      await api(`/api/fields/${columnId}/archive`, { method: 'POST' });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '删除属性失败。');
+      await refreshWorkspace();
+    }
   }
 
-  function duplicateTable(tableId: string) {
-    const source = tables.find((table) => table.id === tableId);
-    if (!source) return;
-    const id = `table-${crypto.randomUUID()}`;
-    const columnIdMap = new Map(
-      source.columns.map((column) => [column.id, `column-${crypto.randomUUID()}`])
-    );
-    const copy: PrototypeTable = {
-      ...source,
-      id,
-      name: `${source.name} 副本`,
-      columns: source.columns.map((column) => ({
-        ...column,
-        id: columnIdMap.get(column.id)!,
-        options: column.options ? [...column.options] : undefined
-      })),
-      rows: source.rows.map((row) => ({
-        id: `row-${crypto.randomUUID()}`,
-        values: Object.fromEntries(
-          Object.entries(row.values).flatMap(([columnId, value]) => {
-            const copiedColumnId = columnIdMap.get(columnId);
-            return copiedColumnId ? [[copiedColumnId, value]] : [];
-          })
-        )
-      })),
-      filter: source.filter
-        ? {
-            ...source.filter,
-            columnId: columnIdMap.get(source.filter.columnId)!
-          }
-        : undefined
-    };
-    setTables((current) => {
-      const sourceIndex = current.findIndex((table) => table.id === tableId);
-      if (sourceIndex < 0) return [...current, copy];
-      const next = [...current];
-      next.splice(sourceIndex + 1, 0, copy);
-      return next;
-    });
-    setPageBlocks((current) => {
-      const sourceIndex = current.findIndex(
-        (block) => block.kind === 'table' && block.tableId === tableId
-      );
-      const copyBlock: PrototypePageBlock = {
-        id: `block-${crypto.randomUUID()}`,
-        kind: 'table',
-        tableId: id
-      };
-      if (sourceIndex < 0) return [...current, copyBlock];
-      const next = [...current];
-      next.splice(sourceIndex + 1, 0, copyBlock);
-      return next;
-    });
-    setNotice('已复制表格，副本保留列结构和当前记录。');
-    closePopover();
+  async function duplicateTable(tableId: string) {
+    const blockId = tableBlockId(tableId);
+    if (!blockId) return;
+    try {
+      await api(`/api/dashboard-blocks/${blockId}/duplicate-table`, { method: 'POST' });
+      await refreshWorkspace();
+      setNotice('已复制表格，副本保留列结构和当前记录。');
+      closePopover();
+      return;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '复制表格失败。');
+      return;
+    }
   }
 
-  function deleteTable(tableId: string) {
+  async function deleteTable(tableId: string) {
     const tableName = tables.find((table) => table.id === tableId)?.name;
     setTables((current) => current.filter((table) => table.id !== tableId));
     setPageBlocks((current) =>
@@ -357,9 +585,18 @@ export function PrototypeV2() {
     });
     setNotice(`已删除表格“${tableName ?? '未命名表格'}”`);
     closePopover();
+    const blockId = tableBlockId(tableId);
+    if (!blockId) return;
+    try {
+      await api(`/api/dashboard-blocks/${blockId}/archive`, { method: 'POST' });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '删除表格失败。');
+      await refreshWorkspace();
+    }
   }
 
-  function duplicateRow(tableId: string, rowId: string) {
+  async function duplicateRow(tableId: string, rowId: string) {
     updateTable(tableId, (table) => {
       const rowIndex = table.rows.findIndex((row) => row.id === rowId);
       if (rowIndex < 0) return table;
@@ -372,15 +609,29 @@ export function PrototypeV2() {
     });
     setNotice('已复制记录。');
     closePopover();
+    try {
+      await api(`/api/records/${rowId}/duplicate`, { method: 'POST' });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '复制记录失败。');
+      await refreshWorkspace();
+    }
   }
 
-  function deleteRow(tableId: string, rowId: string) {
+  async function deleteRow(tableId: string, rowId: string) {
     updateTable(tableId, (table) => ({
       ...table,
       rows: table.rows.filter((row) => row.id !== rowId)
     }));
     setNotice('已删除记录。');
     closePopover();
+    try {
+      await api(`/api/records/${rowId}/archive`, { method: 'POST' });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '删除记录失败。');
+      await refreshWorkspace();
+    }
   }
 
   function openFilter(table: PrototypeTable, anchor: HTMLElement) {
@@ -393,7 +644,7 @@ export function PrototypeV2() {
     setPopover({ kind: 'filter', anchor, tableId: table.id });
   }
 
-  function applyFilter(tableId: string) {
+  async function applyFilter(tableId: string) {
     updateTable(tableId, (table) => ({
       ...table,
       filter: filterDraft.keyword.trim()
@@ -401,70 +652,110 @@ export function PrototypeV2() {
         : undefined
     }));
     closePopover();
+    await saveTableView(tableId);
   }
 
-  function addTable() {
+  async function addTable() {
     const name = newTableName.trim();
     if (!name) return;
-    const id = `table-${crypto.randomUUID()}`;
-    setTables((current) => [
-      ...current,
-      {
-        id,
-        name,
-        icon: '▤',
-        columns: [
-          { id: `${id}-sequence`, name: '序号', type: 'sequence', width: 76 },
-          { id: `${id}-title`, name: '名称', type: 'text', width: 300 },
-          {
-            id: `${id}-status`,
-            name: '状态',
-            type: 'status',
-            width: 132,
-            options: ['未开始', '进行中', '已完成']
+    try {
+      const database = await api<{ id: string }>(`/api/databases`, {
+        method: 'POST',
+        body: JSON.stringify({ name })
+      });
+      const sequence = await api<{ id: string }>(`/api/databases/${database.id}/fields`, {
+        method: 'POST',
+        body: JSON.stringify({ name: '序号', type: 'sequence', config: { version: 1 } })
+      });
+      const title = await api<{ id: string }>(`/api/databases/${database.id}/fields`, {
+        method: 'POST',
+        body: JSON.stringify({ name: '名称', type: 'long_text', config: { version: 1 } })
+      });
+      const statusOptions = ['未开始', '进行中', '已完成'].map((label) => ({
+        id: crypto.randomUUID(),
+        label
+      }));
+      const status = await api<{ id: string }>(`/api/databases/${database.id}/fields`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: '状态',
+          type: 'status',
+          config: {
+            version: 1,
+            options: statusOptions,
+            completion: { completedOptionIds: [statusOptions[2].id] }
           }
-        ],
-        rows: []
-      }
-    ]);
-    setPageBlocks((current) => [
-      ...current,
-      { id: `block-${crypto.randomUUID()}`, kind: 'table', tableId: id }
-    ]);
-    setNewTableName('');
-    setModuleComposer(undefined);
-    closePopover();
-    requestAnimationFrame(() =>
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-    );
+        })
+      });
+      const view = await api<{ id: string }>(`/api/databases/${database.id}/views`, {
+        method: 'POST',
+        body: JSON.stringify({
+          name: '默认视图',
+          config: {
+            version: 1,
+            visibleFieldIds: [sequence.id, title.id, status.id],
+            fieldWidths: { [sequence.id]: 76, [title.id]: 300, [status.id]: 132 },
+            fieldPresentation: {},
+            filter: null,
+            sorts: [],
+            includeArchived: false
+          }
+        })
+      });
+      if (!dashboardId) throw new Error('工作台尚未准备完成。');
+      await api(`/api/dashboards/${dashboardId}/blocks`, {
+        method: 'POST',
+        body: JSON.stringify({
+          kind: 'table_view',
+          viewId: view.id,
+          config: { version: 1, titleOverride: null, description: null }
+        })
+      });
+      await refreshWorkspace();
+      setNewTableName('');
+      closePopover();
+      requestAnimationFrame(() =>
+        document.getElementById(database.id)?.scrollIntoView({ behavior: 'smooth' })
+      );
+      return;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '新建表格失败。');
+      return;
+    }
   }
 
-  function addTextBlock() {
-    const id = `block-${crypto.randomUUID()}`;
-    setPageBlocks((current) => [
-      ...current,
-      {
-        id,
-        kind: 'text',
-        title: '本周摘要',
-        content: '在这里输入说明、结论或本周摘要。'
-      }
-    ]);
-    setNotice('已添加文字模块。');
-    closePopover();
-    requestAnimationFrame(() =>
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-    );
+  async function addTextBlock() {
+    if (!dashboardId) return;
+    try {
+      await api(`/api/dashboards/${dashboardId}/blocks`, {
+        method: 'POST',
+        body: JSON.stringify({ kind: 'text', config: { version: 1, title: '本周摘要', body: '' } })
+      });
+      await refreshWorkspace();
+      setNotice('已添加文字模块。');
+      closePopover();
+      return;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '添加文字模块失败。');
+      return;
+    }
   }
 
-  function addImageBlock() {
-    const id = `block-${crypto.randomUUID()}`;
-    setPageBlocks((current) => [...current, { id, kind: 'image', title: '', caption: '' }]);
-    setNotice('已添加图片模块，请从本机选择图片。');
-    closePopover();
-    requestAnimationFrame(() =>
-      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' })
-    );
+  async function addImageBlock() {
+    if (!dashboardId) return;
+    try {
+      await api(`/api/dashboards/${dashboardId}/blocks`, {
+        method: 'POST',
+        body: JSON.stringify({ kind: 'image', config: { version: 1, title: null, caption: null } })
+      });
+      await refreshWorkspace();
+      setNotice('已添加图片模块，请从本机选择图片。');
+      closePopover();
+      return;
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '添加图片模块失败。');
+      return;
+    }
   }
 
   function updatePageBlock(
@@ -474,6 +765,37 @@ export function PrototypeV2() {
     setPageBlocks((current) =>
       current.map((block) => (block.id === blockId ? update(block) : block))
     );
+  }
+
+  async function saveContentBlock(blockId: string) {
+    const block = pageBlocks.find((candidate) => candidate.id === blockId);
+    if (!block || block.kind === 'table') return;
+    const config =
+      block.kind === 'text'
+        ? { version: 1, title: block.title, body: block.content }
+        : { version: 1, title: block.title.trim() || null, caption: block.caption.trim() || null };
+    try {
+      await api(`/api/dashboard-blocks/${blockId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ config })
+      });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '保存模块失败。');
+    }
+  }
+
+  async function saveTableName(tableId: string) {
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table || !table.name.trim()) return;
+    try {
+      await api(`/api/databases/${tableId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: table.name.trim() })
+      });
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '重命名表格失败。');
+      await refreshWorkspace();
+    }
   }
 
   function movePageBlockByOffset(blockId: string, offset: -1 | 1) {
@@ -491,6 +813,11 @@ export function PrototypeV2() {
       const next = [...current];
       const [source] = next.splice(currentSourceIndex, 1);
       next.splice(currentTargetIndex, 0, source!);
+      if (dashboardId)
+        void api(`/api/dashboards/${dashboardId}/block-order`, {
+          method: 'PUT',
+          body: JSON.stringify({ blockIds: next.map((item) => item.id) })
+        });
       return next;
     });
     setNotice(offset < 0 ? '已将模块上移。' : '已将模块下移。');
@@ -521,6 +848,11 @@ export function PrototypeV2() {
       if (!source || currentTargetIndex < 0) return current;
       next.splice(edge === 'before' ? currentTargetIndex : currentTargetIndex + 1, 0, source);
       if (next.every((block, index) => block.id === current[index]?.id)) return current;
+      if (dashboardId)
+        void api(`/api/dashboards/${dashboardId}/block-order`, {
+          method: 'PUT',
+          body: JSON.stringify({ blockIds: next.map((item) => item.id) })
+        });
       return next;
     });
     setNotice('已调整模块顺序，导出预览会使用相同顺序。');
@@ -595,36 +927,48 @@ export function PrototypeV2() {
       .join(' ');
   }
 
-  function loadImage(blockId: string, file?: File) {
+  async function loadImage(blockId: string, file?: File) {
     if (!file) return;
     if (!['image/png', 'image/jpeg', 'image/webp', 'image/gif'].includes(file.type)) {
       setNotice('请选择 PNG、JPEG、WebP 或 GIF 图片。');
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setNotice('原型中的图片不能超过 10 MB。');
+      setNotice('图片不能超过 10 MB。');
       return;
     }
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      if (typeof reader.result !== 'string') return;
-      updatePageBlock(blockId, (block) =>
-        block.kind === 'image'
-          ? { ...block, src: reader.result as string, fileName: file.name }
-          : block
-      );
-      setNotice(`已载入图片“${file.name}” · 仅保存在当前页面`);
-    });
-    reader.readAsDataURL(file);
+    try {
+      const response = await fetch(`/api/dashboard-blocks/${blockId}/image`, {
+        method: 'PUT',
+        headers: {
+          'content-type': file.type,
+          'x-project-manager-filename': encodeURIComponent(file.name)
+        },
+        body: file
+      });
+      if (!response.ok)
+        throw new Error((await response.json().catch(() => ({}))).message ?? '上传图片失败。');
+      await refreshWorkspace();
+      setNotice(`已保存图片“${file.name}”。`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '上传图片失败。');
+    }
   }
 
-  function deleteContentBlock(blockId: string) {
+  async function deleteContentBlock(blockId: string) {
     setPageBlocks((current) => current.filter((block) => block.id !== blockId));
     setNotice('已删除页面模块。');
     closePopover();
+    try {
+      await api(`/api/dashboard-blocks/${blockId}/archive`, { method: 'POST' });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '删除模块失败。');
+      await refreshWorkspace();
+    }
   }
 
-  function addColumn(tableId: string) {
+  async function addColumn(tableId: string) {
     const column: PrototypeColumn = {
       id: `column-${crypto.randomUUID()}`,
       name: '新属性',
@@ -632,6 +976,30 @@ export function PrototypeV2() {
       width: 200
     };
     updateTable(tableId, (table) => ({ ...table, columns: [...table.columns, column] }));
+    try {
+      const field = await api<{ id: string }>(`/api/databases/${tableId}/fields`, {
+        method: 'POST',
+        body: JSON.stringify({ name: column.name, type: 'long_text', config: { version: 1 } })
+      });
+      const next = { ...column, id: field.id };
+      updateTable(tableId, (table) => ({
+        ...table,
+        columns: [...table.columns.filter((item) => item.id !== column.id), next]
+      }));
+      await saveTableView(tableId, {
+        ...tables.find((table) => table.id === tableId)!,
+        columns: [
+          ...(tables.find((table) => table.id === tableId)?.columns ?? []).filter(
+            (item) => item.id !== column.id
+          ),
+          next
+        ]
+      });
+      await refreshWorkspace();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '添加属性失败。');
+      await refreshWorkspace();
+    }
     setNotice('已添加新属性，点击表头即可修改。');
   }
 
@@ -642,6 +1010,15 @@ export function PrototypeV2() {
         row.id === rowId ? { ...row, values: { ...row.values, [columnId]: value } } : row
       )
     }));
+    const table = tables.find((candidate) => candidate.id === tableId);
+    const row = table?.rows.find((candidate) => candidate.id === rowId);
+    if (table && row) {
+      const values = { ...row.values, [columnId]: value };
+      void api(`/api/records/${rowId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ values: serializeValues(table, values) })
+      }).catch((error) => setNotice(error instanceof Error ? error.message : '保存单元格失败。'));
+    }
   }
 
   function updateBlankDraft(tableId: string, columnId: string, value: string) {
@@ -651,7 +1028,7 @@ export function PrototypeV2() {
     }));
   }
 
-  function commitBlankRow(tableId: string, override?: Record<string, string>) {
+  async function commitBlankRow(tableId: string, override?: Record<string, string>) {
     const values = override ?? blankRowDrafts[tableId] ?? {};
     if (!Object.values(values).some((value) => value.trim())) return;
     updateTable(tableId, (table) => ({
@@ -659,7 +1036,20 @@ export function PrototypeV2() {
       rows: [...table.rows, { id: `row-${crypto.randomUUID()}`, values }]
     }));
     setBlankRowDrafts((current) => ({ ...current, [tableId]: {} }));
-    setNotice('新行已自动创建 · 原型数据仅保存在当前页面');
+    setNotice('正在创建新行…');
+    const table = tables.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    try {
+      await api(`/api/databases/${tableId}/records`, {
+        method: 'POST',
+        body: JSON.stringify({ values: serializeValues(table, values) })
+      });
+      await refreshWorkspace();
+      setNotice('新行已自动创建。');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '新建记录失败。');
+      await refreshWorkspace();
+    }
   }
 
   function startResize(
@@ -687,6 +1077,7 @@ export function PrototypeV2() {
       document.body.classList.remove('v2-is-resizing');
       window.removeEventListener('pointermove', handleMove);
       window.removeEventListener('pointerup', handleUp);
+      void saveTableView(tableId);
     };
     window.addEventListener('pointermove', handleMove);
     window.addEventListener('pointerup', handleUp, { once: true });
@@ -702,6 +1093,7 @@ export function PrototypeV2() {
       columns.splice(targetIndex, 0, source!);
       return { ...table, columns };
     });
+    void Promise.resolve().then(() => saveTableView(tableId));
     setDraggingColumn(undefined);
   }
 
@@ -731,6 +1123,7 @@ export function PrototypeV2() {
 
   return (
     <div className="v2-shell">
+      {loadError && <div className="v2-toast">{loadError}</div>}
       <aside className="v2-sidebar">
         <div className="v2-brand">
           <span>PM</span>
@@ -758,13 +1151,10 @@ export function PrototypeV2() {
           );
         })}
         <div className="v2-prototype-badge">
-          V2 交互原型
+          本机工作区
           <br />
-          <small>不会读写正式数据</small>
+          <small>数据仅保存到此电脑</small>
         </div>
-        <a className="v2-back-link" href="/">
-          ← 返回当前正式界面
-        </a>
       </aside>
 
       <main className="v2-page" id="page-top">
@@ -858,6 +1248,7 @@ export function PrototypeV2() {
                       )
                     }
                     placeholder="输入模块标题…"
+                    onBlur={() => void saveContentBlock(block.id)}
                     value={block.title}
                   />
                   <textarea
@@ -871,6 +1262,7 @@ export function PrototypeV2() {
                       )
                     }
                     placeholder="输入说明、结论或本周摘要…"
+                    onBlur={() => void saveContentBlock(block.id)}
                     rows={3}
                     value={block.content}
                   />
@@ -924,6 +1316,7 @@ export function PrototypeV2() {
                       )
                     }
                     placeholder="添加图片标题（可选）…"
+                    onBlur={() => void saveContentBlock(block.id)}
                     value={block.title}
                   />
                   {block.src ? (
@@ -964,6 +1357,7 @@ export function PrototypeV2() {
                       )
                     }
                     placeholder="添加图片说明…"
+                    onBlur={() => void saveContentBlock(block.id)}
                     value={block.caption}
                   />
                 </section>
@@ -999,6 +1393,7 @@ export function PrototypeV2() {
                           name: event.target.value
                         }))
                       }
+                      onBlur={() => void saveTableName(table.id)}
                     />
                   </div>
                   <div className="v2-table-tools">
@@ -1915,7 +2310,7 @@ function ExportPreview({
               : 'Outlook：使用静态表格排版，并保留相同的字段顺序和筛选结果。'}
           </span>
           <button disabled type="button">
-            原型仅预览
+            导出预览
           </button>
         </div>
       </div>
@@ -2049,4 +2444,50 @@ function excelWeight(column: PrototypeColumn) {
   if (column.type === 'sequence') return 0.7;
   if (column.type === 'status' || column.type === 'date' || column.type === 'person') return 1.1;
   return Math.max(1.2, column.width / 130);
+}
+
+function toPrototypeColumnType(type: FieldType): PrototypeColumnType {
+  if (type === 'sequence') return 'sequence';
+  if (type === 'status' || type === 'single_select') return 'status';
+  if (type === 'person') return 'person';
+  if (type === 'date') return 'date';
+  if (type === 'number') return 'number';
+  return 'text';
+}
+
+function toServerFieldType(type: PrototypeColumnType): FieldType {
+  if (type === 'sequence') return 'sequence';
+  if (type === 'status') return 'status';
+  if (type === 'person') return 'person';
+  if (type === 'date') return 'date';
+  if (type === 'number') return 'number';
+  return 'long_text';
+}
+
+function defaultWidth(type: FieldType) {
+  if (type === 'sequence') return 76;
+  if (type === 'status') return 132;
+  if (type === 'date' || type === 'person') return 150;
+  return 220;
+}
+
+function serializeValues(table: PrototypeTable, values: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(values).flatMap(([fieldId, value]) => {
+      const column = table.columns.find((candidate) => candidate.id === fieldId);
+      if (!column || column.type === 'sequence') return [];
+      const option = column.optionValues?.find((candidate) => candidate.label === value);
+      return [[fieldId, option?.id ?? value]];
+    })
+  );
+}
+
+async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(path, {
+    ...init,
+    headers: { ...(init.body ? { 'content-type': 'application/json' } : {}), ...init.headers }
+  });
+  if (response.ok) return (await response.json()) as T;
+  const body = (await response.json().catch(() => null)) as { message?: string } | null;
+  throw new Error(body?.message ?? `请求失败（${response.status}）`);
 }
