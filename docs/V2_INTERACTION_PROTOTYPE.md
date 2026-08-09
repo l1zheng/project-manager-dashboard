@@ -28,6 +28,7 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - The blank row becomes a real local row after the first non-empty value is committed.
 - Every visible overflow menu performs real actions; table and row menus must not remain inert placeholders.
 - Deleting a property, record, or table requires an in-context confirmation before the local data is removed.
+- Export presentation is field metadata, not a field-name heuristic: short metadata may be centered and a business-title field may be emphasized independently of its mutable label.
 - Empty tables remain visible in the export preview with their headers.
 - Internal terms such as database, saved view, dashboard block, and field ID are absent from the routine UI.
 
@@ -46,6 +47,8 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - [x] The table overflow menu can duplicate and delete a table.
 - [x] The row overflow menu can duplicate and delete a record.
 - [x] A property can be deleted from its anchored editor after explicit confirmation.
+- [x] Sequence, identifier, date, person, and status cells can render centered while narrative fields remain left-aligned.
+- [x] A field marked as the row title renders with stronger typography in the export preview.
 
 The checklist above passed automated browser interaction and visual verification on 2026-08-09. Hands-on user acceptance remains the promotion gate.
 

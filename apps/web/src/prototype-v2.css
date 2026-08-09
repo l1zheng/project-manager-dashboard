@@ -691,6 +691,7 @@
   margin: 0;
   color: #17233c;
   font-size: 27px;
+  font-weight: 750;
   text-align: center;
 }
 .v2-report-page > p {
@@ -708,6 +709,7 @@
   color: #fff;
   background: #315fce;
   font-size: 14px;
+  font-weight: 700;
 }
 .v2-excel-grid-label {
   display: flex;
@@ -729,14 +731,29 @@
   padding: 8px 9px;
   overflow-wrap: anywhere;
   font-size: 11px;
+  line-height: 1.45;
 }
 .v2-static-grid strong {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: #344054;
   background: #eef2f7;
+  font-weight: 700;
   text-align: center;
 }
 .v2-static-grid span {
   color: #344054;
+}
+.v2-static-grid span.is-centered {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.v2-static-grid span.is-title {
+  color: #1d2939;
+  font-weight: 700;
 }
 .v2-static-grid span.is-status {
   color: #315fce;

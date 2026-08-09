@@ -20,6 +20,8 @@ type PrototypeColumn = {
   type: PrototypeColumnType;
   width: number;
   options?: string[];
+  reportAlign?: 'left' | 'center';
+  reportEmphasis?: 'strong';
 };
 
 type PrototypeRow = {
@@ -77,8 +79,20 @@ const initialTables: PrototypeTable[] = [
     icon: '▤',
     columns: [
       { id: 'req-sequence', name: '序号', type: 'sequence', width: 76 },
-      { id: 'req-number', name: '需求号', type: 'text', width: 138 },
-      { id: 'req-title', name: '需求描述', type: 'text', width: 250 },
+      {
+        id: 'req-number',
+        name: '需求号',
+        type: 'text',
+        width: 138,
+        reportAlign: 'center'
+      },
+      {
+        id: 'req-title',
+        name: '需求描述',
+        type: 'text',
+        width: 250,
+        reportEmphasis: 'strong'
+      },
       { id: 'req-progress', name: '当前进展', type: 'long_text', width: 320 },
       { id: 'req-plan', name: '交付计划', type: 'date', width: 150 },
       { id: 'req-owner', name: '责任人', type: 'person', width: 140 },
@@ -798,6 +812,38 @@ export function PrototypeV2() {
                   <small>用逗号分隔；最后一个状态用于完成标记</small>
                 </label>
               )}
+              <label>
+                导出对齐
+                <select
+                  value={propertyDraft.reportAlign ?? 'auto'}
+                  onChange={(event) =>
+                    setPropertyDraft({
+                      ...propertyDraft,
+                      reportAlign:
+                        event.target.value === 'auto'
+                          ? undefined
+                          : (event.target.value as 'left' | 'center')
+                    })
+                  }
+                >
+                  <option value="auto">按属性类型自动</option>
+                  <option value="left">左对齐</option>
+                  <option value="center">居中</option>
+                </select>
+              </label>
+              <label className="v2-check">
+                <input
+                  checked={propertyDraft.reportEmphasis === 'strong'}
+                  onChange={(event) =>
+                    setPropertyDraft({
+                      ...propertyDraft,
+                      reportEmphasis: event.target.checked ? 'strong' : undefined
+                    })
+                  }
+                  type="checkbox"
+                />
+                在导出中作为行标题加粗
+              </label>
               <div className="v2-destructive-zone">
                 {destructiveConfirmation === 'column' ? (
                   <div className="v2-delete-confirm">
@@ -1266,16 +1312,13 @@ function ExportPreview({
                   ))}
                   {rows.length === 0 &&
                     table.columns.map((column) => (
-                      <span className="is-empty" key={column.id}>
+                      <span className="is-empty is-centered" key={column.id}>
                         —
                       </span>
                     ))}
                   {rows.map((row, rowIndex) =>
                     table.columns.map((column) => (
-                      <span
-                        className={column.type === 'status' ? 'is-status' : ''}
-                        key={`${row.id}-${column.id}`}
-                      >
+                      <span className={reportCellClass(column)} key={`${row.id}-${column.id}`}>
                         {column.type === 'sequence' ? rowIndex + 1 : row.values[column.id] || '—'}
                       </span>
                     ))
@@ -1354,6 +1397,20 @@ function statusTone(value: string) {
   if (/进行|open/i.test(value)) return 'active';
   if (/暂停|suspend/i.test(value)) return 'paused';
   return 'neutral';
+}
+
+function reportCellClass(column: PrototypeColumn) {
+  const automaticCenterTypes: PrototypeColumnType[] = ['sequence', 'date', 'person', 'status'];
+  const centered =
+    column.reportAlign === 'center' ||
+    (column.reportAlign !== 'left' && automaticCenterTypes.includes(column.type));
+  return [
+    column.type === 'status' ? 'is-status' : '',
+    centered ? 'is-centered' : '',
+    column.reportEmphasis === 'strong' ? 'is-title' : ''
+  ]
+    .filter(Boolean)
+    .join(' ');
 }
 
 function excelWeight(column: PrototypeColumn) {
