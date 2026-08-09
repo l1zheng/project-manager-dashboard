@@ -44,8 +44,12 @@ type PrototypeTable = {
 type PopoverState =
   | { kind: 'column'; anchor: HTMLElement; tableId: string; columnId: string }
   | { kind: 'filter'; anchor: HTMLElement; tableId: string }
+  | { kind: 'table'; anchor: HTMLElement; tableId: string }
+  | { kind: 'row'; anchor: HTMLElement; tableId: string; rowId: string }
   | { kind: 'export'; anchor: HTMLElement }
   | { kind: 'new-table'; anchor: HTMLElement };
+
+type DestructiveConfirmation = 'column' | 'table' | 'row';
 
 type PreviewMode = 'report' | 'excel';
 
@@ -148,6 +152,7 @@ export function PrototypeV2() {
   const [propertyDraft, setPropertyDraft] = useState<PrototypeColumn>();
   const [filterDraft, setFilterDraft] = useState<PrototypeFilter>({ columnId: '', keyword: '' });
   const [newTableName, setNewTableName] = useState('');
+  const [destructiveConfirmation, setDestructiveConfirmation] = useState<DestructiveConfirmation>();
   const [blankRowDrafts, setBlankRowDrafts] = useState<Record<string, Record<string, string>>>({});
   const [draggingColumn, setDraggingColumn] = useState<{ tableId: string; columnId: string }>();
   const [resizingColumn, setResizingColumn] = useState<{ tableId: string; columnId: string }>();
@@ -164,6 +169,7 @@ export function PrototypeV2() {
   const closePopover = () => {
     setPopover(undefined);
     setPropertyDraft(undefined);
+    setDestructiveConfirmation(undefined);
   };
 
   useEffect(() => {
@@ -199,6 +205,7 @@ export function PrototypeV2() {
   }
 
   function openColumnEditor(table: PrototypeTable, column: PrototypeColumn, anchor: HTMLElement) {
+    setDestructiveConfirmation(undefined);
     setPropertyDraft({ ...column, options: column.options ? [...column.options] : undefined });
     setPopover({ kind: 'column', anchor, tableId: table.id, columnId: column.id });
   }
@@ -214,6 +221,107 @@ export function PrototypeV2() {
       )
     }));
     setNotice(`已更新属性“${propertyDraft.name.trim()}”`);
+    closePopover();
+  }
+
+  function deleteColumn(tableId: string, columnId: string) {
+    const columnName = tables
+      .find((table) => table.id === tableId)
+      ?.columns.find((column) => column.id === columnId)?.name;
+    updateTable(tableId, (table) => ({
+      ...table,
+      columns: table.columns.filter((column) => column.id !== columnId),
+      filter: table.filter?.columnId === columnId ? undefined : table.filter,
+      rows: table.rows.map((row) => {
+        const values = { ...row.values };
+        delete values[columnId];
+        return { ...row, values };
+      })
+    }));
+    setBlankRowDrafts((current) => {
+      const next = { ...current, [tableId]: { ...current[tableId] } };
+      delete next[tableId]![columnId];
+      return next;
+    });
+    setNotice(`已删除属性“${columnName ?? '未命名属性'}”`);
+    closePopover();
+  }
+
+  function duplicateTable(tableId: string) {
+    setTables((current) => {
+      const sourceIndex = current.findIndex((table) => table.id === tableId);
+      if (sourceIndex < 0) return current;
+      const source = current[sourceIndex]!;
+      const id = `table-${crypto.randomUUID()}`;
+      const columnIdMap = new Map(
+        source.columns.map((column) => [column.id, `column-${crypto.randomUUID()}`])
+      );
+      const copy: PrototypeTable = {
+        ...source,
+        id,
+        name: `${source.name} 副本`,
+        columns: source.columns.map((column) => ({
+          ...column,
+          id: columnIdMap.get(column.id)!,
+          options: column.options ? [...column.options] : undefined
+        })),
+        rows: source.rows.map((row) => ({
+          id: `row-${crypto.randomUUID()}`,
+          values: Object.fromEntries(
+            Object.entries(row.values).flatMap(([columnId, value]) => {
+              const copiedColumnId = columnIdMap.get(columnId);
+              return copiedColumnId ? [[copiedColumnId, value]] : [];
+            })
+          )
+        })),
+        filter: source.filter
+          ? {
+              ...source.filter,
+              columnId: columnIdMap.get(source.filter.columnId)!
+            }
+          : undefined
+      };
+      const next = [...current];
+      next.splice(sourceIndex + 1, 0, copy);
+      return next;
+    });
+    setNotice('已复制表格，副本保留列结构和当前记录。');
+    closePopover();
+  }
+
+  function deleteTable(tableId: string) {
+    const tableName = tables.find((table) => table.id === tableId)?.name;
+    setTables((current) => current.filter((table) => table.id !== tableId));
+    setBlankRowDrafts((current) => {
+      const next = { ...current };
+      delete next[tableId];
+      return next;
+    });
+    setNotice(`已删除表格“${tableName ?? '未命名表格'}”`);
+    closePopover();
+  }
+
+  function duplicateRow(tableId: string, rowId: string) {
+    updateTable(tableId, (table) => {
+      const rowIndex = table.rows.findIndex((row) => row.id === rowId);
+      if (rowIndex < 0) return table;
+      const rows = [...table.rows];
+      rows.splice(rowIndex + 1, 0, {
+        id: `row-${crypto.randomUUID()}`,
+        values: { ...rows[rowIndex]!.values }
+      });
+      return { ...table, rows };
+    });
+    setNotice('已复制记录。');
+    closePopover();
+  }
+
+  function deleteRow(tableId: string, rowId: string) {
+    updateTable(tableId, (table) => ({
+      ...table,
+      rows: table.rows.filter((row) => row.id !== rowId)
+    }));
+    setNotice('已删除记录。');
     closePopover();
   }
 
@@ -465,7 +573,18 @@ export function PrototypeV2() {
                   <button onClick={() => addColumn(table.id)} type="button">
                     ＋ 属性
                   </button>
-                  <button aria-label={`${table.name}更多操作`} type="button">
+                  <button
+                    aria-label={`${table.name}更多操作`}
+                    onClick={(event) => {
+                      setDestructiveConfirmation(undefined);
+                      setPopover({
+                        kind: 'table',
+                        anchor: event.currentTarget,
+                        tableId: table.id
+                      });
+                    }}
+                    type="button"
+                  >
                     •••
                   </button>
                 </div>
@@ -549,7 +668,21 @@ export function PrototypeV2() {
                           </td>
                         ))}
                         <td className="v2-row-more">
-                          <button type="button">⋯</button>
+                          <button
+                            aria-label={`第 ${rowIndex + 1} 行操作`}
+                            onClick={(event) => {
+                              setDestructiveConfirmation(undefined);
+                              setPopover({
+                                kind: 'row',
+                                anchor: event.currentTarget,
+                                tableId: table.id,
+                                rowId: row.id
+                              });
+                            }}
+                            type="button"
+                          >
+                            ⋯
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -665,6 +798,33 @@ export function PrototypeV2() {
                   <small>用逗号分隔；最后一个状态用于完成标记</small>
                 </label>
               )}
+              <div className="v2-destructive-zone">
+                {destructiveConfirmation === 'column' ? (
+                  <div className="v2-delete-confirm">
+                    <span>删除后，该列中的值也会移除。</span>
+                    <div>
+                      <button onClick={() => setDestructiveConfirmation(undefined)} type="button">
+                        取消
+                      </button>
+                      <button
+                        className="is-danger"
+                        onClick={() => deleteColumn(popover.tableId, popover.columnId)}
+                        type="button"
+                      >
+                        确认删除
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    className="v2-menu-command is-danger"
+                    onClick={() => setDestructiveConfirmation('column')}
+                    type="button"
+                  >
+                    <span>⌫</span> 删除属性
+                  </button>
+                )}
+              </div>
               <div className="v2-popover-actions">
                 <button onClick={closePopover} type="button">
                   取消
@@ -675,6 +835,102 @@ export function PrototypeV2() {
               </div>
             </div>
           )}
+
+          {popover.kind === 'table' &&
+            (() => {
+              const table = tables.find((candidate) => candidate.id === popover.tableId);
+              if (!table) return null;
+              return (
+                <div className="v2-popover-content v2-compact-menu">
+                  <div className="v2-popover-title">
+                    <span>▤</span>
+                    <strong>{table.name}</strong>
+                  </div>
+                  {destructiveConfirmation === 'table' ? (
+                    <div className="v2-delete-confirm">
+                      <span>删除整张表格及其当前记录？</span>
+                      <div>
+                        <button onClick={() => setDestructiveConfirmation(undefined)} type="button">
+                          取消
+                        </button>
+                        <button
+                          className="is-danger"
+                          onClick={() => deleteTable(table.id)}
+                          type="button"
+                        >
+                          确认删除
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="v2-menu-list">
+                      <button
+                        className="v2-menu-command"
+                        onClick={() => duplicateTable(table.id)}
+                        type="button"
+                      >
+                        <span>⧉</span> 复制表格
+                      </button>
+                      <button
+                        className="v2-menu-command is-danger"
+                        onClick={() => setDestructiveConfirmation('table')}
+                        type="button"
+                      >
+                        <span>⌫</span> 删除表格
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+          {popover.kind === 'row' &&
+            (() => {
+              const table = tables.find((candidate) => candidate.id === popover.tableId);
+              if (!table) return null;
+              return (
+                <div className="v2-popover-content v2-compact-menu">
+                  <div className="v2-popover-title">
+                    <span>≡</span>
+                    <strong>记录操作</strong>
+                  </div>
+                  {destructiveConfirmation === 'row' ? (
+                    <div className="v2-delete-confirm">
+                      <span>确认删除这条记录？</span>
+                      <div>
+                        <button onClick={() => setDestructiveConfirmation(undefined)} type="button">
+                          取消
+                        </button>
+                        <button
+                          className="is-danger"
+                          onClick={() => deleteRow(table.id, popover.rowId)}
+                          type="button"
+                        >
+                          确认删除
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="v2-menu-list">
+                      <button
+                        className="v2-menu-command"
+                        onClick={() => duplicateRow(table.id, popover.rowId)}
+                        type="button"
+                      >
+                        <span>⧉</span> 复制记录
+                      </button>
+                      <button
+                        className="v2-menu-command is-danger"
+                        onClick={() => setDestructiveConfirmation('row')}
+                        type="button"
+                      >
+                        <span>⌫</span> 删除记录
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
           {popover.kind === 'filter' &&
             (() => {

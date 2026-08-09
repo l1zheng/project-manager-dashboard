@@ -208,6 +208,7 @@ Tasks:
 - Anchor column, filter, and export popovers to their initiating controls with outside-click and `Escape` dismissal. Completed.
 - Prototype per-table column resizing and drag reordering. Completed.
 - Prototype automatic row creation from the bottom blank row. Completed.
+- Complete property, table, and row deletion/duplication actions so no overflow control is inert. Completed.
 - Prototype a complete-page static report and Excel-layout preview. Completed.
 - Obtain hands-on user acceptance before reconnecting the shell to SQLite.
 

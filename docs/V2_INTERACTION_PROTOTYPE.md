@@ -26,6 +26,8 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - Column resizing provides a visible guide and has a practical minimum width.
 - Column drag reordering has a visible dragged state and cannot affect another table.
 - The blank row becomes a real local row after the first non-empty value is committed.
+- Every visible overflow menu performs real actions; table and row menus must not remain inert placeholders.
+- Deleting a property, record, or table requires an in-context confirmation before the local data is removed.
 - Empty tables remain visible in the export preview with their headers.
 - Internal terms such as database, saved view, dashboard block, and field ID are absent from the routine UI.
 
@@ -41,6 +43,9 @@ The product goal is not to reproduce every Notion feature. It is to make indepen
 - [x] Filtering one table does not filter the other.
 - [x] Export preview contains both tables and no editing controls.
 - [x] The Excel layout preview gives descriptive columns more width than status/sequence columns.
+- [x] The table overflow menu can duplicate and delete a table.
+- [x] The row overflow menu can duplicate and delete a record.
+- [x] A property can be deleted from its anchored editor after explicit confirmation.
 
 The checklist above passed automated browser interaction and visual verification on 2026-08-09. Hands-on user acceptance remains the promotion gate.
 
