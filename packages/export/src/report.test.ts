@@ -12,6 +12,7 @@ describe('report model', () => {
           description: '<说明>',
           includeInExport: true,
           view: {
+            database: { name: '关键风险' },
             view: { name: '风险', config: { visibleFieldIds: ['risk'], fieldWidths: {} } },
             fields: [
               { id: 'risk', name: '风险描述', type: 'long_text', config: { version: 1 } },
@@ -22,6 +23,7 @@ describe('report model', () => {
         }
       ]
     });
+    expect(model.sections[0]?.title).toBe('关键风险');
     expect(model.sections[0]?.fields).toHaveLength(1);
     expect(renderReportHtml(model)).toContain('&lt;script&gt;');
     expect(renderReportHtml(model)).not.toContain('<script>');
@@ -37,6 +39,7 @@ describe('report model', () => {
           description: null,
           includeInExport: true,
           view: {
+            database: { name: '需求跟踪' },
             view: {
               name: '需求',
               config: { visibleFieldIds: ['sequence', 'status'], fieldWidths: {} }
@@ -68,6 +71,7 @@ describe('report model', () => {
           description: null,
           includeInExport: true,
           view: {
+            database: { name: '需求跟踪' },
             view: { name: '需求', config: { visibleFieldIds: ['title'], fieldWidths: {} } },
             fields: [
               {

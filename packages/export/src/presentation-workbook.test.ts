@@ -47,6 +47,23 @@ describe('presentation Excel workbook', () => {
     );
     expect(emptyWorkbook.worksheets[0]!.getCell('A4').value).toContain('没有符合');
   });
+
+  it('keeps an empty section and leaves an omitted report period blank', async () => {
+    const source = reportModel();
+    const model: ReportModel = {
+      ...source,
+      period: null,
+      includeEmptySections: true,
+      sections: [{ ...source.sections[1]!, rows: [] }]
+    };
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load((await buildPresentationWorkbook(model)) as never);
+    const worksheet = workbook.worksheets[0]!;
+
+    expect(worksheet.getCell('A2').value).toBeNull();
+    expect(worksheet.getCell('A4').value).toBe('关键风险');
+    expect(findCell(worksheet, (value) => value === '风险消减措施').value).toBe('风险消减措施');
+  });
 });
 
 function findCell(

@@ -61,7 +61,7 @@ function writeReportHeading(worksheet: ExcelJS.Worksheet, model: ReportModel): v
     PERIOD_ROW,
     1,
     GRID_COLUMNS,
-    model.period ? sanitizeExcelText(model.period) : ''
+    model.period ? sanitizeExcelText(model.period) : null
   );
   const period = worksheet.getCell(PERIOD_ROW, 1);
   period.font = { name: 'Microsoft YaHei', size: 10, color: { argb: 'FF657084' } };

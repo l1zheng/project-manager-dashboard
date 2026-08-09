@@ -62,6 +62,16 @@ describe('workspace canvas API', () => {
           .blocks.map((block: { view: { database: { name: string } } }) => block.view.database.name)
       ).toEqual(['需求跟踪', '关键风险']);
 
+      const report = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${first.json().dashboard.id}/report-preview?includeEmptySections=true`
+      });
+      expect(report.statusCode).toBe(200);
+      expect(
+        report.json().model.sections.map((section: { title: string }) => section.title)
+      ).toEqual(['需求跟踪', '关键风险']);
+      expect(report.json().model.includeEmptySections).toBe(true);
+
       const second = await app.inject({ method: 'POST', url: '/api/workspace/primary-dashboard' });
       expect(second.statusCode).toBe(200);
       expect(second.json().blocks).toHaveLength(2);

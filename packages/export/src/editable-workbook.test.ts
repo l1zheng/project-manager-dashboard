@@ -86,6 +86,39 @@ describe('editable Excel workbook', () => {
     expect(workbook.worksheets[0]!.getCell('A1').value).toContain('没有符合');
   });
 
+  it('keeps an empty database as a header-only worksheet when requested', async () => {
+    const buffer = await buildEditableWorkbook({
+      version: 1,
+      title: '完整工作台',
+      period: null,
+      density: 'comfortable',
+      includeEmptySections: true,
+      includeCompleted: true,
+      highlightStatus: true,
+      sections: [
+        {
+          blockId: 'risks',
+          title: '关键风险',
+          description: null,
+          includeInExport: true,
+          fields: [
+            { id: 'risk', name: '风险描述', type: 'short_text', width: 220 },
+            { id: 'mitigation', name: '风险消减措施', type: 'long_text', width: 320 }
+          ],
+          rows: []
+        }
+      ]
+    });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buffer as never);
+
+    expect(workbook.worksheets.map((worksheet) => worksheet.name)).toEqual(['关键风险']);
+    expect((workbook.worksheets[0]!.getRow(1).values as unknown[]).slice(1)).toEqual([
+      '风险描述',
+      '风险消减措施'
+    ]);
+  });
+
   it('neutralizes formula-like text and invalid XML control characters', () => {
     expect(sanitizeExcelText('=1+1')).toBe("'=1+1");
     expect(sanitizeExcelText('@cmd')).toBe("'@cmd");

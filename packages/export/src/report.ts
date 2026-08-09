@@ -46,6 +46,7 @@ export type DashboardReportSource = {
     description: string | null;
     includeInExport: boolean;
     view: {
+      database: { name: string };
       view: {
         name: string;
         config: { visibleFieldIds: string[]; fieldWidths: Record<string, number> };
@@ -98,7 +99,7 @@ export function buildReportModel(
         }));
       return {
         blockId: block.id,
-        title: block.titleOverride ?? block.view.view.name,
+        title: block.titleOverride ?? block.view.database.name,
         description: block.description,
         includeInExport: block.includeInExport,
         fields,

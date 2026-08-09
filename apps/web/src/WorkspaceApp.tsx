@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import type {
   FieldType,
   FilterCondition,
@@ -117,11 +117,32 @@ export function WorkspaceApp() {
   const [reportTitle, setReportTitle] = useState('');
   const [reportPeriod, setReportPeriod] = useState('');
   const [includeCompleted, setIncludeCompleted] = useState(true);
+  const [includeEmptySections, setIncludeEmptySections] = useState(true);
+  const recordDraftsRef = useRef<Record<string, Record<string, EditableValue>>>({});
+  const recordSaveQueuesRef = useRef(new Map<string, Promise<void>>());
+  const pendingCellSavesRef = useRef(new Set<Promise<void>>());
+  const failedCellSavesRef = useRef(new Set<string>());
 
   useEffect(() => {
     void initialize();
     // The initial workspace bootstrap is intentionally run once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    const dismissOutsidePopovers = (event: PointerEvent) => {
+      if (!(event.target instanceof Node)) return;
+      closeDismissiblePopovers(event.target);
+    };
+    const dismissPopoversWithKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeDismissiblePopovers();
+    };
+    document.addEventListener('pointerdown', dismissOutsidePopovers, true);
+    document.addEventListener('keydown', dismissPopoversWithKeyboard);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutsidePopovers, true);
+      document.removeEventListener('keydown', dismissPopoversWithKeyboard);
+    };
   }, []);
 
   const blockCount = dashboard?.blocks.length ?? 0;
@@ -172,18 +193,18 @@ export function WorkspaceApp() {
         )
       )
     );
-    setRecordDrafts(
-      Object.fromEntries(
-        next.blocks.flatMap((block) =>
-          block.view.records.map((record) => [
-            record.id,
-            Object.fromEntries(
-              block.view.fields.map((field) => [field.id, toEditableValue(field, record)])
-            )
-          ])
-        )
+    const nextRecordDrafts = Object.fromEntries(
+      next.blocks.flatMap((block) =>
+        block.view.records.map((record) => [
+          record.id,
+          Object.fromEntries(
+            block.view.fields.map((field) => [field.id, toEditableValue(field, record)])
+          )
+        ])
       )
     );
+    recordDraftsRef.current = nextRecordDrafts;
+    setRecordDrafts(nextRecordDrafts);
     setFilterDrafts((current) =>
       Object.fromEntries(
         next.blocks.map((block) => {
@@ -300,6 +321,18 @@ export function WorkspaceApp() {
     });
   }
 
+  function resetFieldPropertyDraft(field: Field) {
+    setFieldPropertyDrafts((current) => ({
+      ...current,
+      [field.id]: {
+        name: field.name,
+        type: field.type,
+        options: field.config.options?.map((option) => ({ ...option })) ?? [],
+        completedOptionIds: [...(field.config.completion?.completedOptionIds ?? [])]
+      }
+    }));
+  }
+
   function changeFieldPropertyType(fieldId: string, type: FieldType) {
     updateFieldPropertyDraft(fieldId, (draft) => {
       const options = optionFieldTypes.has(type)
@@ -371,12 +404,14 @@ export function WorkspaceApp() {
         );
         if (!confirmed) {
           setNotice('已取消属性修改，现有数据未变化。');
+          closeDismissiblePopovers();
           return;
         }
         await save(true);
       }
       await refresh();
       setNotice('列属性已保存。');
+      closeDismissiblePopovers();
     }, '保存列属性失败。');
   }
 
@@ -392,25 +427,56 @@ export function WorkspaceApp() {
     }, '新增记录失败。');
   }
 
-  async function saveCell(
-    block: DashboardBlock,
-    record: RecordRow,
-    field: Field,
-    value: EditableValue
-  ) {
-    const persistedValue = toEditableValue(field, record);
-    if (JSON.stringify(persistedValue) === JSON.stringify(value)) return;
-    const nextDraft = { ...(recordDrafts[record.id] ?? {}), [field.id]: value };
-    setRecordDrafts((current) => ({ ...current, [record.id]: nextDraft }));
-    try {
-      await request(`/api/records/${record.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ values: serializeValues(block.view.fields, nextDraft) })
-      });
-      setNotice('已自动保存');
-    } catch (requestError) {
-      setError(readError(requestError, '保存单元格失败。'));
+  function saveCell(block: DashboardBlock, record: RecordRow, field: Field, value: EditableValue) {
+    const nextDraft = updateRecordDraft(record.id, field.id, value);
+
+    const previousSave = recordSaveQueuesRef.current.get(record.id) ?? Promise.resolve();
+    const save = previousSave.then(async () => {
+      try {
+        const latestDraft = recordDraftsRef.current[record.id] ?? nextDraft;
+        await request(`/api/records/${record.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ values: serializeValues(block.view.fields, latestDraft) })
+        });
+        failedCellSavesRef.current.delete(record.id);
+        setNotice('已自动保存');
+      } catch (requestError) {
+        failedCellSavesRef.current.add(record.id);
+        setError(readError(requestError, '保存单元格失败。'));
+      }
+    });
+    recordSaveQueuesRef.current.set(record.id, save);
+    pendingCellSavesRef.current.add(save);
+    void save.finally(() => {
+      pendingCellSavesRef.current.delete(save);
+      if (recordSaveQueuesRef.current.get(record.id) === save) {
+        recordSaveQueuesRef.current.delete(record.id);
+      }
+    });
+  }
+
+  function updateRecordDraft(recordId: string, fieldId: string, value: EditableValue) {
+    const nextRecordDraft = { ...(recordDraftsRef.current[recordId] ?? {}), [fieldId]: value };
+    recordDraftsRef.current = {
+      ...recordDraftsRef.current,
+      [recordId]: nextRecordDraft
+    };
+    setRecordDrafts(recordDraftsRef.current);
+    return nextRecordDraft;
+  }
+
+  async function flushPendingCellSaves() {
+    while (pendingCellSavesRef.current.size > 0) {
+      await Promise.all([...pendingCellSavesRef.current]);
     }
+    if (failedCellSavesRef.current.size > 0) {
+      throw new Error('存在尚未保存成功的单元格，请先处理保存错误后再导出。');
+    }
+  }
+
+  async function prepareReportExport() {
+    closeDismissiblePopovers();
+    await flushPendingCellSaves();
   }
 
   async function archiveRecord(record: RecordRow) {
@@ -430,6 +496,7 @@ export function WorkspaceApp() {
         body: JSON.stringify({ config: { ...block.view.view.config, filter } })
       });
       await refresh();
+      closeDismissiblePopovers();
     }, '保存筛选失败。');
   }
 
@@ -458,7 +525,7 @@ export function WorkspaceApp() {
     if (reportTitle.trim()) query.set('title', reportTitle.trim());
     if (reportPeriod.trim()) query.set('period', reportPeriod.trim());
     query.set('includeCompleted', String(includeCompleted));
-    query.set('includeEmptySections', 'false');
+    query.set('includeEmptySections', String(includeEmptySections));
     query.set('highlightStatus', 'true');
     query.set('density', 'comfortable');
     return query.toString();
@@ -467,6 +534,7 @@ export function WorkspaceApp() {
   async function downloadExport(kind: 'editable' | 'presentation') {
     if (!dashboard) return;
     await runSaving(async () => {
+      await prepareReportExport();
       const response = await fetch(
         `/api/dashboards/${dashboard.dashboard.id}/export/${kind}.xlsx?${reportQuery()}`
       );
@@ -482,6 +550,7 @@ export function WorkspaceApp() {
   async function copyOutlookReport() {
     if (!dashboard) return;
     await runSaving(async () => {
+      await prepareReportExport();
       const response = await fetch(
         `/api/dashboards/${dashboard.dashboard.id}/export/outlook.html?${reportQuery()}`
       );
@@ -501,6 +570,7 @@ export function WorkspaceApp() {
   async function createOutlookDraft() {
     if (!dashboard) return;
     await runSaving(async () => {
+      await prepareReportExport();
       await request(
         `/api/dashboards/${dashboard.dashboard.id}/export/outlook-draft?${reportQuery()}`,
         {
@@ -512,12 +582,15 @@ export function WorkspaceApp() {
     }, '当前环境无法创建 Outlook 草稿，请使用复制邮件内容。');
   }
 
-  function downloadOutlookHtml() {
+  async function downloadOutlookHtml() {
     if (!dashboard) return;
-    const anchor = document.createElement('a');
-    anchor.href = `/api/dashboards/${dashboard.dashboard.id}/export/outlook.html?${reportQuery()}`;
-    anchor.download = `${reportTitle.trim() || dashboard.dashboard.name}-Outlook报告.html`;
-    anchor.click();
+    await runSaving(async () => {
+      await prepareReportExport();
+      const anchor = document.createElement('a');
+      anchor.href = `/api/dashboards/${dashboard.dashboard.id}/export/outlook.html?${reportQuery()}`;
+      anchor.download = `${reportTitle.trim() || dashboard.dashboard.name}-Outlook报告.html`;
+      anchor.click();
+    }, '下载 Outlook HTML 失败。');
   }
 
   async function runSaving(action: () => Promise<void>, fallback: string) {
@@ -606,7 +679,7 @@ export function WorkspaceApp() {
           <button className="primary-action" onClick={() => setIsAddingTable(true)} type="button">
             ＋ 新建表格
           </button>
-          <details className="export-menu">
+          <details className="export-menu" data-popover>
             <summary>导出</summary>
             <div className="export-popover">
               <label>
@@ -633,6 +706,14 @@ export function WorkspaceApp() {
                 />
                 包含已完成事项
               </label>
+              <label className="compact-check">
+                <input
+                  checked={includeEmptySections}
+                  onChange={(event) => setIncludeEmptySections(event.target.checked)}
+                  type="checkbox"
+                />
+                包含空表
+              </label>
               <button onClick={() => void downloadExport('editable')} type="button">
                 下载可编辑 Excel
               </button>
@@ -645,7 +726,7 @@ export function WorkspaceApp() {
               <button onClick={() => void createOutlookDraft()} type="button">
                 创建 Outlook 草稿
               </button>
-              <button onClick={downloadOutlookHtml} type="button">
+              <button onClick={() => void downloadOutlookHtml()} type="button">
                 下载 Outlook HTML
               </button>
             </div>
@@ -721,7 +802,7 @@ export function WorkspaceApp() {
                     />
                   </div>
                   <div className="table-toolbar">
-                    <details className="filter-menu">
+                    <details className="filter-menu" data-popover>
                       <summary>{block.view.view.config.filter ? '筛选 · 1' : '筛选'}</summary>
                       <div className="filter-popover">
                         {visibleFields.length === 0 ? (
@@ -890,7 +971,12 @@ export function WorkspaceApp() {
                                   }}
                                   onBlur={() => void renameField(field)}
                                 />
-                                <details>
+                                <details
+                                  data-popover
+                                  onToggle={(event) => {
+                                    if (!event.currentTarget.open) resetFieldPropertyDraft(field);
+                                  }}
+                                >
                                   <summary aria-label={`${field.name}列菜单`}>···</summary>
                                   <div className="column-menu">
                                     {fieldPropertyDrafts[field.id] && (
@@ -1063,10 +1149,7 @@ export function WorkspaceApp() {
                                     toEditableValue(field, record)
                                   }
                                   onChange={(value) =>
-                                    setRecordDrafts((current) => ({
-                                      ...current,
-                                      [record.id]: { ...current[record.id], [field.id]: value }
-                                    }))
+                                    updateRecordDraft(record.id, field.id, value)
                                   }
                                   onCommit={(value) => void saveCell(block, record, field, value)}
                                 />
@@ -1309,6 +1392,14 @@ function defaultPropertyOptions() {
     id: `option-${crypto.randomUUID()}`,
     label
   }));
+}
+
+function closeDismissiblePopovers(target?: Node) {
+  document
+    .querySelectorAll<HTMLDetailsElement>('details[data-popover][open]')
+    .forEach((details) => {
+      if (!target || !details.contains(target)) details.open = false;
+    });
 }
 
 function filterOperatorsForField(type?: FieldType): FilterOperator[] {

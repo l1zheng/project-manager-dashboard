@@ -148,6 +148,7 @@ Primary-workflow acceptance criteria:
 - All tables assigned to the current workspace are visible together as vertically stacked editable blocks.
 - The system creates the default view and dashboard placement automatically; the user does not need to understand or assemble those entities.
 - Table title, column names, cell values, new rows, new columns, and per-table filters are editable in place.
+- Transient export, filter, and column-property menus close when the user clicks outside them or presses `Escape`; closing an unsaved property menu discards its local draft.
 
 ### FR-6 Report preview
 
@@ -161,6 +162,8 @@ Before exporting, the user can preview the static report and choose:
 - Status highlighting.
 
 Interactive browser controls must not appear in the rendered report.
+
+The primary workspace export defaults to every table on the page, including header-only empty tables. Before any report or workbook request begins, pending inline cell saves must finish successfully so the exported values cannot lag behind the visible table.
 
 ### FR-7 Outlook export
 
