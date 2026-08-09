@@ -281,7 +281,7 @@ body.v2-is-dragging-module {
 .v2-content-block-toolbar .v2-block-drag-handle:active {
   cursor: grabbing;
 }
-.v2-page-text-title {
+.v2-page-module-title {
   width: min(680px, 100%);
   border: 0;
   border-radius: 4px;
@@ -294,8 +294,8 @@ body.v2-is-dragging-module {
   line-height: 1.4;
   outline: none;
 }
-.v2-page-text-title:hover,
-.v2-page-text-title:focus {
+.v2-page-module-title:hover,
+.v2-page-module-title:focus {
   background: #f7f7f5;
 }
 .v2-page-text-editor {

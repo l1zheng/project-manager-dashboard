@@ -45,7 +45,14 @@ type PrototypeTable = {
 type PrototypePageBlock =
   | { id: string; kind: 'table'; tableId: string }
   | { id: string; kind: 'text'; title: string; content: string }
-  | { id: string; kind: 'image'; src?: string; fileName?: string; caption: string };
+  | {
+      id: string;
+      kind: 'image';
+      title: string;
+      src?: string;
+      fileName?: string;
+      caption: string;
+    };
 
 type PopoverState =
   | { kind: 'column'; anchor: HTMLElement; tableId: string; columnId: string }
@@ -452,7 +459,7 @@ export function PrototypeV2() {
 
   function addImageBlock() {
     const id = `block-${crypto.randomUUID()}`;
-    setPageBlocks((current) => [...current, { id, kind: 'image', caption: '' }]);
+    setPageBlocks((current) => [...current, { id, kind: 'image', title: '', caption: '' }]);
     setNotice('已添加图片模块，请从本机选择图片。');
     closePopover();
     requestAnimationFrame(() =>
@@ -744,7 +751,9 @@ export function PrototypeV2() {
           }
           return (
             <a href={`#${block.id}`} key={block.id}>
-              {block.kind === 'text' ? `¶ ${block.title.trim() || '文字'}` : '▧ 图片'}
+              {block.kind === 'text'
+                ? `¶ ${block.title.trim() || '文字'}`
+                : `▧ ${block.title.trim() || '图片'}`}
             </a>
           );
         })}
@@ -840,7 +849,7 @@ export function PrototypeV2() {
                   </div>
                   <input
                     aria-label="文字模块标题"
-                    className="v2-page-text-title"
+                    className="v2-page-module-title"
                     onChange={(event) =>
                       updatePageBlock(block.id, (current) =>
                         current.kind === 'text'
@@ -904,9 +913,22 @@ export function PrototypeV2() {
                       •••
                     </button>
                   </div>
+                  <input
+                    aria-label="图片模块标题"
+                    className="v2-page-module-title"
+                    onChange={(event) =>
+                      updatePageBlock(block.id, (current) =>
+                        current.kind === 'image'
+                          ? { ...current, title: event.target.value }
+                          : current
+                      )
+                    }
+                    placeholder="添加图片标题（可选）…"
+                    value={block.title}
+                  />
                   {block.src ? (
                     <img
-                      alt={block.caption || block.fileName || '页面图片'}
+                      alt={block.title || block.caption || block.fileName || '页面图片'}
                       className="v2-page-image"
                       src={block.src}
                     />
@@ -1418,7 +1440,9 @@ export function PrototypeV2() {
                   <div className="v2-popover-title">
                     <span>{block.kind === 'text' ? '¶' : '▧'}</span>
                     <strong>
-                      {block.kind === 'text' ? block.title.trim() || '文字模块' : '图片模块'}
+                      {block.kind === 'text'
+                        ? block.title.trim() || '文字模块'
+                        : block.title.trim() || '图片模块'}
                     </strong>
                   </div>
                   {destructiveConfirmation === 'content' ? (
@@ -1818,8 +1842,12 @@ function ExportPreview({
                 if (!block.src && !exportSettings.includeEmpty) return null;
                 return (
                   <section className="v2-static-image-block" key={block.id}>
+                    {block.title.trim() && <h2>{block.title.trim()}</h2>}
                     {block.src ? (
-                      <img alt={block.caption || block.fileName || '页面图片'} src={block.src} />
+                      <img
+                        alt={block.title || block.caption || block.fileName || '页面图片'}
+                        src={block.src}
+                      />
                     ) : (
                       <div>未选择图片</div>
                     )}
