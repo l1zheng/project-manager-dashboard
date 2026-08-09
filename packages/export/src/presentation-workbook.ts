@@ -143,8 +143,10 @@ function writePresentationSection(
     cell.fill = solidFill(EXCEL_THEME.color.headerFill);
     cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
     cell.border = {
+      top: { style: 'thin', color: { argb: EXCEL_THEME.color.accent } },
+      left: { style: 'thin', color: { argb: EXCEL_THEME.color.accent } },
       bottom: { style: 'medium', color: { argb: EXCEL_THEME.color.accent } },
-      right: { style: 'thin', color: { argb: EXCEL_THEME.color.white } }
+      right: { style: 'thin', color: { argb: EXCEL_THEME.color.accent } }
     };
   }
   worksheet.getRow(nextRow).height = 28;

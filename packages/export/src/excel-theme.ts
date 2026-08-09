@@ -68,8 +68,11 @@ export function solidFill(argb: string): ExcelJS.Fill {
 }
 
 export function dataCellBorder(): Partial<ExcelJS.Borders> {
+  const border = { style: 'thin' as const, color: { argb: EXCEL_THEME.color.border } };
   return {
-    bottom: { style: 'thin', color: { argb: EXCEL_THEME.color.border } },
-    right: { style: 'thin', color: { argb: EXCEL_THEME.color.borderSoft } }
+    top: border,
+    left: border,
+    bottom: border,
+    right: border
   };
 }

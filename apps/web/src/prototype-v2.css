@@ -956,6 +956,8 @@ body.v2-is-dragging-module {
 .v2-static-grid {
   display: grid;
   grid-template-columns: var(--preview-columns);
+  border-top: 1px solid #d7e0e7;
+  border-left: 1px solid #d7e0e7;
   border-right: 1px solid #e8edf1;
 }
 .v2-static-grid > * {

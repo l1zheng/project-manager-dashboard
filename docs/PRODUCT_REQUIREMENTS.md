@@ -201,6 +201,7 @@ Two modes are required.
 - One sheet per exported database/view.
 - No merged cells in the data area.
 - Frozen headers, filters, wrapping, sensible widths, and typed dates/numbers.
+- Every populated header and data cell uses explicit all-side borders so the exported range reads as a complete Excel table.
 - Suitable for further sorting, filtering, and editing.
 - Text and image modules are presentation content and do not become artificial database sheets.
 
@@ -213,6 +214,7 @@ Two modes are required.
 - Module headings may span the entire report width.
 - Text modules span the report width; supported image modules are embedded in page order with their optional captions.
 - Styles, wrapping, row heights, borders, page orientation, print area, and repeated print headers are set automatically.
+- Every calculated business-field header and value span has a visible top, bottom, left, and right border; merged presentation cells must still form a complete table grid.
 
 Acceptance criteria:
 

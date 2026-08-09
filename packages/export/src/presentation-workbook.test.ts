@@ -37,6 +37,13 @@ describe('presentation Excel workbook', () => {
     });
     expect(worksheet.getCell('A4').border.top).toBeUndefined();
     expect(worksheet.getCell('A4').border.bottom?.style).toBe('medium');
+    expect(worksheet.getCell('A6').border.top?.style).toBe('thin');
+    expect(riskCell.border).toMatchObject({
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    });
     const statusCell = findCell(worksheet, (value) => value === '进行中');
     expect(statusCell.fill).toMatchObject({ fgColor: { argb: 'FFE8F1FB' } });
   });
