@@ -73,6 +73,10 @@ test('release scripts pin runtime, loopback, frozen deployment, local data, and 
     `${startCommand}\n${stopCommand}\n${verifyCommand}`,
     /-ExecutionPolicy RemoteSigned/i
   );
+  assert.match(
+    `${startCommand}\n${stopCommand}\n${verifyCommand}`,
+    /Get-ChildItem[\s\S]*-Filter '\*\.ps1'[\s\S]*Unblock-File/i
+  );
   assert.doesNotMatch(
     `${startCommand}\n${stopCommand}\n${verifyCommand}`,
     /ExecutionPolicy Bypass|EncodedCommand/i
