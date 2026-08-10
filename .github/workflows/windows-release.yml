@@ -1,0 +1,76 @@
+name: Windows portable release
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_version:
+        description: 'Version written into the portable artifact'
+        required: false
+        default: '0.1.0'
+      release_tag:
+        description: 'Optional unique Git tag for the private GitHub Release'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and publish Windows x64 ZIP
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      NODE_VERSION: 24.19.0
+      PNPM_VERSION: 11.9.0
+      APPLICATION_VERSION: ${{ inputs.application_version || '0.1.0' }}
+      RELEASE_TAG: ${{ inputs.release_tag || '' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Install pinned Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+
+      - name: Build and verify portable release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ((node --version) -ne "v$env:NODE_VERSION") {
+            throw "Unexpected Node.js version: $(node --version)"
+          }
+          if ((pnpm --version) -ne $env:PNPM_VERSION) {
+            throw "Unexpected pnpm version: $(pnpm --version)"
+          }
+          & .\release\build-windows-portable.ps1 `
+            -Architecture x64 `
+            -ApplicationVersion $env:APPLICATION_VERSION
+
+      - name: Publish private GitHub Release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:RELEASE_TAG
+          if ([string]::IsNullOrWhiteSpace($tag)) {
+            $tag = "windows-build-$($env:APPLICATION_VERSION)-$($env:GITHUB_RUN_NUMBER)"
+          }
+          if ($tag -notmatch '^[0-9A-Za-z._/-]{1,100}$') {
+            throw "Release tag contains unsupported characters: $tag"
+          }
+          $archive = Get-ChildItem -LiteralPath 'artifacts' -Filter '*.zip' -File | Select-Object -First 1
+          if ($null -eq $archive) { throw 'Portable ZIP was not found.' }
+          gh release create $tag $archive.FullName `
+            --target $env:GITHUB_SHA `
+            --title "Project Manager Dashboard $($env:APPLICATION_VERSION) Windows x64" `
+            --notes "Windows x64 portable build from commit $($env:GITHUB_SHA)." `
+            --prerelease
