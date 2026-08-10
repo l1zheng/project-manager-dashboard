@@ -1,0 +1,70 @@
+name: Windows portable build
+
+on:
+  workflow_dispatch:
+    inputs:
+      application_version:
+        description: 'Release version written into the portable artifact'
+        required: false
+        default: '0.1.0'
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/windows-portable.yml'
+      - 'apps/**'
+      - 'packages/**'
+      - 'release/**'
+      - 'scripts/**'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+      - 'pnpm-workspace.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows-portable:
+    name: Build Windows x64 portable ZIP
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      NODE_VERSION: 24.19.0
+      PNPM_VERSION: 11.9.0
+      APPLICATION_VERSION: ${{ inputs.application_version || '0.1.0' }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+
+      - name: Install pinned Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.19.0
+          cache: pnpm
+
+      - name: Build and verify portable release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ((node --version) -ne "v$env:NODE_VERSION") {
+            throw "Unexpected Node.js version: $(node --version)"
+          }
+          if ((pnpm --version) -ne $env:PNPM_VERSION) {
+            throw "Unexpected pnpm version: $(pnpm --version)"
+          }
+          & .\release\build-windows-portable.ps1 `
+            -Architecture x64 `
+            -ApplicationVersion $env:APPLICATION_VERSION
+
+      - name: Upload portable Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ProjectManagerDashboard-${{ env.APPLICATION_VERSION }}-win-x64
+          path: artifacts/ProjectManagerDashboard-${{ env.APPLICATION_VERSION }}-win-x64.zip
+          if-no-files-found: error
+          retention-days: 14
