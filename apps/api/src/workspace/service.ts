@@ -413,8 +413,8 @@ export class WorkspaceService {
         this.toValidationField(field)
       );
       const copiedConfig = remapViewConfig(
-        parseViewConfig(
-          parseJsonObject(sourceView.configJson),
+        this.parsePersistedViewConfig(
+          sourceView,
           sourceFields.map((field) => this.toValidationField(field))
         ),
         fieldIds
@@ -768,7 +768,7 @@ export class WorkspaceService {
     const rawFields = this.listActiveFields(database.id);
     const validationFields = rawFields.map((field) => this.toValidationField(field));
     const fields = rawFields.map((field) => this.toFieldOutput(field));
-    const config = parseViewConfig(parseJsonObject(view.configJson), validationFields);
+    const config = this.parsePersistedViewConfig(view, validationFields);
     const rows = this.persistence.db
       .select()
       .from(schema.records)
@@ -856,7 +856,12 @@ export class WorkspaceService {
 
   archiveField(fieldId: string) {
     const field = this.requireActiveField(fieldId);
-    return this.setArchived(schema.fields, field.id, true);
+    const archive = this.persistence.sqlite.transaction(() => {
+      const archived = this.setArchived(schema.fields, field.id, true);
+      this.repairPersistedViews(field.databaseId);
+      return archived;
+    });
+    return archive();
   }
 
   restoreField(fieldId: string) {
@@ -1164,13 +1169,64 @@ export class WorkspaceService {
   }
 
   private toViewOutput(view: typeof schema.views.$inferSelect) {
+    const fields = this.listActiveFields(view.databaseId);
     return {
       ...view,
-      config: parseViewConfig(
-        parseJsonObject(view.configJson),
-        this.listActiveFields(view.databaseId).map((field) => this.toValidationField(field))
+      config: this.parsePersistedViewConfig(
+        view,
+        fields.map((field) => this.toValidationField(field))
       )
     };
+  }
+
+  private parsePersistedViewConfig(
+    view: typeof schema.views.$inferSelect,
+    fields: FieldDefinitionForValidation[]
+  ): ViewConfig {
+    const raw = parseJsonObject(view.configJson);
+    try {
+      return parseViewConfig(raw, fields);
+    } catch (error) {
+      // Older builds could archive a field without repairing the saved view
+      // that referenced it. Repair only references that are provably stale;
+      // any unrelated malformed config still fails loudly.
+      const repaired = repairViewConfigReferences(raw, fields);
+      let config: ViewConfig;
+      try {
+        config = parseViewConfig(repaired, fields);
+      } catch {
+        throw error;
+      }
+      if (JSON.stringify(raw) !== JSON.stringify(config)) {
+        this.persistence.db
+          .update(schema.views)
+          .set({
+            configVersion: config.version,
+            configJson: JSON.stringify(config),
+            updatedAt: new Date()
+          })
+          .where(eq(schema.views.id, view.id))
+          .run();
+      }
+      return config;
+    }
+  }
+
+  private repairPersistedViews(databaseId: string): void {
+    const fields = this.listActiveFields(databaseId).map((field) => this.toValidationField(field));
+    const views = this.persistence.db
+      .select()
+      .from(schema.views)
+      .where(and(eq(schema.views.databaseId, databaseId), isNull(schema.views.archivedAt)))
+      .all();
+    for (const view of views) {
+      try {
+        this.parsePersistedViewConfig(view, fields);
+      } catch {
+        // Keep unrelated invalid configurations for the normal validation
+        // path; archiving the field itself must remain recoverable.
+      }
+    }
   }
 
   private toDashboardBlockOutput(block: typeof schema.dashboardBlocks.$inferSelect) {
@@ -1223,6 +1279,64 @@ function parseJsonObject(value: string): Record<string, unknown> {
     throw new Error('Expected a JSON object in local persistence.');
   }
   return parsed as Record<string, unknown>;
+}
+
+function repairViewConfigReferences(
+  raw: Record<string, unknown>,
+  fields: FieldDefinitionForValidation[]
+): Record<string, unknown> {
+  const fieldIds = new Set(fields.map((field) => field.id));
+  const visibleFieldIds = Array.isArray(raw.visibleFieldIds)
+    ? uniqueKnownStrings(raw.visibleFieldIds, fieldIds)
+    : raw.visibleFieldIds;
+  const fieldWidths = filterKnownRecordKeys(raw.fieldWidths, fieldIds);
+  const fieldPresentation = filterKnownRecordKeys(raw.fieldPresentation, fieldIds);
+  const sorts = Array.isArray(raw.sorts)
+    ? raw.sorts.filter(
+        (sort): sort is Record<string, unknown> =>
+          isObject(sort) && typeof sort.fieldId === 'string' && fieldIds.has(sort.fieldId)
+      )
+    : raw.sorts;
+  const filter = repairFilterReferences(raw.filter, fieldIds);
+  return {
+    ...raw,
+    visibleFieldIds,
+    fieldWidths,
+    fieldPresentation,
+    sorts,
+    filter
+  };
+}
+
+function uniqueKnownStrings(input: unknown[], fieldIds: Set<string>): string[] {
+  const result: string[] = [];
+  for (const value of input) {
+    if (typeof value !== 'string' || !fieldIds.has(value) || result.includes(value)) continue;
+    result.push(value);
+  }
+  return result;
+}
+
+function filterKnownRecordKeys(input: unknown, fieldIds: Set<string>): unknown {
+  if (!isObject(input)) return input;
+  return Object.fromEntries(Object.entries(input).filter(([fieldId]) => fieldIds.has(fieldId)));
+}
+
+function repairFilterReferences(input: unknown, fieldIds: Set<string>): unknown {
+  if (input === null || input === undefined) return null;
+  if (!isObject(input)) return input;
+  if (input.kind === 'condition') {
+    return typeof input.fieldId === 'string' && fieldIds.has(input.fieldId) ? input : null;
+  }
+  if (input.kind !== 'group' || !Array.isArray(input.children)) return input;
+  const children = input.children
+    .map((child) => repairFilterReferences(child, fieldIds))
+    .filter((child): child is Record<string, unknown> => isObject(child));
+  return children.length > 0 ? { ...input, children } : null;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function remapViewConfig(config: ViewConfig, fieldIds: Map<string, string>): ViewConfig {

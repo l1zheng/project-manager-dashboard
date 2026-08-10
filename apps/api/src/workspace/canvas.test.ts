@@ -292,6 +292,91 @@ describe('workspace canvas API', () => {
       persistence.close();
     }
   });
+
+  it('repairs archived field references before loading mixed content modules', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'project-manager-stale-view-'));
+    temporaryRoots.push(rootDirectory);
+    const persistence = await openPersistence({
+      dataPaths: resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } })
+    });
+    const app = await buildApp({ persistence });
+
+    try {
+      const database = (
+        await app.inject({
+          method: 'POST',
+          url: '/api/databases',
+          payload: { name: '需求跟踪' }
+        })
+      ).json() as { id: string };
+      const field = (
+        await app.inject({
+          method: 'POST',
+          url: `/api/databases/${database.id}/fields`,
+          payload: { name: '需求描述', type: 'long_text' }
+        })
+      ).json() as { id: string };
+      const dashboard = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/primary-dashboard'
+      });
+      const dashboardId = dashboard.json().dashboard.id as string;
+      const viewId = dashboard.json().blocks[0].view.view.id as string;
+
+      const archived = await app.inject({
+        method: 'POST',
+        url: `/api/fields/${field.id}/archive`
+      });
+      expect(archived.statusCode).toBe(200);
+
+      // Recreate the corruption produced by older builds: a saved view still
+      // points at the field after it was archived.
+      persistence.sqlite.prepare('UPDATE views SET config_json = ? WHERE id = ?').run(
+        JSON.stringify({
+          version: 1,
+          visibleFieldIds: [field.id],
+          fieldWidths: { [field.id]: 260 },
+          fieldPresentation: {},
+          filter: { kind: 'condition', fieldId: field.id, operator: 'contains', value: 'x' },
+          sorts: [],
+          includeArchived: false
+        }),
+        viewId
+      );
+
+      const textBlock = await app.inject({
+        method: 'POST',
+        url: `/api/dashboards/${dashboardId}/blocks`,
+        payload: {
+          kind: 'text',
+          config: { version: 1, title: '本周摘要', body: '继续推进。' }
+        }
+      });
+      expect(textBlock.statusCode).toBe(201);
+
+      const imageBlock = await app.inject({
+        method: 'POST',
+        url: `/api/dashboards/${dashboardId}/blocks`,
+        payload: { kind: 'image', config: { version: 1, title: null, caption: null } }
+      });
+      expect(imageBlock.statusCode).toBe(201);
+
+      const repaired = await app.inject({
+        method: 'GET',
+        url: `/api/dashboards/${dashboardId}`
+      });
+      expect(repaired.statusCode).toBe(200);
+      expect(repaired.json().blocks.map((block: { kind: string }) => block.kind)).toEqual([
+        'table_view',
+        'text',
+        'image'
+      ]);
+      expect(repaired.json().blocks[0].view.view.config.visibleFieldIds).toEqual([]);
+    } finally {
+      await app.close();
+      persistence.close();
+    }
+  });
 });
 
 function findWorkbookCellRow(worksheet: ExcelJS.Worksheet, value: string): number {
