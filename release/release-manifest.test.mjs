@@ -65,6 +65,8 @@ test('release scripts pin runtime, loopback, frozen deployment, local data, and 
   assert.match(launcher, /127\.0\.0\.1/);
   assert.match(launcher, /LocalApplicationData/);
   assert.match(launcher, /project-manager-api/);
+  assert.match(launcher, /unmanaged or older dashboard service/);
+  assert.match(launcher, /differentRelease/);
   assert.doesNotMatch(launcher, /0\.0\.0\.0/);
   assert.doesNotMatch(`${builder}\n${launcher}\n${verifier}`, /ExecutionPolicy|EncodedCommand/i);
   assert.match(

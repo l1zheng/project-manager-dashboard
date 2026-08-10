@@ -90,9 +90,13 @@ try {
 
   if ($null -ne $health) {
     $state = Read-LauncherState
+    if ($null -eq $state) {
+      throw "Port $address is already used by an unmanaged or older dashboard service. Close the old Node process, then run start-dashboard.cmd again."
+    }
+    $differentRelease = [string]$state.releaseRoot -ne $root -or [string]$state.executablePath -ne $nodePath
     $restorePending = $health.storage.restorePending -eq $true
     $differentVersion = $null -ne $state -and [string]$state.applicationVersion -ne [string]$manifest.application.version
-    if ($restorePending -or $differentVersion) {
+    if ($restorePending -or $differentVersion -or $differentRelease) {
       Write-Host 'Restarting the local service to apply a restore or application update...'
       Stop-Dashboard
     } else {

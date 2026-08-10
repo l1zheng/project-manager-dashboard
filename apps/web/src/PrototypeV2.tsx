@@ -725,7 +725,10 @@ export function PrototypeV2() {
   }
 
   async function addTextBlock() {
-    if (!dashboardId) return;
+    if (!dashboardId) {
+      setNotice(loadError ?? '工作台尚未载入，请先重新启动本地服务。');
+      return;
+    }
     try {
       await api(`/api/dashboards/${dashboardId}/blocks`, {
         method: 'POST',
@@ -742,7 +745,10 @@ export function PrototypeV2() {
   }
 
   async function addImageBlock() {
-    if (!dashboardId) return;
+    if (!dashboardId) {
+      setNotice(loadError ?? '工作台尚未载入，请先重新启动本地服务。');
+      return;
+    }
     try {
       await api(`/api/dashboards/${dashboardId}/blocks`, {
         method: 'POST',
