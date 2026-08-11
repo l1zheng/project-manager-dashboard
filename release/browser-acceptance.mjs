@@ -26,6 +26,11 @@ try {
   });
 
   await step('create a record and a property', async () => {
+    const tableId = await evaluate(`(() => {
+      const table = [...document.querySelectorAll('.v2-table-block')].find((item) => item.innerText.includes('浏览器验收表格'));
+      if (!table?.id) throw new Error('Acceptance table ID was not found.');
+      return table.id;
+    })()`);
     await evaluate(`(() => {
       const input = document.querySelector('.v2-blank-row textarea[aria-label="名称"]');
       if (!input) throw new Error('Blank-row name editor was not found.');
@@ -33,8 +38,12 @@ try {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
       setter.call(input, '浏览器记录');
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.blur();
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      input.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
     })()`);
+    await waitForAsync(
+      `fetch('/api/databases/' + ${JSON.stringify(tableId)}).then((response) => response.json()).then((database) => database.records.length === 1)`
+    );
     await waitFor('document.body.innerText.includes("1 条记录")');
     await evaluate(`(() => {
       const table = [...document.querySelectorAll('.v2-table-block')].find((item) => item.innerText.includes('浏览器验收表格'));
@@ -129,6 +138,10 @@ try {
 
   console.log('Real-browser production acceptance passed.');
 } catch (error) {
+  const pageText = await evaluate('document.body.innerText.slice(0, 4000)').catch(
+    () => 'Browser page text was unavailable.'
+  );
+  console.error(`Browser page at failure:\n${pageText}`);
   await captureScreenshot('browser-acceptance-failure.png').catch(() => undefined);
   throw error;
 } finally {
