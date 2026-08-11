@@ -10,7 +10,7 @@
 
 1. 获取可信来源提供的 `ProjectManagerDashboard-0.1.0-win-x64.zip`。
 2. 将 ZIP 完整解压到当前用户可写的本地目录，例如 `C:\Users\你的用户名\Apps\ProjectManagerDashboard-0.1.0`。不要直接在 ZIP 内运行，也不要放到需要管理员权限的 `Program Files`。
-3. 双击 `verify-release.cmd`。看到完整性检查成功后再继续。
+3. 双击 `verify-release.cmd`。看到发布结构检查成功后再继续。
 4. 双击 `start-dashboard.cmd`。
 5. 等待默认浏览器打开 `http://127.0.0.1:4300`。
 6. 第一次进入后确认右上角显示“已保存到本机”。数据目录位于 `%LOCALAPPDATA%\ProjectManagerDashboard`。
@@ -164,11 +164,11 @@
 
 | 现象 | 处理方法 |
 | --- | --- |
-| `verify-release.cmd` 失败 | 发布文件已缺失或被修改。保留数据目录，从原始 ZIP 重新解压到新目录，不要编辑完整性清单。 |
+| `verify-release.cmd` 失败 | 运行时、服务文件、网页文件或发布信息缺失。保留数据目录，从原始 ZIP 重新解压到新目录。 |
 | 启动后浏览器没有打开 | 手动访问 `http://127.0.0.1:4300`；仍不可用时查看 `%LOCALAPPDATA%\ProjectManagerDashboard\logs`。 |
 | 提示端口属于其他服务 | 停止占用 `127.0.0.1:4300` 的其他程序后重试。不要修改清单绕过检查。 |
-| 提示 `.ps1` 未进行数字签名 | 浏览器下载的 ZIP 可能带有 Windows“来自互联网”标记。右键 ZIP →“属性”→勾选“解除锁定/Unblock”→“应用”，再重新解压；新版本启动器也会自动解除发布包内启动脚本的该标记。若公司策略要求所有 PowerShell 脚本必须签名，请联系 IT，不要关闭系统策略。 |
-| 公司策略阻止 PowerShell 或便携程序 | 不要使用 `ExecutionPolicy Bypass`。将提示交给单位 IT，申请允许受信任发布目录中的签名/受控脚本。 |
+| 公司策略阻止便携程序 | 正常启动只使用 CMD 和包内 Node，不依赖 PowerShell。若 `node.exe` 本身被单位策略阻止，请将提示交给 IT 申请允许可信发布目录。 |
+| Outlook 草稿提示 PowerShell 策略问题 | 这只影响可选的经典 Outlook 自动化，不影响工作台和 Excel。使用 Outlook HTML 备用文件，或由 IT 允许已审查的 Outlook 脚本。 |
 | Outlook 草稿无法创建 | 确认使用 Windows 经典 Outlook并已完成账户配置；随后使用富文本复制或 HTML 下载备用方式。 |
 | Excel 提示修复文件 | 不要继续编辑该文件；保留原始下载和日志，改用另一种 Excel 模式并报告问题。 |
 | 恢复后显示已自动回滚 | 当前数据仍是恢复前版本。保留所选备份和日志，检查备份兼容性后再处理。 |

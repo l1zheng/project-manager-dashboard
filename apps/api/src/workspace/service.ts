@@ -6,6 +6,7 @@ import {
   createFieldInputSchema,
   createRecordInputSchema,
   createViewInputSchema,
+  createWorkspaceTableInputSchema,
   evaluateViewRecords,
   parseDashboardBlockConfig,
   parseFieldConfig,
@@ -166,6 +167,20 @@ export class WorkspaceService {
     };
     this.persistence.db.insert(schema.dashboardBlocks).values(block).run();
     return this.toDashboardBlockOutput(block);
+  }
+
+  createWorkspaceContentBlock(input: unknown) {
+    const command = createDashboardBlockInputSchema.parse(input);
+    if (command.kind === 'table_view') {
+      throw new ZodError([
+        { code: 'custom', path: ['kind'], message: 'Use the workspace table action for tables.' }
+      ]);
+    }
+    const create = this.persistence.sqlite.transaction(() => {
+      const dashboard = this.ensurePrimaryDashboard().dashboard;
+      return this.createDashboardBlock(dashboard.id, command);
+    });
+    return create();
   }
 
   updateDashboardBlock(blockId: string, input: unknown) {
@@ -504,6 +519,55 @@ export class WorkspaceService {
 
     this.persistence.db.insert(schema.databases).values(database).run();
     return database;
+  }
+
+  createWorkspaceTable(input: unknown) {
+    const command = createWorkspaceTableInputSchema.parse(input);
+    const create = this.persistence.sqlite.transaction(() => {
+      const dashboard = this.ensurePrimaryDashboard().dashboard;
+      const database = this.createDatabase({ name: command.name });
+      const sequence = this.createField(database.id, {
+        name: '序号',
+        type: 'sequence',
+        config: { version: 1 }
+      });
+      const title = this.createField(database.id, {
+        name: '名称',
+        type: 'long_text',
+        config: { version: 1 }
+      });
+      const statusOptions = ['未开始', '进行中', '已完成'].map((label) => ({
+        id: randomUUID(),
+        label
+      }));
+      const status = this.createField(database.id, {
+        name: '状态',
+        type: 'status',
+        config: {
+          version: 1,
+          options: statusOptions,
+          completion: { completedOptionIds: [statusOptions[2]!.id] }
+        }
+      });
+      const view = this.createView(database.id, {
+        name: '默认视图',
+        config: {
+          version: 1,
+          visibleFieldIds: [sequence.id, title.id, status.id],
+          fieldWidths: { [sequence.id]: 76, [title.id]: 300, [status.id]: 132 },
+          fieldPresentation: {},
+          filter: null,
+          sorts: [],
+          includeArchived: false
+        }
+      });
+      return this.createDashboardBlock(dashboard.id, {
+        kind: 'table_view',
+        viewId: view.id,
+        config: { version: 1, titleOverride: null, description: null }
+      });
+    });
+    return create();
   }
 
   updateDatabase(databaseId: string, input: unknown) {

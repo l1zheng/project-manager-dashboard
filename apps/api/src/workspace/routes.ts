@@ -151,6 +151,12 @@ export function registerWorkspaceRoutes(
   });
   app.get('/api/dashboards', async () => service.listDashboards());
   app.post('/api/workspace/primary-dashboard', async () => service.ensurePrimaryDashboard());
+  app.post('/api/workspace/tables', async (request, reply) =>
+    reply.code(201).send(service.createWorkspaceTable(request.body))
+  );
+  app.post('/api/workspace/content-blocks', async (request, reply) =>
+    reply.code(201).send(service.createWorkspaceContentBlock(request.body))
+  );
   app.post('/api/dashboards', async (request, reply) =>
     reply.code(201).send(service.createDashboard(request.body))
   );

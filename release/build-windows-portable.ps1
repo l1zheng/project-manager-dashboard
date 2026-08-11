@@ -20,7 +20,6 @@ $stagedRelease = Join-Path $stagingRoot 'ProjectManagerDashboard'
 $finalName = "ProjectManagerDashboard-$ApplicationVersion-win-$Architecture"
 $finalRelease = Join-Path $artifactRoot $finalName
 $zipPath = "$finalRelease.zip"
-$metadataPath = Join-Path $stagingRoot 'release-metadata.json'
 
 function Invoke-Checked([string]$Description, [scriptblock]$Command) {
   Write-Host $Description -ForegroundColor Cyan
@@ -82,8 +81,7 @@ try {
   Copy-Item -LiteralPath (Join-Path $releaseDirectory 'windows\start-dashboard.cmd') -Destination (Join-Path $stagedRelease 'start-dashboard.cmd')
   Copy-Item -LiteralPath (Join-Path $releaseDirectory 'windows\stop-dashboard.cmd') -Destination (Join-Path $stagedRelease 'stop-dashboard.cmd')
   Copy-Item -LiteralPath (Join-Path $releaseDirectory 'windows\verify-release.cmd') -Destination (Join-Path $stagedRelease 'verify-release.cmd')
-  Copy-Item -LiteralPath (Join-Path $releaseDirectory 'windows\start-dashboard.ps1') -Destination (Join-Path $stagedRelease 'launcher\start-dashboard.ps1')
-  Copy-Item -LiteralPath (Join-Path $releaseDirectory 'windows\verify-release.ps1') -Destination (Join-Path $stagedRelease 'launcher\verify-release.ps1')
+  Copy-Item -LiteralPath (Join-Path $releaseDirectory 'windows\launcher.mjs') -Destination (Join-Path $stagedRelease 'launcher\launcher.mjs')
 
   $expandedRuntime = Join-Path $stagingRoot 'expanded-runtime'
   Expand-Archive -LiteralPath $RuntimeArchive -DestinationPath $expandedRuntime
@@ -108,25 +106,36 @@ try {
   } | Select-Object -First 1
   if ($null -ne $linkedEntry) { throw "Portable release contains a link or junction: $($linkedEntry.FullName)" }
 
-  $metadata = @{
-    applicationName = [string]$config.applicationName
-    applicationVersion = $ApplicationVersion
-    architecture = $Architecture
-    nodeVersion = $expectedNodeVersion
-    runtimeArchive = [string]$runtime.filename
-    runtimeArchiveSha256 = $archiveDigest
-    port = [int]$config.port
+  $releaseInfo = @{
+    format = 'project-manager-dashboard-release'
+    version = 1
+    application = @{
+      name = [string]$config.applicationName
+      version = $ApplicationVersion
+    }
+    target = @{
+      platform = 'win32'
+      architecture = $Architecture
+    }
+    runtime = @{
+      nodeVersion = $expectedNodeVersion
+      sourceArchive = [string]$runtime.filename
+    }
+    launcher = @{
+      host = '127.0.0.1'
+      port = [int]$config.port
+      entrypoint = 'start-dashboard.cmd'
+    }
     createdAt = [DateTime]::UtcNow.ToString('o')
-  } | ConvertTo-Json
-  [IO.File]::WriteAllText($metadataPath, $metadata, (New-Object Text.UTF8Encoding($false)))
-  Invoke-Checked 'Generating release integrity manifest' {
-    node (Join-Path $releaseDirectory 'release-manifest.mjs') generate $stagedRelease $metadataPath
+  } | ConvertTo-Json -Depth 4
+  [IO.File]::WriteAllText(
+    (Join-Path $stagedRelease 'RELEASE-INFO.json'),
+    $releaseInfo,
+    (New-Object Text.UTF8Encoding($false))
+  )
+  Invoke-Checked 'Checking packaged launcher and required files' {
+    & $packagedNode (Join-Path $stagedRelease 'launcher\launcher.mjs') --check
   }
-  Invoke-Checked 'Verifying release integrity manifest' {
-    node (Join-Path $releaseDirectory 'release-manifest.mjs') verify $stagedRelease
-  }
-  & (Join-Path $stagedRelease 'launcher\verify-release.ps1') -ReleaseRoot $stagedRelease -Quiet
-  if ($LASTEXITCODE -ne 0) { throw 'Packaged PowerShell integrity verification failed.' }
 
   Move-Item -LiteralPath $stagedRelease -Destination $finalRelease
   Compress-Archive -LiteralPath $finalRelease -DestinationPath $zipPath -CompressionLevel Optimal

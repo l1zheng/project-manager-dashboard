@@ -16,6 +16,66 @@ afterEach(async () => {
 });
 
 describe('workspace canvas API', () => {
+  it('creates tables and content modules atomically from an empty workspace', async () => {
+    const rootDirectory = await mkdtemp(join(tmpdir(), 'project-manager-empty-canvas-'));
+    temporaryRoots.push(rootDirectory);
+    const persistence = await openPersistence({
+      dataPaths: resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } })
+    });
+    const app = await buildApp({ persistence });
+
+    try {
+      const table = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/tables',
+        payload: { name: '需求跟踪' }
+      });
+      expect(table.statusCode).toBe(201);
+      expect(table.json()).toMatchObject({
+        kind: 'table_view',
+        view: { database: { name: '需求跟踪' } }
+      });
+      expect(table.json().view.fields.map((field: { name: string }) => field.name)).toEqual([
+        '序号',
+        '名称',
+        '状态'
+      ]);
+
+      const text = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/content-blocks',
+        payload: {
+          kind: 'text',
+          config: { version: 1, title: '本周摘要', body: '' }
+        }
+      });
+      const image = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/content-blocks',
+        payload: {
+          kind: 'image',
+          config: { version: 1, title: null, caption: null }
+        }
+      });
+      expect(text.statusCode).toBe(201);
+      expect(image.statusCode).toBe(201);
+
+      const dashboard = await app.inject({
+        method: 'POST',
+        url: '/api/workspace/primary-dashboard'
+      });
+      expect(dashboard.statusCode).toBe(200);
+      expect(dashboard.json().blocks.map((block: { kind: string }) => block.kind)).toEqual([
+        'table_view',
+        'text',
+        'image'
+      ]);
+    } finally {
+      await app.close();
+      persistence.close();
+    }
+  });
+
   it('assembles every database on one idempotent primary dashboard', async () => {
     const rootDirectory = await mkdtemp(join(tmpdir(), 'project-manager-canvas-'));
     temporaryRoots.push(rootDirectory);

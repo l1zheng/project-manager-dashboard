@@ -20,7 +20,8 @@
 
 - 服务固定监听 `127.0.0.1`。
 - 数据默认保存在 `%LOCALAPPDATA%\ProjectManagerDashboard`，不会写入发布目录。
-- 发布包启动前验证完整的 SHA-256 文件清单。
+- 构建时只校验一次官方 Node 运行时压缩包；用户启动不再遍历发布包计算逐文件哈希。
+- 正常启动和停止由 CMD 调用包内 Node 启动器，不依赖 PowerShell 执行策略。
 - Outlook 适配器不接受收件人、附件、任意脚本或任意 HTML，也没有保存或发送邮件的代码路径。
 - HTML 和 Excel 导出会转义或中和不可信文本。
 
@@ -28,7 +29,7 @@
 
 - Windows x64 上完成冻结依赖安装，无需 C/C++ 编译工具链。
 - 使用固定 Node.js 24.19.0 运行时加载并查询了便携包内的原生 SQLite 模块。
-- 生成并验证 `ProjectManagerDashboard-0.1.0-win-x64.zip`。
+- Windows CI 会解压并实际启动 `ProjectManagerDashboard-0.1.0-win-x64.zip`，在发布前验证混合模块、筛选、重启持久化、两种 Excel、Outlook HTML 和工作区备份。
 - 用户于 2026-08-09 确认 Windows 验收矩阵完成，包括断网首次启动、数据持久化、启停、篡改拒绝、Excel 两种导出、经典 Outlook 草稿与后备方式、备份恢复、失败回滚和升级流程。
 - 集成后的跨平台自动验证包含 57 项测试，并通过 lint、生产构建和格式检查。
 

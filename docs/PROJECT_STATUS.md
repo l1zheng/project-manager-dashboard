@@ -31,17 +31,17 @@ Last updated: 2026-08-10
 - Drizzle-generated SQL migrations are committed and embedded. Pending migrations and destructive imports require a verified online backup; `drizzle-kit push` is forbidden for user databases.
 - Completion is configured explicitly on at most one status field per database using stable completed option IDs; status labels are never guessed.
 - Manual workspace backups use one versioned `.pmdbackup` container containing a checksummed, verified SQLite snapshot. Restore is staged and validated as untrusted input, creates a pre-restore backup, and switches databases only during controlled startup with rollback.
-- The first Windows release is an offline, architecture-specific portable directory with the pinned official Node.js 24.19.0 runtime and Windows-built native dependencies. The frozen build emits an exact-file integrity manifest and an authenticated loopback launcher; Electron and Node single-executable packaging are deferred, and mutable data remains under `%LOCALAPPDATA%`.
+- The first Windows release is an offline, architecture-specific portable directory with the pinned official Node.js 24.19.0 runtime and Windows-built native dependencies. The frozen build validates the official runtime archive once, emits compact release metadata, and uses an authenticated Node launcher reached through thin CMD entrypoints; it does not hash every packaged file at startup. Electron and Node single-executable packaging are deferred, and mutable data remains under `%LOCALAPPDATA%`.
 
 ## Active task
 
-Collect user feedback from normal Mac dashboard-and-Excel use, then prioritize the next usability issue or feature request. Windows classic Outlook CID acceptance is explicitly deferred.
+Complete the release-readiness audit: run the shared production journey against the exact GitHub-built Windows ZIP, inspect its Excel artifacts, and publish only the passing candidate. Windows classic Outlook CID acceptance remains explicitly deferred.
 
 ## Next tasks
 
-1. Continue normal dashboard-and-Excel use on macOS and collect concrete usability feedback.
-2. Remove the temporary `/prototype-v2` route only after the user confirms the production `/` route remains satisfactory.
-3. When Outlook convenience becomes a priority, use a Windows target to verify PNG/JPEG/GIF inline images, Chinese text, and the visible classic Outlook compose window, then run the no-send scan and release regression there.
+1. Push the release-readiness changes and run the GitHub Windows release workflow.
+2. Require the extracted ZIP to pass start/repeat-start/stop/restart plus the complete mixed-workspace and export journey before publication.
+3. Inspect the published asset and generated Excel files, then hand off the final public ZIP.
 
 ## Risks and validation items
 
@@ -57,6 +57,8 @@ Collect user feedback from normal Mac dashboard-and-Excel use, then prioritize t
 | Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes. Generated Outlook CIDs are implemented and isolated, but target-Windows rendering is deferred because Outlook is not the current primary handoff. |
 
 ## Verification log
+
+- 2026-08-10: Began a full release-readiness correction after repeated target-Windows failures. Table creation is now one SQLite transaction that creates the database, default fields, saved view, and dashboard placement together; text and image modules can likewise create themselves through the primary workspace without depending on a frontend-cached dashboard ID. The production page now always bootstraps the primary dashboard, preserves stable status-option IDs during label edits, persists filter clearing, uses field-appropriate status/number/date filtering, and serializes number cells as numbers. The portable package no longer ships or invokes PowerShell launch scripts and no longer generates or recalculates a per-file hash manifest: CMD invokes a bundled-Node launcher, while the official Node archive retains one build-time digest check. Added a shared production acceptance journey plus a Windows wrapper that extracts the exact ZIP, starts headless Microsoft Edge for real button/input/reload/outside-click/delete interaction coverage, then exercises clean start, repeat start, authenticated stop, restart persistence, independently shaped tables, records, field archival repair, text/image modules, module order, saved filters, editable/presentation Excel, Outlook HTML, and workspace backup before release publication. Local verification currently passes 71 application tests, the launcher test, TypeScript, ESLint, formatting, and build; the GitHub Windows artifact run is the remaining gate.
 
 - 2026-08-10: User clarified that current development is on a Mac mini and that classic Outlook export is lower priority because Excel can be pasted into Outlook manually. The project therefore treats Excel as the primary reporting handoff. The existing no-send Outlook implementation and HTML fallback remain available, but real Windows COM/CID compose-window acceptance is deferred and no longer blocks the dashboard-and-Excel workflow.
 

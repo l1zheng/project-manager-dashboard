@@ -32,6 +32,7 @@ type PrototypeRow = {
 
 type PrototypeFilter = {
   columnId: string;
+  operator: 'contains' | 'equals';
   keyword: string;
 };
 
@@ -219,7 +220,6 @@ const initialPageBlocks: PrototypePageBlock[] = [
 export function PrototypeV2() {
   void initialTables;
   void initialPageBlocks;
-  void tableViewConfig;
   const [tables, setTables] = useState<PrototypeTable[]>([]);
   const [pageBlocks, setPageBlocks] = useState<PrototypePageBlock[]>([]);
   const [dashboardId, setDashboardId] = useState<string>();
@@ -227,7 +227,11 @@ export function PrototypeV2() {
   const tablesRef = useRef<PrototypeTable[]>([]);
   const [popover, setPopover] = useState<PopoverState>();
   const [propertyDraft, setPropertyDraft] = useState<PrototypeColumn>();
-  const [filterDraft, setFilterDraft] = useState<PrototypeFilter>({ columnId: '', keyword: '' });
+  const [filterDraft, setFilterDraft] = useState<PrototypeFilter>({
+    columnId: '',
+    operator: 'contains',
+    keyword: ''
+  });
   const [newTableName, setNewTableName] = useState('');
   const [moduleComposer, setModuleComposer] = useState<'table'>();
   const [destructiveConfirmation, setDestructiveConfirmation] = useState<DestructiveConfirmation>();
@@ -260,10 +264,9 @@ export function PrototypeV2() {
 
   async function refreshWorkspace() {
     try {
-      const dashboards = await api<Array<{ id: string }>>('/api/dashboards');
-      const next = dashboards[0]
-        ? await api<ServerDashboard>(`/api/dashboards/${dashboards[0].id}`)
-        : await api<ServerDashboard>('/api/workspace/primary-dashboard', { method: 'POST' });
+      const next = await api<ServerDashboard>('/api/workspace/primary-dashboard', {
+        method: 'POST'
+      });
       setDashboardId(next.dashboard.id);
       const nextTables = next.blocks.flatMap((block) => {
         if (block.kind !== 'table_view') return [];
@@ -314,13 +317,7 @@ export function PrototypeV2() {
                 })
               )
             })),
-            filter:
-              view.config.filter?.kind === 'condition' && view.config.filter.operator === 'contains'
-                ? {
-                    columnId: view.config.filter.fieldId,
-                    keyword: String(view.config.filter.value ?? '')
-                  }
-                : undefined
+            filter: deserializeFilter(view.config.filter, fields)
           }
         ];
       });
@@ -357,38 +354,6 @@ export function PrototypeV2() {
     return pageBlocks.find((block) => block.kind === 'table' && block.tableId === tableId)?.id;
   }
 
-  function tableViewConfig(tableId: string): ViewConfig | undefined {
-    const table = tables.find((candidate) => candidate.id === tableId);
-    if (!table) return undefined;
-    return {
-      version: 1,
-      visibleFieldIds: table.columns.map((column) => column.id),
-      fieldWidths: Object.fromEntries(table.columns.map((column) => [column.id, column.width])),
-      fieldPresentation: Object.fromEntries(
-        table.columns.flatMap((column) =>
-          column.reportAlign || column.reportEmphasis
-            ? [
-                [
-                  column.id,
-                  { reportAlign: column.reportAlign, reportEmphasis: column.reportEmphasis }
-                ]
-              ]
-            : []
-        )
-      ),
-      filter: table.filter
-        ? {
-            kind: 'condition',
-            fieldId: table.filter.columnId,
-            operator: 'contains',
-            value: table.filter.keyword
-          }
-        : null,
-      sorts: [],
-      includeArchived: false
-    };
-  }
-
   async function saveTableView(tableId: string, override?: PrototypeTable) {
     const table = override ?? tablesRef.current.find((candidate) => candidate.id === tableId);
     if (!table) return;
@@ -420,14 +385,7 @@ export function PrototypeV2() {
             : []
         )
       ),
-      filter: table.filter
-        ? {
-            kind: 'condition',
-            fieldId: table.filter.columnId,
-            operator: 'contains',
-            value: table.filter.keyword
-          }
-        : null,
+      filter: serializeFilter(table),
       sorts: [],
       includeArchived: false
     };
@@ -487,9 +445,10 @@ export function PrototypeV2() {
     const type = toServerFieldType(propertyDraft.type);
     const options =
       propertyDraft.type === 'status'
-        ? (propertyDraft.options ?? []).map((label) => ({
+        ? (propertyDraft.options ?? []).map((label, index) => ({
             id:
               original.optionValues?.find((option) => option.label === label)?.id ??
+              original.optionValues?.[index]?.id ??
               crypto.randomUUID(),
             label
           }))
@@ -635,9 +594,11 @@ export function PrototypeV2() {
   }
 
   function openFilter(table: PrototypeTable, anchor: HTMLElement) {
+    const firstColumn = table.columns.find((column) => column.type !== 'sequence');
     setFilterDraft(
       table.filter ?? {
-        columnId: table.columns.find((column) => column.type !== 'sequence')?.id ?? '',
+        columnId: firstColumn?.id ?? '',
+        operator: filterOperatorForColumn(firstColumn),
         keyword: ''
       }
     );
@@ -645,77 +606,51 @@ export function PrototypeV2() {
   }
 
   async function applyFilter(tableId: string) {
-    updateTable(tableId, (table) => ({
+    const table = tablesRef.current.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    const next: PrototypeTable = {
       ...table,
       filter: filterDraft.keyword.trim()
         ? { ...filterDraft, keyword: filterDraft.keyword.trim() }
         : undefined
-    }));
-    closePopover();
-    await saveTableView(tableId);
+    };
+    updateTable(tableId, () => next);
+    try {
+      await saveTableView(tableId, next);
+      closePopover();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '保存筛选失败。');
+      await refreshWorkspace();
+    }
+  }
+
+  async function clearFilter(tableId: string) {
+    const table = tablesRef.current.find((candidate) => candidate.id === tableId);
+    if (!table) return;
+    const next: PrototypeTable = { ...table, filter: undefined };
+    updateTable(tableId, () => next);
+    try {
+      await saveTableView(tableId, next);
+      closePopover();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '清除筛选失败。');
+      await refreshWorkspace();
+    }
   }
 
   async function addTable() {
     const name = newTableName.trim();
     if (!name) return;
     try {
-      const database = await api<{ id: string }>(`/api/databases`, {
+      const block = await api<ServerTableBlock>('/api/workspace/tables', {
         method: 'POST',
         body: JSON.stringify({ name })
-      });
-      const sequence = await api<{ id: string }>(`/api/databases/${database.id}/fields`, {
-        method: 'POST',
-        body: JSON.stringify({ name: '序号', type: 'sequence', config: { version: 1 } })
-      });
-      const title = await api<{ id: string }>(`/api/databases/${database.id}/fields`, {
-        method: 'POST',
-        body: JSON.stringify({ name: '名称', type: 'long_text', config: { version: 1 } })
-      });
-      const statusOptions = ['未开始', '进行中', '已完成'].map((label) => ({
-        id: crypto.randomUUID(),
-        label
-      }));
-      const status = await api<{ id: string }>(`/api/databases/${database.id}/fields`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: '状态',
-          type: 'status',
-          config: {
-            version: 1,
-            options: statusOptions,
-            completion: { completedOptionIds: [statusOptions[2].id] }
-          }
-        })
-      });
-      const view = await api<{ id: string }>(`/api/databases/${database.id}/views`, {
-        method: 'POST',
-        body: JSON.stringify({
-          name: '默认视图',
-          config: {
-            version: 1,
-            visibleFieldIds: [sequence.id, title.id, status.id],
-            fieldWidths: { [sequence.id]: 76, [title.id]: 300, [status.id]: 132 },
-            fieldPresentation: {},
-            filter: null,
-            sorts: [],
-            includeArchived: false
-          }
-        })
-      });
-      if (!dashboardId) throw new Error('工作台尚未准备完成。');
-      await api(`/api/dashboards/${dashboardId}/blocks`, {
-        method: 'POST',
-        body: JSON.stringify({
-          kind: 'table_view',
-          viewId: view.id,
-          config: { version: 1, titleOverride: null, description: null }
-        })
       });
       await refreshWorkspace();
       setNewTableName('');
       closePopover();
       requestAnimationFrame(() =>
-        document.getElementById(database.id)?.scrollIntoView({ behavior: 'smooth' })
+        document.getElementById(block.view.database.id)?.scrollIntoView({ behavior: 'smooth' })
       );
       return;
     } catch (error) {
@@ -725,12 +660,8 @@ export function PrototypeV2() {
   }
 
   async function addTextBlock() {
-    if (!dashboardId) {
-      setNotice(loadError ?? '工作台尚未载入，请先重新启动本地服务。');
-      return;
-    }
     try {
-      await api(`/api/dashboards/${dashboardId}/blocks`, {
+      await api('/api/workspace/content-blocks', {
         method: 'POST',
         body: JSON.stringify({ kind: 'text', config: { version: 1, title: '本周摘要', body: '' } })
       });
@@ -745,12 +676,8 @@ export function PrototypeV2() {
   }
 
   async function addImageBlock() {
-    if (!dashboardId) {
-      setNotice(loadError ?? '工作台尚未载入，请先重新启动本地服务。');
-      return;
-    }
     try {
-      await api(`/api/dashboards/${dashboardId}/blocks`, {
+      await api('/api/workspace/content-blocks', {
         method: 'POST',
         body: JSON.stringify({ kind: 'image', config: { version: 1, title: null, caption: null } })
       });
@@ -1670,8 +1597,8 @@ export function PrototypeV2() {
                     {
                       table.columns.find((column) => column.id === table.filter?.columnId)?.name
                     }{' '}
-                    包含“
-                    {table.filter.keyword}” · 显示 {table.visibleRows.length}/{table.rows.length}
+                    {table.filter.operator === 'contains' ? '包含' : '等于'}“{table.filter.keyword}”
+                    · 显示 {table.visibleRows.length}/{table.rows.length}
                   </div>
                 )}
               </section>
@@ -2006,9 +1933,17 @@ export function PrototypeV2() {
                     属性
                     <select
                       value={filterDraft.columnId}
-                      onChange={(event) =>
-                        setFilterDraft({ ...filterDraft, columnId: event.target.value })
-                      }
+                      onChange={(event) => {
+                        const column = table.columns.find(
+                          (candidate) => candidate.id === event.target.value
+                        );
+                        setFilterDraft({
+                          ...filterDraft,
+                          columnId: event.target.value,
+                          operator: filterOperatorForColumn(column),
+                          keyword: ''
+                        });
+                      }}
                     >
                       {table.columns
                         .filter((column) => column.type !== 'sequence')
@@ -2019,25 +1954,13 @@ export function PrototypeV2() {
                         ))}
                     </select>
                   </label>
-                  <label>
-                    包含文字
-                    <input
-                      autoFocus
-                      placeholder="输入筛选内容"
-                      value={filterDraft.keyword}
-                      onChange={(event) =>
-                        setFilterDraft({ ...filterDraft, keyword: event.target.value })
-                      }
-                    />
-                  </label>
+                  {renderFilterValueEditor(
+                    table.columns.find((column) => column.id === filterDraft.columnId),
+                    filterDraft,
+                    setFilterDraft
+                  )}
                   <div className="v2-popover-actions">
-                    <button
-                      onClick={() => {
-                        updateTable(table.id, (current) => ({ ...current, filter: undefined }));
-                        closePopover();
-                      }}
-                      type="button"
-                    >
+                    <button onClick={() => void clearFilter(table.id)} type="button">
                       清除
                     </button>
                     <button
@@ -2538,12 +2461,92 @@ function renderCell(
   );
 }
 
+function renderFilterValueEditor(
+  column: PrototypeColumn | undefined,
+  filter: PrototypeFilter,
+  onChange: (filter: PrototypeFilter) => void
+) {
+  if (column?.type === 'status') {
+    return (
+      <label>
+        等于
+        <select
+          autoFocus
+          value={filter.keyword}
+          onChange={(event) => onChange({ ...filter, keyword: event.target.value })}
+        >
+          <option value="">选择状态</option>
+          {(column.options ?? []).map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+  }
+  return (
+    <label>
+      {filter.operator === 'contains' ? '包含文字' : '等于'}
+      <input
+        autoFocus
+        placeholder={filter.operator === 'contains' ? '输入筛选内容' : '输入精确值'}
+        type={column?.type === 'date' ? 'date' : column?.type === 'number' ? 'number' : 'text'}
+        value={filter.keyword}
+        onChange={(event) => onChange({ ...filter, keyword: event.target.value })}
+      />
+    </label>
+  );
+}
+
+function filterOperatorForColumn(column: PrototypeColumn | undefined): PrototypeFilter['operator'] {
+  return column?.type === 'text' || column?.type === 'person' ? 'contains' : 'equals';
+}
+
+function serializeFilter(table: PrototypeTable): ViewConfig['filter'] {
+  if (!table.filter) return null;
+  const column = table.columns.find((candidate) => candidate.id === table.filter!.columnId);
+  if (!column) return null;
+  const option = column.optionValues?.find(
+    (candidate) => candidate.label === table.filter!.keyword
+  );
+  const value =
+    column.type === 'number'
+      ? Number(table.filter.keyword)
+      : column.type === 'status'
+        ? (option?.id ?? table.filter.keyword)
+        : table.filter.keyword;
+  return {
+    kind: 'condition',
+    fieldId: column.id,
+    operator: filterOperatorForColumn(column),
+    value
+  };
+}
+
+function deserializeFilter(
+  filter: ViewConfig['filter'],
+  fields: ServerField[]
+): PrototypeFilter | undefined {
+  if (!filter || filter.kind !== 'condition') return undefined;
+  if (filter.operator !== 'contains' && filter.operator !== 'equals') return undefined;
+  const field = fields.find((candidate) => candidate.id === filter.fieldId);
+  if (!field) return undefined;
+  const option = field.config.options?.find((candidate) => candidate.id === filter.value);
+  return {
+    columnId: filter.fieldId,
+    operator: filter.operator,
+    keyword: option?.label ?? String(filter.value ?? '')
+  };
+}
+
 function filterRows(table: PrototypeTable) {
   if (!table.filter?.keyword) return table.rows;
   const keyword = table.filter.keyword.toLocaleLowerCase();
-  return table.rows.filter((row) =>
-    (row.values[table.filter!.columnId] ?? '').toLocaleLowerCase().includes(keyword)
-  );
+  return table.rows.filter((row) => {
+    const value = (row.values[table.filter!.columnId] ?? '').toLocaleLowerCase();
+    return table.filter!.operator === 'equals' ? value === keyword : value.includes(keyword);
+  });
 }
 
 function columnTypeIcon(type: PrototypeColumnType) {
@@ -2604,14 +2607,17 @@ function defaultWidth(type: FieldType) {
 }
 
 function serializeValues(table: PrototypeTable, values: Record<string, string>) {
-  return Object.fromEntries(
-    Object.entries(values).flatMap(([fieldId, value]) => {
-      const column = table.columns.find((candidate) => candidate.id === fieldId);
-      if (!column || column.type === 'sequence') return [];
-      const option = column.optionValues?.find((candidate) => candidate.label === value);
-      return [[fieldId, option?.id ?? value]];
-    })
-  );
+  const entries: Array<[string, string | number]> = [];
+  for (const [fieldId, value] of Object.entries(values)) {
+    const column = table.columns.find((candidate) => candidate.id === fieldId);
+    if (!column || column.type === 'sequence') continue;
+    const option = column.optionValues?.find((candidate) => candidate.label === value);
+    entries.push([
+      fieldId,
+      column.type === 'number' && value !== '' ? Number(value) : (option?.id ?? value)
+    ]);
+  }
+  return Object.fromEntries(entries);
 }
 
 async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {

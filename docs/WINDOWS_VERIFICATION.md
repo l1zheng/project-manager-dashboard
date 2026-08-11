@@ -75,7 +75,7 @@ powershell.exe -NoLogo -NoProfile -File .\release\build-windows-portable.ps1 `
   -ApplicationVersion 0.1.0
 ```
 
-The script downloads the pinned official runtime when it is not already cached, checks its committed SHA-256, repeats the frozen install/tests/lint/build, creates a physical production dependency tree, loads the packaged native SQLite module, generates and verifies `RELEASE-MANIFEST.json`, and produces `artifacts\ProjectManagerDashboard-0.1.0-win-x64.zip`.
+The script downloads the pinned official runtime when it is not already cached, checks that one archive against its committed SHA-256, repeats the frozen install/tests/lint/build, creates a physical production dependency tree, loads the packaged native SQLite module, writes compact `RELEASE-INFO.json`, and produces `artifacts\ProjectManagerDashboard-0.1.0-win-x64.zip`. It does not create a per-file hash manifest.
 
 For a controlled/offline build environment, download the exact archive named in `release\windows-portable.config.json` through an approved channel and pass `-RuntimeArchive C:\approved\node-v24.19.0-win-x64.zip`. The same committed digest is still required.
 
@@ -85,14 +85,14 @@ On a clean Windows 10/11 x64 account that does not have Node or pnpm installed:
 
 1. Extract the ZIP to a normal user-writable application directory.
 2. Disconnect the network before the first launch.
-3. Run `verify-release.cmd`; it must report success.
+3. Run `verify-release.cmd`; it must confirm that the metadata, bundled runtime, server entrypoint, and web build are present and compatible.
 4. Run `start-dashboard.cmd`; the default browser must open `http://127.0.0.1:4300`.
 5. Open “本机诊断” and confirm Node 24.19.0, `win32`, `x64`, healthy SQLite, no pending migration, and a data directory under `%LOCALAPPDATA%\ProjectManagerDashboard`.
 6. Create a database and record, close the browser, and run `start-dashboard.cmd` again. It must reuse the one healthy backend and reopen the same data.
 7. Run `stop-dashboard.cmd`, confirm health is no longer reachable, and then start it again.
 8. Confirm no SQLite database, backup, export, launcher state, or log was written beneath the extracted release directory.
 
-Tamper with a disposable copy of one shipped file and confirm both `verify-release.cmd` and `start-dashboard.cmd` refuse to proceed. Restore from the original ZIP rather than editing the manifest.
+Normal startup does not invoke PowerShell and does not traverse the package to calculate thousands of hashes. GitHub's Windows workflow extracts the exact candidate ZIP, uses headless Microsoft Edge to click through table/text/image creation, inline editing, filtering, reload persistence, menu dismissal, and deletion, and then runs the shared API/export/restart journey. All of these checks must pass before that ZIP can be published.
 
 ## Offline functional and recovery matrix
 

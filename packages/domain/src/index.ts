@@ -78,6 +78,10 @@ export const createDatabaseInputSchema = z.object({
   color: z.string().trim().max(40).nullable().optional()
 });
 
+export const createWorkspaceTableInputSchema = z.object({ name: displayNameSchema }).strict();
+
+export type CreateWorkspaceTableInput = z.infer<typeof createWorkspaceTableInputSchema>;
+
 export type CreateDatabaseInput = z.infer<typeof createDatabaseInputSchema>;
 
 export const updateDatabaseInputSchema = z

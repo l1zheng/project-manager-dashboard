@@ -61,6 +61,14 @@ jobs:
             -Architecture x64 `
             -ApplicationVersion $env:APPLICATION_VERSION
 
+      - name: Run full journey against extracted portable ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\release\verify-windows-portable.ps1 `
+            -ArchivePath ".\artifacts\ProjectManagerDashboard-$env:APPLICATION_VERSION-win-x64.zip" `
+            -OutputDirectory (Join-Path $env:RUNNER_TEMP 'project-manager-portable-acceptance')
+
       - name: Upload portable Windows artifact
         uses: actions/upload-artifact@v4
         with:
