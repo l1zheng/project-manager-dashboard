@@ -2,14 +2,14 @@
 
 Run this checklist on the Windows PC intended to build and use the first release. It validates both the source build and the self-contained portable artifact before Outlook integration is accepted.
 
-Status for 0.1.0: accepted on 2026-08-09. The Windows x64 build and native SQLite checks were recorded in commit `fd1901b`; the user subsequently confirmed the remaining offline launch, persistence, start/stop, tamper rejection, Excel, classic Outlook, backup/restore, injected rollback, and upgrade journeys passed. Keep this document as the regression checklist for future releases.
+Status for 0.1.0: accepted on 2026-08-11. The target-PC acceptance matrix passed, and GitHub release run `31461229458` additionally extracted the final ZIP and passed CMD launch, packaged native SQLite, real Microsoft Edge interaction, mixed modules, saved filters, stop/restart persistence, Excel exports, Outlook HTML, and backup before publishing `windows-build-0.1.0-6`. Keep this document as the regression checklist for future releases.
 
 ## Prerequisites
 
 - Windows 10 or Windows 11.
 - Node.js 24.19.0, verified with `node --version`.
 - pnpm 11.9.0 exactly, verified with `pnpm --version`.
-- A clean clone of the private repository.
+- A clean clone of the public repository.
 
 Do not use Node.js 25 or another Node 24 patch for the release build. The embedded runtime and native dependency build are deliberately pinned to 24.19.0.
 

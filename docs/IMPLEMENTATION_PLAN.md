@@ -163,7 +163,7 @@ Exit criteria:
 
 ## Phase 7 — Backup, packaging, and release hardening
 
-Status: completed — P7-01 through P7-08 and the Windows x64 acceptance matrix completed by 2026-08-09.
+Status: completed — P7-01 through P7-08, the Windows x64 acceptance matrix, and the exact extracted-ZIP release gate completed by 2026-08-11.
 
 Tasks:
 
@@ -173,7 +173,7 @@ Tasks:
 - Generalize and test automatic pre-migration and pre-restore retention. Completed in P7-04 with separate 10-item groups, strict generated-filename recognition, bounded deletion diagnostics, and adversarial retention tests.
 - Serve the production web build from the loopback API and add first-run/data-directory diagnostics. Completed in P7-05 with same-origin static assets, safe client-route fallback, and a no-record-content runtime diagnostics view.
 - Build an offline Windows portable artifact with a pinned Node 24 LTS runtime and matching native dependencies. Completed in P7-06 and hardened in the release-readiness pass with a Windows-only frozen build pipeline, pinned Node 24.19.0 archives, physical production deployment, native SQLite self-test, authenticated Node launcher, compact release metadata, and an end-to-end test of the exact extracted ZIP.
-- Test clean-machine installation, offline operation, upgrade migrations, and injected restore failure. Completed in P7-07 on 2026-08-09.
+- Test clean-machine installation, offline operation, upgrade migrations, and injected restore failure. Completed in P7-07 on 2026-08-09; the final GitHub Windows package additionally passed automated CMD launch, Microsoft Edge interaction, stop/restart persistence, and export acceptance before publication on 2026-08-11.
 - Write user documentation and recovery instructions. Completed in P7-08 with the 0.1.0 user guide and release notes on 2026-08-09.
 
 Exit criteria:

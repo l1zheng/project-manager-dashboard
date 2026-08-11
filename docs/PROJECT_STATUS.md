@@ -1,13 +1,13 @@
 # Project Status
 
-Last updated: 2026-08-10
+Last updated: 2026-08-11
 
 ## Current state
 
 - Phase: Phase 10 accepted V2 production integration. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is now active under ADR-0005.
-- Implementation: the accepted V2 browser surface is the production `/` route and consumes only the strict polymorphic block API. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, and per-view layout. Its export controls call the real editable/presentation Excel and optional Outlook endpoints after persisting current page state. Presentation Excel, browser HTML, and Outlook HTML preserve the mixed module order; presentation Excel embeds validated internal images and classic Outlook can receive them through bounded server-generated CID attachments. Full regression, workbook visual inspection, and live macOS browser verification passed. The dashboard-and-Excel workflow is the current acceptance baseline; Windows Outlook CID acceptance is deferred.
+- Implementation: the accepted V2 browser surface is the production `/` route and consumes only the strict polymorphic block API. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, saved filters, and per-view layout. Its export controls call the real editable/presentation Excel and optional Outlook endpoints after persisting current page state. Presentation Excel, browser HTML, and Outlook HTML preserve the mixed module order; presentation Excel embeds validated internal images and classic Outlook can receive them through bounded server-generated CID attachments. Full regression, workbook visual inspection, macOS production verification, and the exact extracted Windows ZIP journey passed. The dashboard-and-Excel workflow is the current acceptance baseline; Windows Outlook CID acceptance is deferred.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
-- GitHub: public repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`. A Windows GitHub Actions workflow now builds the pinned x64 portable ZIP and uploads it as a 14-day workflow artifact; the Windows Release workflow publishes a durable asset.
+- GitHub: public repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`. Windows build run `31461026585` and release run `31461229458` passed the same extracted-ZIP acceptance gate. Public prerelease `windows-build-0.1.0-6` contains the durable x64 portable ZIP.
 - Target user: one person.
 - Target platform: Windows with classic Outlook.
 - Deployment: local web application with SQLite.
@@ -35,13 +35,13 @@ Last updated: 2026-08-10
 
 ## Active task
 
-Complete the release-readiness audit: run the shared production journey against the exact GitHub-built Windows ZIP, inspect its Excel artifacts, and publish only the passing candidate. Windows classic Outlook CID acceptance remains explicitly deferred.
+Version 0.1.0 dashboard-and-Excel release is accepted and published. Windows classic Outlook CID acceptance remains explicitly deferred.
 
 ## Next tasks
 
-1. Push the release-readiness changes and run the GitHub Windows release workflow.
-2. Require the extracted ZIP to pass start/repeat-start/stop/restart plus the complete mixed-workspace and export journey before publication.
-3. Inspect the published asset and generated Excel files, then hand off the final public ZIP.
+1. Hand off and use the public `windows-build-0.1.0-6` ZIP on the target Windows x64 computer.
+2. Collect product feedback against real weekly-report data without changing the accepted single-page interaction baseline prematurely.
+3. Treat classic Outlook CID rendering as an optional follow-up; Excel remains the primary handoff.
 
 ## Risks and validation items
 
@@ -57,6 +57,10 @@ Complete the release-readiness audit: run the shared production journey against 
 | Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes. Generated Outlook CIDs are implemented and isolated, but target-Windows rendering is deferred because Outlook is not the current primary handoff. |
 
 ## Verification log
+
+- 2026-08-11: Completed the Windows release-readiness gate and published prerelease `windows-build-0.1.0-6` from commit `4d051d1`. GitHub Windows build run `31461026585` and release run `31461229458` both built the pinned Node.js 24.19.0 x64 package, passed 71 application tests plus the launcher test, TypeScript/build/lint/format checks, loaded packaged native SQLite, extracted the real ZIP, started it through its CMD/Node launcher, and ran the complete acceptance journey before any artifact publication. Real Microsoft Edge interaction created a table and record, added a property, saved and cleared a filter, created and edited text/image modules, reloaded and verified persistence, dismissed the export popover by clicking blank space, and deleted all acceptance modules through their menus. The production API journey then validated independently shaped requirement/risk tables, record and field operations, stale-view repair, stable status and typed filters, module order/duplication/archive, validated PNG storage, editable/presentation Excel, Outlook HTML, backup, clean stop, repeat start, and restart persistence. The public ZIP is `https://github.com/l1zheng/project-manager-dashboard/releases/download/windows-build-0.1.0-6/ProjectManagerDashboard-0.1.0-win-x64.zip`.
+
+- 2026-08-11: Downloaded the public Release asset itself and audited its extracted contents. It has one release root, thin `start-dashboard.cmd`/`stop-dashboard.cmd`/`verify-release.cmd` entrypoints, the bundled Node runtime, compact `RELEASE-INFO.json`, and the Node launcher; it contains no `.env`, Git/Codex state, API token/key pattern, user-home path, packaged PowerShell launcher, or per-file manifest. The only packaged PowerShell file is the optional bounded classic-Outlook bridge. Generated representative editable workbooks contained complete differently shaped requirement/risk sheets, and the presentation workbook retained table/text/image order on one sheet. Artifact-tool imported and rendered every sheet, found no formula errors, and visually confirmed readable wrapping, centered metadata, bold hierarchy, black all-side table borders, merged presentation spans, and complete values.
 
 - 2026-08-10: Began a full release-readiness correction after repeated target-Windows failures. Table creation is now one SQLite transaction that creates the database, default fields, saved view, and dashboard placement together; text and image modules can likewise create themselves through the primary workspace without depending on a frontend-cached dashboard ID. The production page now always bootstraps the primary dashboard, preserves stable status-option IDs during label edits, persists filter clearing, uses field-appropriate status/number/date filtering, and serializes number cells as numbers. The portable package no longer ships or invokes PowerShell launch scripts and no longer generates or recalculates a per-file hash manifest: CMD invokes a bundled-Node launcher, while the official Node archive retains one build-time digest check. Added a shared production acceptance journey plus a Windows wrapper that extracts the exact ZIP, starts headless Microsoft Edge for real button/input/reload/outside-click/delete interaction coverage, then exercises clean start, repeat start, authenticated stop, restart persistence, independently shaped tables, records, field archival repair, text/image modules, module order, saved filters, editable/presentation Excel, Outlook HTML, and workspace backup before release publication. Local verification currently passes 71 application tests, the launcher test, TypeScript, ESLint, formatting, and build; the GitHub Windows artifact run is the remaining gate.
 
