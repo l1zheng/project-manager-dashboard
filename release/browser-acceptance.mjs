@@ -11,6 +11,12 @@ const cdp = await connectCdp(target.webSocketDebuggerUrl);
 try {
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
+  await cdp.send('Emulation.setDeviceMetricsOverride', {
+    width: 1440,
+    height: 1000,
+    deviceScaleFactor: 1,
+    mobile: false
+  });
   await waitFor(
     'document.querySelectorAll("button").length > 0 && document.body.innerText.includes("添加模块")'
   );
@@ -45,7 +51,11 @@ try {
     await waitForAsync(
       `fetch('/api/databases/' + ${JSON.stringify(tableId)}).then((response) => response.json()).then((database) => database.records.length === 1)`
     );
-    await waitFor('document.body.innerText.includes("1 条记录")');
+    await waitFor(`(() => {
+      const title = [...document.querySelectorAll('.v2-table-title input')].find((input) => input.value === '浏览器验收表格');
+      const table = title?.closest('.v2-table-block');
+      return table?.querySelectorAll('tbody tr:not(.v2-blank-row)').length === 1;
+    })()`);
     await evaluate(`(() => {
       const title = [...document.querySelectorAll('.v2-table-title input')].find((input) => input.value === '浏览器验收表格');
       const table = title?.closest('.v2-table-block');
