@@ -27,7 +27,8 @@ try {
 
   await step('create a record and a property', async () => {
     const tableId = await evaluate(`(() => {
-      const table = [...document.querySelectorAll('.v2-table-block')].find((item) => item.innerText.includes('浏览器验收表格'));
+      const title = [...document.querySelectorAll('.v2-table-title input')].find((input) => input.value === '浏览器验收表格');
+      const table = title?.closest('.v2-table-block');
       if (!table?.id) throw new Error('Acceptance table ID was not found.');
       return table.id;
     })()`);
@@ -46,7 +47,8 @@ try {
     );
     await waitFor('document.body.innerText.includes("1 条记录")');
     await evaluate(`(() => {
-      const table = [...document.querySelectorAll('.v2-table-block')].find((item) => item.innerText.includes('浏览器验收表格'));
+      const title = [...document.querySelectorAll('.v2-table-title input')].find((input) => input.value === '浏览器验收表格');
+      const table = title?.closest('.v2-table-block');
       const button = [...table.querySelectorAll('button')].find((item) => item.textContent.includes('属性'));
       if (!button) throw new Error('Add-property button was not found.');
       button.click();
@@ -56,7 +58,8 @@ try {
 
   await step('save and clear a table filter', async () => {
     await evaluate(`(() => {
-      const table = [...document.querySelectorAll('.v2-table-block')].find((item) => item.innerText.includes('浏览器验收表格'));
+      const title = [...document.querySelectorAll('.v2-table-title input')].find((input) => input.value === '浏览器验收表格');
+      const table = title?.closest('.v2-table-block');
       const button = [...table.querySelectorAll('button')].find((item) => item.textContent.includes('筛选'));
       if (!button) throw new Error('Filter button was not found.');
       button.click();
@@ -65,7 +68,8 @@ try {
     await clickButton('应用筛选');
     await waitFor('document.body.innerText.includes("当前筛选")');
     await evaluate(`(() => {
-      const table = [...document.querySelectorAll('.v2-table-block')].find((item) => item.innerText.includes('浏览器验收表格'));
+      const title = [...document.querySelectorAll('.v2-table-title input')].find((input) => input.value === '浏览器验收表格');
+      const table = title?.closest('.v2-table-block');
       const button = [...table.querySelectorAll('button')].find((item) => item.textContent.includes('筛选'));
       button.click();
     })()`);
