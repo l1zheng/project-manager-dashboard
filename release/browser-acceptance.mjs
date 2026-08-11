@@ -90,7 +90,7 @@ try {
   await step('create and edit text and image modules', async () => {
     await clickButton('添加模块');
     await clickButton('¶ 文字');
-    await waitFor('document.querySelector("input[aria-label=\"文字模块标题\"]") !== null');
+    await waitForSelector('input[aria-label="文字模块标题"]');
     await setInput('input[aria-label="文字模块标题"]', '浏览器验收摘要', true);
     await setInput(
       'textarea[aria-label="文字模块内容"]',
@@ -100,7 +100,7 @@ try {
 
     await clickButton('添加模块');
     await clickButton('▧ 图片');
-    await waitFor('document.querySelector("input[aria-label=\"图片模块标题\"]") !== null');
+    await waitForSelector('input[aria-label="图片模块标题"]');
     await setInput('input[aria-label="图片模块标题"]', '浏览器验收图片', true);
     await setInput('input[aria-label="图片说明"]', '未选择文件时模块仍可保存。', true);
     await waitForAsync(`fetch('/api/workspace/primary-dashboard', { method: 'POST' })
@@ -117,9 +117,21 @@ try {
 
   await step('reload and verify persistence', async () => {
     await cdp.send('Page.reload', { ignoreCache: true });
-    await waitFor('document.body.innerText.includes("浏览器验收表格")');
-    await waitFor('document.body.innerText.includes("浏览器验收摘要")');
-    await waitFor('document.body.innerText.includes("浏览器验收图片")');
+    await waitFor(
+      `[...document.querySelectorAll('.v2-table-title input')].some((input) => input.value === '浏览器验收表格')`
+    );
+    await waitFor(
+      `document.querySelector('input[aria-label="文字模块标题"]')?.value === '浏览器验收摘要'`
+    );
+    await waitFor(
+      `document.querySelector('textarea[aria-label="文字模块内容"]')?.value === '文字模块能够直接创建、编辑并持久化。'`
+    );
+    await waitFor(
+      `document.querySelector('input[aria-label="图片模块标题"]')?.value === '浏览器验收图片'`
+    );
+    await waitFor(
+      `document.querySelector('input[aria-label="图片说明"]')?.value === '未选择文件时模块仍可保存。'`
+    );
     const summary = await evaluate(
       '[...document.querySelectorAll(".v2-page-summary")].map((item) => item.textContent).join(" ")'
     );
@@ -205,6 +217,13 @@ async function waitFor(expression, timeoutMilliseconds = 20_000) {
     await delay(100);
   }
   throw new Error(`Timed out waiting for browser condition: ${expression}`);
+}
+
+async function waitForSelector(selector, timeoutMilliseconds = 20_000) {
+  await waitFor(
+    `document.querySelector(${JSON.stringify(selector)}) !== null`,
+    timeoutMilliseconds
+  );
 }
 
 async function waitForAsync(expression, timeoutMilliseconds = 20_000) {
