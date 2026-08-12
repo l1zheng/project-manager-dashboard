@@ -1,6 +1,6 @@
 # Windows verification checklist
 
-Run this checklist on the Windows PC intended to build and use the first release. It validates both the source build and the self-contained portable artifact before Outlook integration is accepted.
+Run this checklist on the Windows PC intended to build and use the first release. It validates the source build, self-contained portable artifact, and normal per-user installer before Outlook integration is accepted.
 
 Status for 0.1.0: accepted on 2026-08-11. The target-PC acceptance matrix passed, and GitHub release run `31461229458` additionally extracted the final ZIP and passed CMD launch, packaged native SQLite, real Microsoft Edge interaction, mixed modules, saved filters, stop/restart persistence, Excel exports, Outlook HTML, and backup before publishing `windows-build-0.1.0-6`. Keep this document as the regression checklist for future releases.
 
@@ -93,6 +93,38 @@ On a clean Windows 10/11 x64 account that does not have Node or pnpm installed:
 8. Confirm no SQLite database, backup, export, launcher state, or log was written beneath the extracted release directory.
 
 Normal startup does not invoke PowerShell and does not traverse the package to calculate thousands of hashes. GitHub's Windows workflow extracts the exact candidate ZIP, uses headless Microsoft Edge to click through table/text/image creation, inline editing, filtering, reload persistence, menu dismissal, and deletion, and then runs the shared API/export/restart journey. All of these checks must pass before that ZIP can be published.
+
+## Build and verify the per-user installer
+
+Install the pinned compiler into a build-tools directory. The bootstrap accepts only the immutable official release URL and verifies the downloaded installer's valid Authenticode signature and `Pyrsys B.V.` signer before executing it:
+
+```powershell
+$inno = .\release\install-inno-setup.ps1 `
+  -InstallDirectory .\artifacts\.tools\inno-setup
+
+.\release\build-windows-installer.ps1 `
+  -ReleaseDirectory .\artifacts\ProjectManagerDashboard-0.1.0-win-x64 `
+  -Architecture x64 `
+  -ApplicationVersion 0.1.0 `
+  -InnoCompiler $inno
+
+.\release\verify-windows-installer.ps1 `
+  -InstallerPath .\artifacts\ProjectManagerDashboard-Setup-0.1.0-win-x64.exe `
+  -OutputDirectory (Join-Path $env:TEMP 'project-manager-installer-acceptance')
+```
+
+The installer gate must pass all of the following:
+
+| Area | Required result |
+| --- | --- |
+| Install scope | Installs for the current user without elevation and contains its bundled runtime/native SQLite module. |
+| Native launch | `ProjectManagerDashboard.exe --check` and `--start` return successfully without a console window. |
+| Application | The full setup journey, exports, backup, repeat launch, stop, and restart persistence pass. |
+| In-place update | Running the same/newer Setup stops the authenticated service, replaces application files, and retains the workspace. |
+| Uninstall | Shortcuts/application files are removed, while `%LOCALAPPDATA%\ProjectManagerDashboard` and `workspace.sqlite` remain. |
+| Signing | A credentialed release signs launcher, uninstaller, and Setup. An unsigned test build is not described as a verified publisher build. |
+
+The target PC needs no Node.js, pnpm, Inno Setup, compiler, or database installation. Inno Setup and the .NET Framework compiler are build-time tools only. If `WINDOWS_SIGNTOOL_COMMAND` is configured in GitHub Actions, it must contain Inno Setup's `$f` file placeholder and reference credentials outside the repository.
 
 ## Offline functional and recovery matrix
 

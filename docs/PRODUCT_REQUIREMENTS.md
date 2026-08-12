@@ -17,7 +17,7 @@ Its defining workflow is:
 - Primary user: one project manager/developer.
 - Primary OS: Windows.
 - Email client: Windows classic Outlook.
-- Deployment: local machine; no external SaaS dependency.
+- Deployment: a self-contained per-user Windows installer is the primary distribution; a portable ZIP remains available. Neither mode depends on external SaaS.
 - Primary language: Chinese; data and filenames must fully support Unicode.
 
 ## 3. Product principles
@@ -233,6 +233,16 @@ Acceptance criteria:
 - Provide manual backup/export of the full workspace.
 - Use schema migrations and preserve prior data across application updates.
 - Keep automatic rolling backups before destructive migrations or imports.
+
+### FR-10 Windows installation and updates
+
+- Provide a Windows 10/11 x64 Setup executable that installs for the current user without administrator rights.
+- Include the application runtime and native SQLite dependency; end users must not install Node.js, pnpm, a compiler, or database software.
+- Create Start Menu and optional desktop shortcuts that launch without a console window.
+- Stop the authenticated running instance before an in-place update replaces application files.
+- Uninstall application files and shortcuts without deleting `%LOCALAPPDATA%\ProjectManagerDashboard` or its workspace database.
+- Retain the portable ZIP as an alternate distribution and recovery format.
+- Support Authenticode signing of the launcher, uninstaller, and Setup executable when release credentials are configured. Unsigned test builds must be identified as such and must not claim a verified Windows publisher.
 
 ## 6. Non-functional requirements
 

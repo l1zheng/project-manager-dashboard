@@ -1,16 +1,16 @@
 # Project Status
 
-Last updated: 2026-08-11
+Last updated: 2026-08-13
 
 ## Current state
 
-- Phase: Phase 10 accepted V2 production integration. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is now active under ADR-0005.
+- Phase: Phase 10 accepted V2 production integration plus P7-09 Windows installer delivery. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is active under ADR-0005 and the normal Windows installation path is defined by ADR-0006.
 - Implementation: the accepted V2 browser surface is the production `/` route and consumes only the strict polymorphic block API. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, saved filters, and per-view layout. Its export controls call the real editable/presentation Excel and optional Outlook endpoints after persisting current page state. Presentation Excel, browser HTML, and Outlook HTML preserve the mixed module order; presentation Excel embeds validated internal images and classic Outlook can receive them through bounded server-generated CID attachments. Full regression, workbook visual inspection, macOS production verification, and the exact extracted Windows ZIP journey passed. The dashboard-and-Excel workflow is the current acceptance baseline; Windows Outlook CID acceptance is deferred.
 - Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
 - GitHub: public repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`. Windows build run `31461026585` and release run `31461229458` passed the same extracted-ZIP acceptance gate. Public prerelease `windows-build-0.1.0-6` contains the durable x64 portable ZIP.
 - Target user: one person.
 - Target platform: Windows with classic Outlook.
-- Deployment: local web application with SQLite.
+- Deployment: local web application with SQLite, distributed primarily as a per-user Windows x64 Setup EXE with a portable ZIP alternative.
 
 ## Confirmed decisions
 
@@ -32,16 +32,17 @@ Last updated: 2026-08-11
 - Completion is configured explicitly on at most one status field per database using stable completed option IDs; status labels are never guessed.
 - Manual workspace backups use one versioned `.pmdbackup` container containing a checksummed, verified SQLite snapshot. Restore is staged and validated as untrusted input, creates a pre-restore backup, and switches databases only during controlled startup with rollback.
 - The first Windows release is an offline, architecture-specific portable directory with the pinned official Node.js 24.19.0 runtime and Windows-built native dependencies. The frozen build validates the official runtime archive once, emits compact release metadata, and uses an authenticated Node launcher reached through thin CMD entrypoints; it does not hash every packaged file at startup. Electron and Node single-executable packaging are deferred, and mutable data remains under `%LOCALAPPDATA%`.
+- The primary Windows distribution is now a current-user Inno Setup package published by `lz`. It installs under `%LOCALAPPDATA%\Programs`, uses a console-free allowlisted .NET Framework launcher, stops a running version before in-place update, and preserves the workspace on uninstall. The pipeline can Authenticode-sign launcher/setup/uninstaller when signing credentials are supplied; current local test output is unsigned.
 
 ## Active task
 
-Version 0.1.0 dashboard-and-Excel release is accepted and published. Windows classic Outlook CID acceptance remains explicitly deferred.
+Version 0.1.0 dashboard-and-Excel release is accepted. The Windows installer implementation and local acceptance matrix are complete; GitHub CI/release publication of the new Setup asset is the active handoff. Windows classic Outlook CID acceptance remains explicitly deferred.
 
 ## Next tasks
 
-1. Hand off and use the public `windows-build-0.1.0-6` ZIP on the target Windows x64 computer.
-2. Collect product feedback against real weekly-report data without changing the accepted single-page interaction baseline prematurely.
-3. Treat classic Outlook CID rendering as an optional follow-up; Excel remains the primary handoff.
+1. Confirm the pushed Windows build workflow publishes both the Setup EXE and portable ZIP, then create the next prerelease through `Windows release`.
+2. Configure a trusted Authenticode certificate or an approved organizational deployment route before presenting the installer as a verified publisher build.
+3. Collect product feedback against real weekly-report data without changing the accepted single-page interaction baseline prematurely.
 
 ## Risks and validation items
 
@@ -52,11 +53,13 @@ Version 0.1.0 dashboard-and-Excel release is accepted and published. Windows cla
 | Excel merged layout | Rounding or extreme field counts may create unusable spans. | Pure layout/workbook tests and target desktop Excel passed; repeat for allocator changes. |
 | Dynamic filters | JSON-backed records may become slow at higher volumes. | Benchmark representative data before optimizing into SQLite JSON queries. |
 | Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | ADR-0004 validation, injected rollback, offline restore, and upgrade journeys passed; retain manual backups before updates. |
-| Packaging | Corporate Windows policy may reject an unsigned portable launcher. | The canonical portable bundle passed the target environment; add signing only if another policy environment requires it. |
+| Packaging | SmartScreen or corporate policy may reject an unsigned installer even when its package metadata names `lz`. | Per-user Setup, console-free launch, upgrade, restart, uninstall, and data retention passed locally. Configure Authenticode or managed IT approval for verified-publisher distribution. |
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
 | Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes. Generated Outlook CIDs are implemented and isolated, but target-Windows rendering is deferred because Outlook is not the current primary handoff. |
 
 ## Verification log
+
+- 2026-08-13: Completed P7-09 Windows installer delivery. Added a pinned Inno Setup 7.0.2 tool bootstrap that validates the official `Pyrsys B.V.` Authenticode signer, an x64 .NET Framework GUI launcher with no console and a fixed command allowlist, current-user install/shortcut/update/uninstall behavior, optional Authenticode signing hooks, dual-artifact GitHub workflows, and structural regression tests. On Windows x64, 71 application tests plus both release tests, lint, production build, packaged Node 24.19.0/native SQLite loading, and the exact clean portable ZIP browser/API/export/restart journey passed. The final unsigned Setup then passed isolated first install, native `--check`/start, full production setup, repeat launch, running in-place upgrade, persisted-state verification, stop/restart verification, silent uninstall, application-file removal, and `workspace.sqlite` retention. Local outputs are under `artifacts\installer-final-v2` and `artifacts\installer-final`; GitHub publication remains pending the push workflow.
 
 - 2026-08-11: Completed the Windows release-readiness gate and published prerelease `windows-build-0.1.0-6` from commit `4d051d1`. GitHub Windows build run `31461026585` and release run `31461229458` both built the pinned Node.js 24.19.0 x64 package, passed 71 application tests plus the launcher test, TypeScript/build/lint/format checks, loaded packaged native SQLite, extracted the real ZIP, started it through its CMD/Node launcher, and ran the complete acceptance journey before any artifact publication. Real Microsoft Edge interaction created a table and record, added a property, saved and cleared a filter, created and edited text/image modules, reloaded and verified persistence, dismissed the export popover by clicking blank space, and deleted all acceptance modules through their menus. The production API journey then validated independently shaped requirement/risk tables, record and field operations, stale-view repair, stable status and typed filters, module order/duplication/archive, validated PNG storage, editable/presentation Excel, Outlook HTML, backup, clean stop, repeat start, and restart persistence. The public ZIP is `https://github.com/l1zheng/project-manager-dashboard/releases/download/windows-build-0.1.0-6/ProjectManagerDashboard-0.1.0-win-x64.zip`.
 

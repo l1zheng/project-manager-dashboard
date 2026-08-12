@@ -1,4 +1,4 @@
-name: Windows portable build
+name: Windows build
 
 on:
   workflow_dispatch:
@@ -25,13 +25,14 @@ permissions:
 
 jobs:
   build-windows-portable:
-    name: Build Windows x64 portable ZIP
+    name: Build Windows x64 installer and portable ZIP
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       NODE_VERSION: 24.19.0
       PNPM_VERSION: 11.9.0
       APPLICATION_VERSION: ${{ inputs.application_version || '0.1.0' }}
+      WINDOWS_SIGNTOOL_COMMAND: ${{ secrets.WINDOWS_SIGNTOOL_COMMAND }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -69,10 +70,38 @@ jobs:
             -ArchivePath ".\artifacts\ProjectManagerDashboard-$env:APPLICATION_VERSION-win-x64.zip" `
             -OutputDirectory (Join-Path $env:RUNNER_TEMP 'project-manager-portable-acceptance')
 
-      - name: Upload portable Windows artifact
+      - name: Install verified Inno Setup compiler
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $compiler = & .\release\install-inno-setup.ps1 `
+            -InstallDirectory (Join-Path $env:RUNNER_TEMP 'inno-setup')
+          "INNO_COMPILER=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and verify per-user installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installerParameters = @{
+            ReleaseDirectory = ".\artifacts\ProjectManagerDashboard-$env:APPLICATION_VERSION-win-x64"
+            Architecture = 'x64'
+            ApplicationVersion = $env:APPLICATION_VERSION
+            InnoCompiler = $env:INNO_COMPILER
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNTOOL_COMMAND)) {
+            $installerParameters.SignToolCommand = $env:WINDOWS_SIGNTOOL_COMMAND
+          }
+          & .\release\build-windows-installer.ps1 @installerParameters
+          & .\release\verify-windows-installer.ps1 `
+            -InstallerPath ".\artifacts\ProjectManagerDashboard-Setup-$env:APPLICATION_VERSION-win-x64.exe" `
+            -OutputDirectory (Join-Path $env:RUNNER_TEMP 'project-manager-installer-acceptance')
+
+      - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ProjectManagerDashboard-${{ env.APPLICATION_VERSION }}-win-x64
-          path: artifacts/ProjectManagerDashboard-${{ env.APPLICATION_VERSION }}-win-x64.zip
+          path: |
+            artifacts/ProjectManagerDashboard-${{ env.APPLICATION_VERSION }}-win-x64.zip
+            artifacts/ProjectManagerDashboard-Setup-${{ env.APPLICATION_VERSION }}-win-x64.exe
           if-no-files-found: error
           retention-days: 14

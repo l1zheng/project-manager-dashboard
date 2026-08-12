@@ -1,10 +1,10 @@
-name: Windows portable release
+name: Windows release
 
 on:
   workflow_dispatch:
     inputs:
       application_version:
-        description: 'Version written into the portable artifact'
+        description: 'Version written into the Windows artifacts'
         required: false
         default: '0.1.0'
       release_tag:
@@ -17,14 +17,15 @@ permissions:
 
 jobs:
   build-and-release:
-    name: Build and publish Windows x64 ZIP
+    name: Build and publish Windows x64 installer and ZIP
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       NODE_VERSION: 24.19.0
       PNPM_VERSION: 11.9.0
       APPLICATION_VERSION: ${{ inputs.application_version || '0.1.0' }}
       RELEASE_TAG: ${{ inputs.release_tag || '' }}
+      WINDOWS_SIGNTOOL_COMMAND: ${{ secrets.WINDOWS_SIGNTOOL_COMMAND }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -62,6 +63,32 @@ jobs:
             -ArchivePath ".\artifacts\ProjectManagerDashboard-$env:APPLICATION_VERSION-win-x64.zip" `
             -OutputDirectory (Join-Path $env:RUNNER_TEMP 'project-manager-portable-acceptance')
 
+      - name: Install verified Inno Setup compiler
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $compiler = & .\release\install-inno-setup.ps1 `
+            -InstallDirectory (Join-Path $env:RUNNER_TEMP 'inno-setup')
+          "INNO_COMPILER=$compiler" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Build and verify per-user installer
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $installerParameters = @{
+            ReleaseDirectory = ".\artifacts\ProjectManagerDashboard-$env:APPLICATION_VERSION-win-x64"
+            Architecture = 'x64'
+            ApplicationVersion = $env:APPLICATION_VERSION
+            InnoCompiler = $env:INNO_COMPILER
+          }
+          if (-not [string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNTOOL_COMMAND)) {
+            $installerParameters.SignToolCommand = $env:WINDOWS_SIGNTOOL_COMMAND
+          }
+          & .\release\build-windows-installer.ps1 @installerParameters
+          & .\release\verify-windows-installer.ps1 `
+            -InstallerPath ".\artifacts\ProjectManagerDashboard-Setup-$env:APPLICATION_VERSION-win-x64.exe" `
+            -OutputDirectory (Join-Path $env:RUNNER_TEMP 'project-manager-installer-acceptance')
+
       - name: Publish private GitHub Release asset
         shell: pwsh
         env:
@@ -75,10 +102,15 @@ jobs:
           if ($tag -notmatch '^[0-9A-Za-z._/-]{1,100}$') {
             throw "Release tag contains unsupported characters: $tag"
           }
-          $archive = Get-ChildItem -LiteralPath 'artifacts' -Filter '*.zip' -File | Select-Object -First 1
-          if ($null -eq $archive) { throw 'Portable ZIP was not found.' }
-          gh release create $tag $archive.FullName `
+          $archive = Get-Item -LiteralPath ".\artifacts\ProjectManagerDashboard-$env:APPLICATION_VERSION-win-x64.zip"
+          $installer = Get-Item -LiteralPath ".\artifacts\ProjectManagerDashboard-Setup-$env:APPLICATION_VERSION-win-x64.exe"
+          $signingNote = if ([string]::IsNullOrWhiteSpace($env:WINDOWS_SIGNTOOL_COMMAND)) {
+            'The installer is unsigned until a trusted code-signing certificate is configured.'
+          } else {
+            'The installer and native launcher passed Authenticode signature validation during the build.'
+          }
+          gh release create $tag $installer.FullName $archive.FullName `
             --target $env:GITHUB_SHA `
             --title "Project Manager Dashboard $($env:APPLICATION_VERSION) Windows x64" `
-            --notes "Windows x64 portable build from commit $($env:GITHUB_SHA)." `
+            --notes "Windows x64 per-user installer and portable build from commit $($env:GITHUB_SHA). $signingNote" `
             --prerelease
