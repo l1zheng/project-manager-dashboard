@@ -33,7 +33,18 @@ if (Test-Path -LiteralPath $compilerPath -PathType Leaf) {
 New-Item -ItemType Directory -Path $downloadRoot, $installRoot -Force | Out-Null
 if (-not (Test-Path -LiteralPath $installerPath -PathType Leaf)) {
   Write-Host "Downloading Inno Setup $($config.innoSetup.version) from its official release..." -ForegroundColor Cyan
-  Invoke-WebRequest -UseBasicParsing -Uri ([string]$config.innoSetup.url) -OutFile $installerPath
+  for ($attempt = 1; $attempt -le 4; $attempt++) {
+    try {
+      Invoke-WebRequest -UseBasicParsing -Uri ([string]$config.innoSetup.url) -OutFile $installerPath
+      break
+    } catch {
+      if (Test-Path -LiteralPath $installerPath) { Remove-Item -LiteralPath $installerPath -Force }
+      if ($attempt -eq 4) { throw }
+      $delaySeconds = 5 * $attempt
+      Write-Warning "Inno Setup download attempt $attempt failed; retrying in $delaySeconds seconds."
+      Start-Sleep -Seconds $delaySeconds
+    }
+  }
 }
 Assert-AuthenticodeSigner $installerPath
 

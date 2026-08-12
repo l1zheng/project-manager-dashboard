@@ -61,6 +61,8 @@ test('Windows installer is per-user, console-free, and preserves application dat
   assert.match(builder, /SignToolCommand/);
   assert.match(toolInstaller, /Get-AuthenticodeSignature/);
   assert.match(toolInstaller, /expectedSigner/);
+  assert.match(toolInstaller, /attempt -le 4/);
+  assert.match(toolInstaller, /Remove-Item -LiteralPath \$installerPath -Force/);
 
   assert.match(verifier, /\/VERYSILENT/);
   assert.match(verifier, /\.WaitForExit\(\)/);
