@@ -819,16 +819,7 @@ body.v2-is-dragging-module {
   grid-template-columns: repeat(2, 1fr);
   gap: 5px;
 }
-.v2-export-divider {
-  margin: 10px 0 6px;
-  padding-top: 9px;
-  border-top: 1px solid #ecebe8;
-  color: #9b9a97;
-  font-size: 11px;
-  font-weight: 600;
-}
-.v2-export-actions button,
-.v2-export-fallback {
+.v2-export-actions button {
   border: 0;
   border-radius: 5px;
   padding: 7px 5px;
@@ -840,18 +831,7 @@ body.v2-is-dragging-module {
   cursor: pointer;
 }
 .v2-export-actions button:hover,
-.v2-export-fallback:hover {
-  color: #37352f;
-  background: #efefed;
-}
 .v2-export-actions button:disabled,
-.v2-export-fallback:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.v2-export-fallback {
-  width: 100%;
-}
 .v2-template-list {
   display: grid;
   gap: 5px;

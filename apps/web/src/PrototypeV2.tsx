@@ -598,9 +598,17 @@ export function PrototypeV2() {
       await refreshWorkspace();
       setNewTableName('');
       closePopover();
-      requestAnimationFrame(() =>
-        document.getElementById(block.view.database.id)?.scrollIntoView({ behavior: 'smooth' })
-      );
+      // Notion-style: bring the new table into view and focus its title so
+      // the name can be corrected immediately.
+      requestAnimationFrame(() => {
+        const section = document.getElementById(block.view.database.id);
+        section?.scrollIntoView({ behavior: 'smooth' });
+        window.setTimeout(() => {
+          const titleInput = section?.querySelector<HTMLInputElement>('.v2-table-title input');
+          titleInput?.focus();
+          titleInput?.select();
+        }, 380);
+      });
       return;
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '新建表格失败。');
@@ -617,6 +625,11 @@ export function PrototypeV2() {
       await refreshWorkspace();
       setNotice('已添加文字模块。');
       closePopover();
+      // Focus the new text module title for immediate editing.
+      requestAnimationFrame(() => {
+        const titles = document.querySelectorAll<HTMLInputElement>('input.v2-page-module-title');
+        titles[titles.length - 1]?.focus();
+      });
       return;
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '添加文字模块失败。');
@@ -742,28 +755,6 @@ export function PrototypeV2() {
       },
       kind === 'editable' ? '已导出可编辑 Excel。' : '已导出展示版 Excel。'
     );
-  }
-
-  async function createOutlookDraft() {
-    await runExport(async () => {
-      await api(`/api/dashboards/${dashboardId}/export/outlook-draft?${reportQuery()}`, {
-        method: 'POST',
-        headers: { 'x-project-manager-action': 'create-outlook-draft' }
-      });
-    }, '已打开 Outlook 草稿，请检查后自行发送。');
-  }
-
-  async function downloadOutlookHtml() {
-    await runExport(async () => {
-      const response = await fetch(
-        `/api/dashboards/${dashboardId}/export/outlook.html?${reportQuery()}`
-      );
-      if (!response.ok) throw new Error(await responseError(response, '导出邮件 HTML 失败。'));
-      downloadBlob(
-        await response.blob(),
-        `${exportSettings.title.trim() || '项目工作台'}-Outlook报告.html`
-      );
-    }, '已导出 Outlook HTML。');
   }
 
   async function downloadBackup() {
@@ -2117,23 +2108,6 @@ export function PrototypeV2() {
                   展示版 Excel
                 </button>
               </div>
-              <div className="v2-export-divider">Outlook（可选）</div>
-              <button
-                className="v2-export-fallback"
-                disabled={isExporting}
-                onClick={() => void createOutlookDraft()}
-                type="button"
-              >
-                Outlook 草稿
-              </button>
-              <button
-                className="v2-export-fallback"
-                disabled={isExporting}
-                onClick={() => void downloadOutlookHtml()}
-                type="button"
-              >
-                下载 Outlook HTML 备用文件
-              </button>
             </div>
           )}
 

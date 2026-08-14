@@ -29,6 +29,14 @@ Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher t
 
 Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher test, TypeScript builds, Vite production build, ESLint (web/api/domain/export), Prettier, the full real-browser acceptance journey (create table → record/property → filter → text/image modules → reload persistence → popover dismissal → module cleanup), and both production-acceptance phases all passed.
 
+## Round 3 fixes (2026-08-14)
+
+- Removed Outlook from the daily interface: the “Outlook（可选）” group and the `Outlook 草稿` / `下载 Outlook HTML 备用文件` buttons are gone from the export popover, and the unused frontend helpers plus their CSS were deleted. The Outlook API endpoints and the Windows PowerShell/COM bridge remain untouched for a possible future re-enable; Excel is now the only export surface in the UI.
+- Notion-style creation focus: creating a table scrolls to it and focuses + selects its title input so the name can be corrected immediately; creating a text module focuses its title. Verified in the browser for both flows.
+- Confirmed the GitHub Actions Windows workflows contain no references to the removed UI or the old placeholder.
+
+Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher test, TypeScript builds, Vite production build, ESLint (web/api/domain/export), Prettier, the full real-browser acceptance journey, and both production-acceptance phases all passed against the latest build.
+
 ## Confirmed decisions
 
 - Independent custom databases retain their own schemas and terminology.
