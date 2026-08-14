@@ -8,20 +8,24 @@
 
 ## 2. 安装和首次启动
 
-1. 获取可信来源提供的 `ProjectManagerDashboard-0.1.0-win-x64.zip`。
-2. 将 ZIP 完整解压到当前用户可写的本地目录，例如 `C:\Users\你的用户名\Apps\ProjectManagerDashboard-0.1.0`。不要直接在 ZIP 内运行，也不要放到需要管理员权限的 `Program Files`。
-3. 双击 `verify-release.cmd`。看到发布结构检查成功后再继续。
-4. 双击 `start-dashboard.cmd`。
-5. 等待默认浏览器打开 `http://127.0.0.1:4300`。
-6. 第一次进入后确认右上角显示“已保存到本机”。数据目录位于 `%LOCALAPPDATA%\ProjectManagerDashboard`。
+推荐获取可信来源提供的 `ProjectManagerDashboard-Setup-0.1.0-win-x64.exe`：
 
-便携包已经包含 Node.js 运行时，目标电脑不需要安装 Node.js、pnpm 或数据库软件。应用只监听本机回环地址，局域网内的其他电脑无法访问。
+1. 双击 Setup，按向导安装；默认只安装给当前 Windows 用户，不需要管理员权限。
+2. 保持默认的桌面快捷方式选项，或从开始菜单启动“Project Manager Dashboard”。
+3. 等待默认浏览器打开 `http://127.0.0.1:4300`。
+4. 第一次进入后确认右上角显示“已保存到本机”。数据目录位于 `%LOCALAPPDATA%\ProjectManagerDashboard`。
+
+当前测试安装器尚未使用受信任代码签名证书，Windows 可能显示“未知发布者”或 SmartScreen 提示；`lz` 是应用和卸载信息中的发布者名称，不等于 Windows 已验证的证书身份。只运行从项目官方 GitHub Release 下载且版本与文件名匹配的安装包。正式配置 Authenticode 证书后，Windows 才能验证发布者。
+
+便携 ZIP 仍作为备用：将 `ProjectManagerDashboard-0.1.0-win-x64.zip` 完整解压到当前用户可写目录，先双击 `verify-release.cmd`，再双击 `start-dashboard.cmd`。不要直接在 ZIP 内运行，也不要放到需要管理员权限的 `Program Files`。
+
+安装包和便携包都已经包含 Node.js 运行时及 SQLite 原生依赖。目标电脑不需要安装 Node.js、pnpm、Inno Setup、编译器或数据库软件。应用只监听本机回环地址，局域网内的其他电脑无法访问。
 
 ### 日常启动和停止
 
-- 启动或重新打开页面：双击 `start-dashboard.cmd`。重复启动不会创建第二个后端进程。
+- 启动或重新打开页面：使用桌面/开始菜单快捷方式；便携模式双击 `start-dashboard.cmd`。重复启动不会创建第二个后端进程。
 - 关闭浏览器标签页：只关闭界面，不会停止本地服务。
-- 完整停止应用：双击 `stop-dashboard.cmd`。
+- 完整停止应用：便携模式双击 `stop-dashboard.cmd`；安装模式在更新或卸载时会自动停止已认证的本地服务。
 - 页面没有自动打开时：手动访问 `http://127.0.0.1:4300`。
 
 ## 3. 基本工作方式
@@ -113,15 +117,15 @@
 ## 7. 升级
 
 1. 在旧版本中下载一份手动 `.pmdbackup`。
-2. 完整停止旧版本，并保留旧 ZIP、旧解压目录和升级前备份。
-3. 将新版本 ZIP 解压到新的版本目录，不要覆盖旧目录中的文件。
-4. 运行新版本的 `verify-release.cmd`。
-5. 运行新版本的 `start-dashboard.cmd`。
-6. 打开“本机诊断”，确认版本、数据库和迁移状态正常，再检查代表性数据库及导出功能。
+2. 安装模式直接运行可信来源提供的新版本 Setup。安装器会停止当前已认证的本地服务、原地更新程序文件，并保留工作区数据。
+3. 便携模式则完整停止旧版本，将新 ZIP 解压到新的版本目录；不要覆盖旧目录中的文件。运行新版本的 `verify-release.cmd` 和 `start-dashboard.cmd`。
+4. 打开“本机诊断”，确认版本、数据库和迁移状态正常，再检查代表性数据库及导出功能。
 
 不同版本共享 `%LOCALAPPDATA%\ProjectManagerDashboard` 中的数据。若新版本包含数据库迁移，应用会在迁移前自动创建并验证备份，迁移只执行一次。
 
 升级出现问题时，先停止应用并保留日志。要回到旧版本的数据状态，应使用升级前创建的手动备份；不要用旧程序直接修改已经迁移过的新数据库。
+
+从 Windows“已安装的应用”卸载时，只删除程序文件和快捷方式，不删除 `%LOCALAPPDATA%\ProjectManagerDashboard`。若确实要永久删除全部本地数据，请先导出备份，再单独人工处理该数据目录；卸载器不会代替用户做不可恢复的数据删除。
 
 ## 8. 更换电脑
 

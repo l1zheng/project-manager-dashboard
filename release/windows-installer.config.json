@@ -1,0 +1,13 @@
+{
+  "formatVersion": 1,
+  "productName": "Project Manager Dashboard",
+  "executableName": "ProjectManagerDashboard.exe",
+  "publisher": "lz",
+  "appId": "0B838BD8-C96A-472E-9AC7-E51B2DDB5549",
+  "defaultVersion": "0.1.0",
+  "innoSetup": {
+    "version": "7.0.2",
+    "url": "https://github.com/jrsoftware/issrc/releases/download/is-7_0_2/innosetup-7.0.2-x64.exe",
+    "expectedSigner": "Pyrsys B.V."
+  }
+}

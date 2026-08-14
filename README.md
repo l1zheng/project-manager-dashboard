@@ -15,7 +15,7 @@ A local-first, single-user project-management workspace with independent custom 
 - [Agent working agreement](AGENTS.md)
 - [Interactive prototype](prototype/README.md)
 
-Version 0.1.0 has completed its Windows x64 acceptance matrix. It is the first local, single-user portable release; see the user guide for installation, daily operation, backup, restore, upgrade, and recovery instructions.
+Version 0.1.0 has completed its Windows x64 portable and per-user installer acceptance matrices. See the user guide for installation, daily operation, backup, restore, upgrade, and recovery instructions.
 
 ## Development
 
@@ -35,7 +35,7 @@ The API creates its local workspace database under the platform application-data
 pnpm --filter @project-manager/api seed:demo
 ```
 
-## Windows portable release
+## Windows release
 
 The release artifact must be built on matching Windows hardware because `better-sqlite3` is native. The first x64 build is pinned to Node 24.19.0 and pnpm 11.9.0:
 
@@ -47,4 +47,18 @@ The resulting ZIP contains its own Node runtime, physical production dependencie
 
 The same portable ZIP can be built on GitHub Actions from the repository's `main` branch. Open the `Windows portable build` workflow and choose `Run workflow`; the completed ZIP is available from the workflow run's Artifacts section. The workflow uses the repository's pinned Node.js and pnpm versions, then extracts the real ZIP and requires packaged SQLite, CMD launch, Microsoft Edge interaction, stop/restart persistence, mixed modules, saved filters, Excel exports, and backup to pass before upload.
 
-For a durable download link, run the separate `Windows portable release` workflow. The accepted public prerelease is [windows-build-0.1.0-6](https://github.com/l1zheng/project-manager-dashboard/releases/tag/windows-build-0.1.0-6).
+The normal user-facing artifact is built from that same portable directory:
+
+```powershell
+$inno = .\release\install-inno-setup.ps1 -InstallDirectory .\artifacts\.tools\inno-setup
+.\release\build-windows-installer.ps1 `
+  -ReleaseDirectory .\artifacts\ProjectManagerDashboard-0.1.0-win-x64 `
+  -ApplicationVersion 0.1.0 `
+  -InnoCompiler $inno
+```
+
+This produces `ProjectManagerDashboard-Setup-0.1.0-win-x64.exe`. It installs for the current user without administrator rights, adds shortcuts, launches without a console, updates in place, and preserves `%LOCALAPPDATA%\ProjectManagerDashboard` during uninstall. The installed application includes Node.js and SQLite; end users do not install development tools. Local test installers are unsigned and can show “Unknown publisher”; a trusted Authenticode certificate configured through `WINDOWS_SIGNTOOL_COMMAND` signs the launcher, uninstaller, and Setup for formal releases.
+
+Both artifacts can be built on GitHub Actions from `main`. Open the `Windows build` workflow and choose `Run workflow`; the completed Setup EXE and portable ZIP are available together in the run's Artifacts section. The workflow requires both the extracted-ZIP browser journey and installer install/start/in-place-update/restart/uninstall/data-retention gate before upload.
+
+For a durable download link, run the separate `Windows release` workflow. The previously accepted portable-only prerelease is [windows-build-0.1.0-6](https://github.com/l1zheng/project-manager-dashboard/releases/tag/windows-build-0.1.0-6); the next release workflow run publishes both formats.

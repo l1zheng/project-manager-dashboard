@@ -223,6 +223,10 @@ The packaged CMD entrypoints invoke `launcher.mjs` through the bundled `node.exe
 
 The complete container, restore transaction, rollback, retention, packaging, and release-validation decisions are recorded in [ADR-0004](decisions/0004-backup-restore-and-windows-packaging.md).
 
+The primary Windows distribution now wraps that same portable payload in a per-user Inno Setup installer. A small x64 .NET Framework GUI launcher invokes the bundled Node launcher with a fixed allowlist of `--start`, `--stop`, and `--check`, redirects its output to the existing local log boundary, and creates no console window. Setup installs beneath `%LOCALAPPDATA%\Programs\ProjectManagerDashboard`, creates shortcuts, stops an authenticated running version before an in-place update, and leaves `%LOCALAPPDATA%\ProjectManagerDashboard` intact during uninstall. Windows 10/11 provide the required .NET Framework 4.x runtime; Node.js, pnpm, SQLite, and build tools remain bundled or build-time-only dependencies.
+
+Inno Setup is pinned and its own Authenticode signer is checked before the compiler is installed. Release builds may supply an Inno signing-tool command; when present, the launcher, uninstaller, and Setup are Authenticode-signed. Publisher metadata alone is not a Windows trust identity, so unsigned test builds remain explicitly unsigned. The installer and portable ZIP share one already-built application payload and both are independently exercised before publication. This decision is recorded in [ADR-0006](decisions/0006-windows-installer-and-native-launcher.md).
+
 The accepted V2 production-promotion contract, polymorphic-block migration, validated SQLite image boundary, saved-view presentation metadata, and mixed-report evolution are recorded in [ADR-0005](decisions/0005-v2-production-promotion.md).
 
 ## 9. Architecture decisions still to validate
