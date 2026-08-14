@@ -21,6 +21,14 @@ Last updated: 2026-08-14
 
 Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher test, TypeScript builds, Vite production build, ESLint (web/api/domain/export), and an isolated end-to-end browser walkthrough of the full core journey all passed.
 
+## Round 2 fixes (2026-08-14)
+
+- Notion-style interaction: adding a column (＋属性) now automatically opens the anchored property editor for the new column, so the user can rename or change its type immediately.
+- Fixed a React 19 focus gap: `autoFocus` was silently dropped whenever a popover portal and its focused control mounted in the same commit while the container was still `visibility: hidden` (column property editor and filter value editor never auto-focused). Popovers now mark their intended control with `data-autofocus` and the anchored popover focuses it once positioned and visible.
+- Fixed the Windows browser-acceptance selector that referenced the old table-name input placeholder, which the round-1 composer cleanup had changed; the full real-browser acceptance journey now passes against the new UI.
+
+Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher test, TypeScript builds, Vite production build, ESLint (web/api/domain/export), Prettier, the full real-browser acceptance journey (create table → record/property → filter → text/image modules → reload persistence → popover dismissal → module cleanup), and both production-acceptance phases all passed.
+
 ## Confirmed decisions
 
 - Independent custom databases retain their own schemas and terminology.

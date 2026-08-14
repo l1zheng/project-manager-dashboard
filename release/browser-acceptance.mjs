@@ -24,7 +24,7 @@ try {
   await step('create table from the real module composer', async () => {
     await clickButton('添加模块');
     await clickButton('▤ 表格');
-    await setInput('input[placeholder="例如：关键事务跟踪"]', '浏览器验收表格');
+    await setInput('input[placeholder^="例如："]', '浏览器验收表格');
     await clickButton('创建表格');
     await waitFor(
       '[...document.querySelectorAll(".v2-table-title input")].some((input) => input.value === "浏览器验收表格")'

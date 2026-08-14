@@ -1072,11 +1072,23 @@ export function PrototypeV2() {
         ]
       });
       await refreshWorkspace();
+      // Notion-style: open the property editor for the new column so the
+      // user can rename or change its type immediately.
+      window.setTimeout(() => {
+        const header = document.querySelector(
+          `th[data-v2-column-id="${CSS.escape(field.id)}"] .v2-column-header`
+        ) as HTMLElement | null;
+        const refreshedTable = tablesRef.current.find((candidate) => candidate.id === tableId);
+        const newColumn = refreshedTable?.columns.find((candidate) => candidate.id === field.id);
+        if (refreshedTable && newColumn && header) {
+          openColumnEditor(refreshedTable, newColumn, header);
+        }
+      }, 80);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '添加属性失败。');
       await refreshWorkspace();
     }
-    setNotice('已添加新属性，点击表头即可修改。');
+    setNotice('已添加新属性，可直接重命名或设置类型。');
   }
 
   function updateCell(tableId: string, rowId: string, columnId: string, value: string) {
@@ -1681,7 +1693,7 @@ export function PrototypeV2() {
               <label>
                 属性名称
                 <input
-                  autoFocus
+                  data-autofocus
                   value={propertyDraft.name}
                   onChange={(event) =>
                     setPropertyDraft({ ...propertyDraft, name: event.target.value })
@@ -2359,7 +2371,14 @@ function AnchoredPopover({
       setPosition({ top, left, ready: true });
     };
     updatePosition();
-    const frame = requestAnimationFrame(updatePosition);
+    const frame = requestAnimationFrame(() => {
+      updatePosition();
+      // Focus the intended control once the popover is positioned and
+      // visible; React 19 drops autoFocus when the portal mounts with the
+      // control in the same commit while the container is still hidden.
+      const target = popoverRef.current?.querySelector<HTMLElement>('[data-autofocus]');
+      target?.focus();
+    });
     window.addEventListener('resize', updatePosition);
     window.addEventListener('scroll', updatePosition, true);
     return () => {
@@ -2658,7 +2677,7 @@ function renderFilterValueEditor(
       <label>
         等于
         <select
-          autoFocus
+          data-autofocus
           value={filter.keyword}
           onChange={(event) => onChange({ ...filter, keyword: event.target.value })}
         >
@@ -2676,7 +2695,7 @@ function renderFilterValueEditor(
     <label>
       {filter.operator === 'contains' ? '包含文字' : '等于'}
       <input
-        autoFocus
+        data-autofocus
         placeholder={filter.operator === 'contains' ? '输入筛选内容' : '输入精确值'}
         type={column?.type === 'date' ? 'date' : column?.type === 'number' ? 'number' : 'text'}
         value={filter.keyword}
