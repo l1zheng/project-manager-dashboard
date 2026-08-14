@@ -1,5 +1,11 @@
 # Implementation Plan
 
+## Product re-focus (2026-08-14)
+
+Status: round 1 complete — health check, scope cut, and cleanup; see `docs/PROJECT_STATUS.md`.
+
+The user re-confirmed the product goal is a Notion-style single-page workspace (tables/text/images, drag layout, unified Excel export) on Windows. The legacy form-style UI and `/advanced` route were removed from the production build; Outlook is de-emphasized as optional; backup/restore moved into a quiet sidebar popover. Remaining decisions: optional extra field types, Outlook removal depth, and product naming.
+
 ## Delivery strategy
 
 Build a vertical slice early: create two different databases, place them on one dashboard, export the result, and verify it in real Excel and classic Outlook. Avoid completing a large generic database editor before validating the report workflow.

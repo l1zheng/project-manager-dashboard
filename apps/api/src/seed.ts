@@ -207,7 +207,9 @@ export function seedDemoWorkspace(persistence: Persistence): void {
     return {
       id,
       dashboardId: demoDashboardId,
+      kind: 'table_view' as const,
       viewId,
+      configJson: JSON.stringify({ version: 1, titleOverride: null, description: null }),
       sortOrder,
       createdAt: now,
       updatedAt: now

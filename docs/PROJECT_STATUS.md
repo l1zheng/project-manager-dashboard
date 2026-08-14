@@ -1,16 +1,25 @@
 # Project Status
 
-Last updated: 2026-08-11
+Last updated: 2026-08-14
 
 ## Current state
 
-- Phase: Phase 10 accepted V2 production integration. The user accepted the current V2 interaction and Excel presentation baseline on 2026-08-09; production promotion is now active under ADR-0005.
-- Implementation: the accepted V2 browser surface is the production `/` route and consumes only the strict polymorphic block API. It reads the SQLite workspace and persists table/text/image module edits, image uploads, row and table duplication/archive, module ordering, blank-row creation, column properties, saved filters, and per-view layout. Its export controls call the real editable/presentation Excel and optional Outlook endpoints after persisting current page state. Presentation Excel, browser HTML, and Outlook HTML preserve the mixed module order; presentation Excel embeds validated internal images and classic Outlook can receive them through bounded server-generated CID attachments. Full regression, workbook visual inspection, macOS production verification, and the exact extracted Windows ZIP journey passed. The dashboard-and-Excel workflow is the current acceptance baseline; Windows Outlook CID acceptance is deferred.
-- Repository: Git repository on `main` with the TypeScript workspace and accepted prototype committed; `main` tracks `origin/main`.
-- GitHub: public repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`. Windows build run `31461026585` and release run `31461229458` passed the same extracted-ZIP acceptance gate. Public prerelease `windows-build-0.1.0-6` contains the durable x64 portable ZIP.
+- Phase: Product re-focus (“重返正轨”) round 1. A full product health check was run against the latest source in an isolated seeded workspace (headless Chrome CDP walkthrough of the core journey), followed by a scope-cut and cleanup pass. The accepted V2 single-page workspace remains the only production surface; the legacy form-style UI and the `/advanced` route were removed from the build.
+- Implementation: core chain verified working end to end — create table via module composer, add column, blank-row auto record creation, per-table filter, text and image modules, module drag reorder, export preview, editable Excel (one sheet per table, filtered rows, typed dates, no merges), presentation Excel (one 60-column sheet, mixed module order, embedded validated image), and persistence across reload. No console errors on the latest build.
+- Repository: Git repository on `main` with the TypeScript workspace; `main` tracks `origin/main`.
 - Target user: one person.
-- Target platform: Windows with classic Outlook.
+- Target platform: Windows (portable packaging path retained); classic Outlook is an optional convenience and is de-emphasized in the UI.
 - Deployment: local web application with SQLite.
+
+## Round 1 fixes (2026-08-14)
+
+- Fixed demo-seed defect: `seed.ts` inserted legacy-format `dashboard_blocks` rows without the polymorphic `configJson`, so a fresh demo workspace bootstrap failed with `Invalid input: expected 1` and the home page showed 0 modules with an error toast. The seed now writes `kind: 'table_view'` with a versioned block config.
+- Removed the legacy rejected UI from the production build: `main.tsx` now mounts only the V2 workspace; `App.tsx`, `WorkspaceApp.tsx`, `styles.css`, `workspace.css`, and the `/advanced` route were deleted (bundle shrank from ~306 KB to ~242 KB JS). Backup/restore/diagnostics moved into a compact sidebar “设置与备份” popover in the V2 UI, so no capability was lost.
+- Cleaned prototype residue: removed the in-memory demo `initialTables` data, replaced the “本机工作区 / 数据仅保存到此电脑” badge and “仅保存在此页面” top-line wording with product language (“本地工作区 / 数据仅保存在本机，可随时备份”).
+- Export workflow polish: default report period is now empty with a computed current-week placeholder (was hard-coded to a stale “2026 年第 32 周”); Outlook actions are grouped under “Outlook（可选）”; the preview dialog tabs are Excel-first (“报告预览” / “Excel 排版预览”), the footer text no longer mentions Outlook, and the dead disabled “导出预览” button was removed.
+- Module composer: the two table-preset buttons now honestly describe a blank table with default columns (名称/状态/自动编号) and a “里程碑计划” name preset instead of a fake “计划模板”.
+
+Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher test, TypeScript builds, Vite production build, ESLint (web/api/domain/export), and an isolated end-to-end browser walkthrough of the full core journey all passed.
 
 ## Confirmed decisions
 
@@ -35,13 +44,14 @@ Last updated: 2026-08-11
 
 ## Active task
 
-Version 0.1.0 dashboard-and-Excel release is accepted and published. Windows classic Outlook CID acceptance remains explicitly deferred.
+Product re-focus round 1 is complete: health check + scope cut + cleanup verified. The next round addresses the remaining product-direction decisions below.
 
 ## Next tasks
 
-1. Hand off and use the public `windows-build-0.1.0-6` ZIP on the target Windows x64 computer.
-2. Collect product feedback against real weekly-report data without changing the accepted single-page interaction baseline prematurely.
-3. Treat classic Outlook CID rendering as an optional follow-up; Excel remains the primary handoff.
+1. Decide remaining scope questions with the user: whether to (a) add the missing Notion-like field types (勾选/链接/单选/多选) to the property editor, (b) fully remove Outlook actions or keep them hidden, (c) rename the product surface (“项目工具”/“项目工作台”) to a clearer kanban/report name.
+2. Rebuild and restart the user's local service from the corrected source so the live workspace sees the round-1 fixes.
+3. Re-run the Windows portable build pipeline to publish an updated artifact carrying the fixes (the packaged app currently embeds the older UI).
+4. Collect feedback against the cleaned daily workflow before further interaction changes.
 
 ## Risks and validation items
 
@@ -58,7 +68,10 @@ Version 0.1.0 dashboard-and-Excel release is accepted and published. Windows cla
 
 ## Verification log
 
+- 2026-08-14: Ran a full product health check against the latest source in an isolated seeded workspace (headless Chrome CDP). Verified the complete core journey: create table, add column, blank-row auto record, per-table filter, text module, image upload (PNG via real file input, served from SQLite media assets), module drag reorder (persisted via `block-order`), export preview, editable Excel (3 sheets, filtered row, typed date, Chinese values, no merges), presentation Excel (1 sheet, mixed module order, embedded image), and full persistence across reload with zero console errors. Found and fixed the demo-seed polymorphic-block defect (see Round 1 fixes), plus applied the scope-cut/cleanup pass. Re-verified the corrected UI in the browser and ran the full test/lint/build gates.
+
 - 2026-08-11: Completed the Windows release-readiness gate and published prerelease `windows-build-0.1.0-6` from commit `4d051d1`. GitHub Windows build run `31461026585` and release run `31461229458` both built the pinned Node.js 24.19.0 x64 package, passed 71 application tests plus the launcher test, TypeScript/build/lint/format checks, loaded packaged native SQLite, extracted the real ZIP, started it through its CMD/Node launcher, and ran the complete acceptance journey before any artifact publication. Real Microsoft Edge interaction created a table and record, added a property, saved and cleared a filter, created and edited text/image modules, reloaded and verified persistence, dismissed the export popover by clicking blank space, and deleted all acceptance modules through their menus. The production API journey then validated independently shaped requirement/risk tables, record and field operations, stale-view repair, stable status and typed filters, module order/duplication/archive, validated PNG storage, editable/presentation Excel, Outlook HTML, backup, clean stop, repeat start, and restart persistence. The public ZIP is `https://github.com/l1zheng/project-manager-dashboard/releases/download/windows-build-0.1.0-6/ProjectManagerDashboard-0.1.0-win-x64.zip`.
+ GitHub Windows build run `31461026585` and release run `31461229458` both built the pinned Node.js 24.19.0 x64 package, passed 71 application tests plus the launcher test, TypeScript/build/lint/format checks, loaded packaged native SQLite, extracted the real ZIP, started it through its CMD/Node launcher, and ran the complete acceptance journey before any artifact publication. Real Microsoft Edge interaction created a table and record, added a property, saved and cleared a filter, created and edited text/image modules, reloaded and verified persistence, dismissed the export popover by clicking blank space, and deleted all acceptance modules through their menus. The production API journey then validated independently shaped requirement/risk tables, record and field operations, stale-view repair, stable status and typed filters, module order/duplication/archive, validated PNG storage, editable/presentation Excel, Outlook HTML, backup, clean stop, repeat start, and restart persistence. The public ZIP is `https://github.com/l1zheng/project-manager-dashboard/releases/download/windows-build-0.1.0-6/ProjectManagerDashboard-0.1.0-win-x64.zip`.
 
 - 2026-08-11: Downloaded the public Release asset itself and audited its extracted contents. It has one release root, thin `start-dashboard.cmd`/`stop-dashboard.cmd`/`verify-release.cmd` entrypoints, the bundled Node runtime, compact `RELEASE-INFO.json`, and the Node launcher; it contains no `.env`, Git/Codex state, API token/key pattern, user-home path, packaged PowerShell launcher, or per-file manifest. The only packaged PowerShell file is the optional bounded classic-Outlook bridge. Generated representative editable workbooks contained complete differently shaped requirement/risk sheets, and the presentation workbook retained table/text/image order on one sheet. Artifact-tool imported and rendered every sheet, found no formula errors, and visually confirmed readable wrapping, centered metadata, bold hierarchy, black all-side table borders, merged presentation spans, and complete values.
 

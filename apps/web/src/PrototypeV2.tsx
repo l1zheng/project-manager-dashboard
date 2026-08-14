@@ -97,7 +97,36 @@ type PopoverState =
   | { kind: 'row'; anchor: HTMLElement; tableId: string; rowId: string }
   | { kind: 'content'; anchor: HTMLElement; blockId: string }
   | { kind: 'export'; anchor: HTMLElement }
+  | { kind: 'settings'; anchor: HTMLElement }
   | { kind: 'add-module'; anchor: HTMLElement };
+
+type RestoreInspection = {
+  restoreId: string;
+  manifest: {
+    createdAt: string;
+    applicationVersion: string;
+    database: { bytes: number; migrations: { appliedCount: number; totalCount: number } };
+    workspace: { name: string } | null;
+  };
+};
+
+type RuntimeDiagnostics = {
+  application: {
+    version: string;
+    nodeVersion: string;
+    platform: string;
+    architecture: string;
+    loopbackAddress: string;
+  };
+  storage: {
+    dataDirectory: string;
+    database: { healthy: boolean };
+    migration: { appliedCount: number; pendingCount: number; totalCount: number };
+    latestAutomaticBackup?: { kind: string; createdAt: string; bytes: number };
+    availableBytes?: number;
+  };
+  outlook: { available: boolean; reason?: string };
+};
 
 type DestructiveConfirmation = 'column' | 'table' | 'row' | 'content';
 
@@ -124,102 +153,16 @@ const typeOptions: Array<{ value: PrototypeColumnType; label: string; icon: stri
   { value: 'sequence', label: '自动编号', icon: '#' }
 ];
 
-const initialTables: PrototypeTable[] = [
-  {
-    id: 'requirements',
-    name: '需求跟踪',
-    icon: '▤',
-    columns: [
-      { id: 'req-sequence', name: '序号', type: 'sequence', width: 76 },
-      {
-        id: 'req-number',
-        name: '需求号',
-        type: 'text',
-        width: 138,
-        reportAlign: 'center'
-      },
-      {
-        id: 'req-title',
-        name: '需求描述',
-        type: 'text',
-        width: 250,
-        reportEmphasis: 'strong'
-      },
-      { id: 'req-progress', name: '当前进展', type: 'text', width: 320 },
-      { id: 'req-plan', name: '交付计划', type: 'date', width: 150 },
-      { id: 'req-owner', name: '责任人', type: 'person', width: 140 },
-      {
-        id: 'req-status',
-        name: '状态',
-        type: 'status',
-        width: 132,
-        options: ['未开始', '进行中', '已完成']
-      }
-    ],
-    rows: [
-      {
-        id: 'req-1',
-        values: {
-          'req-number': 'REQ-023',
-          'req-title': '支持周报导出模板',
-          'req-progress': '字段映射已完成，正在验证复杂表格排版。',
-          'req-plan': '2026-08-16',
-          'req-owner': '李正',
-          'req-status': '进行中'
-        }
-      },
-      {
-        id: 'req-2',
-        values: {
-          'req-number': 'REQ-024',
-          'req-title': '统一状态完成语义',
-          'req-progress': '完成规则已经写入字段属性。',
-          'req-plan': '2026-08-18',
-          'req-owner': '李正',
-          'req-status': '未开始'
-        }
-      }
-    ]
-  },
-  {
-    id: 'risks',
-    name: '关键风险',
-    icon: '▤',
-    columns: [
-      { id: 'risk-sequence', name: '序号', type: 'sequence', width: 76 },
-      { id: 'risk-description', name: '风险描述', type: 'text', width: 290 },
-      { id: 'risk-mitigation', name: '风险消减措施', type: 'text', width: 380 },
-      { id: 'risk-owner', name: '责任人', type: 'person', width: 150 },
-      {
-        id: 'risk-status',
-        name: '状态',
-        type: 'status',
-        width: 132,
-        options: ['Open', 'Suspended', 'Closed']
-      }
-    ],
-    rows: [
-      {
-        id: 'risk-1',
-        values: {
-          'risk-description': 'Windows 经典 Outlook 的企业策略差异',
-          'risk-mitigation': '保留 HTML 下载和富文本复制回退，并在目标电脑复验。',
-          'risk-owner': '李正',
-          'risk-status': 'Open'
-        }
-      }
-    ]
-  }
-];
-
-const initialPageBlocks: PrototypePageBlock[] = [
-  { id: 'block-requirements', kind: 'table', tableId: 'requirements' },
-  { id: 'block-risks', kind: 'table', tableId: 'risks' }
-];
+function currentWeekPlaceholder(): string {
+  const now = new Date();
+  const startOfYear = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(
+    ((now.getTime() - startOfYear.getTime()) / 86400000 + startOfYear.getUTCDay() + 1) / 7
+  );
+  return `例如：${now.getUTCFullYear()} 年第 ${week} 周`;
+}
 
 export function PrototypeV2() {
-  void initialTables;
-  void initialPageBlocks;
   const [tables, setTables] = useState<PrototypeTable[]>([]);
   const [pageBlocks, setPageBlocks] = useState<PrototypePageBlock[]>([]);
   const [dashboardId, setDashboardId] = useState<string>();
@@ -243,12 +186,18 @@ export function PrototypeV2() {
   const [previewMode, setPreviewMode] = useState<PreviewMode>();
   const [exportSettings, setExportSettings] = useState<ExportSettings>({
     title: '项目工作台',
-    period: '2026 年第 32 周',
+    period: '',
     includeCompleted: true,
     includeEmpty: true
   });
   const [isExporting, setIsExporting] = useState(false);
   const [notice, setNotice] = useState('');
+  const restoreFileInputRef = useRef<HTMLInputElement>(null);
+  const [restoreInspection, setRestoreInspection] = useState<RestoreInspection>();
+  const [restoreFileName, setRestoreFileName] = useState('');
+  const [restoreReplacementConfirmed, setRestoreReplacementConfirmed] = useState(false);
+  const [restoreRestartRequired, setRestoreRestartRequired] = useState(false);
+  const [diagnostics, setDiagnostics] = useState<RuntimeDiagnostics>();
   const popoverRef = useRef<HTMLDivElement>(null);
 
   const closePopover = () => {
@@ -817,6 +766,100 @@ export function PrototypeV2() {
     }, '已导出 Outlook HTML。');
   }
 
+  async function downloadBackup() {
+    try {
+      const response = await fetch('/api/workspace/backup');
+      if (!response.ok) throw new Error(await responseError(response, '备份失败。'));
+      downloadBlob(await response.blob(), 'ProjectManagerWorkspace.pmdbackup');
+      setNotice('工作区备份已下载，请保存到安全的位置。');
+      closePopover();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '下载工作区备份失败。');
+    }
+  }
+
+  async function inspectWorkspaceRestore(file: File) {
+    if (!file.name.toLowerCase().endsWith('.pmdbackup')) {
+      setNotice('请选择 .pmdbackup 工作区备份文件。');
+      return;
+    }
+    if (file.size === 0 || file.size > 128 * 1024 * 1024) {
+      setNotice('备份文件必须大于 0 且不超过 128 MB。');
+      return;
+    }
+    try {
+      const response = await fetch('/api/workspace/restore/inspect', {
+        method: 'POST',
+        headers: { 'content-type': 'application/vnd.project-manager.workspace-backup' },
+        body: file
+      });
+      const payload = (await response.json().catch(() => undefined)) as
+        RestoreInspection | { message?: string } | undefined;
+      if (!response.ok) {
+        throw new Error(
+          payload && 'message' in payload ? (payload.message ?? '检查备份失败。') : '检查备份失败。'
+        );
+      }
+      setRestoreInspection(payload as RestoreInspection);
+      setRestoreFileName(file.name);
+      setRestoreReplacementConfirmed(false);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '检查工作区备份失败。');
+    }
+  }
+
+  async function cancelWorkspaceRestore() {
+    const restoreId = restoreInspection?.restoreId;
+    if (!restoreId) return;
+    try {
+      const response = await fetch(`/api/workspace/restore/${restoreId}`, { method: 'DELETE' });
+      if (!response.ok) throw new Error(`取消失败（${response.status}）`);
+      setRestoreInspection(undefined);
+      setRestoreFileName('');
+      setRestoreReplacementConfirmed(false);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '清理暂存的恢复文件失败。');
+    }
+  }
+
+  async function confirmWorkspaceRestore() {
+    if (!restoreInspection || !restoreReplacementConfirmed) return;
+    try {
+      const response = await fetch('/api/workspace/restore/confirm', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-project-manager-action': 'confirm-workspace-restore'
+        },
+        body: JSON.stringify({
+          restoreId: restoreInspection.restoreId,
+          confirmation: 'replace-workspace'
+        })
+      });
+      const payload = (await response.json().catch(() => undefined)) as
+        { message?: string; restartRequired?: boolean } | undefined;
+      if (!response.ok || !payload?.restartRequired) {
+        throw new Error(payload?.message ?? `准备恢复失败（${response.status}）`);
+      }
+      setRestoreInspection(undefined);
+      setRestoreFileName('');
+      setRestoreReplacementConfirmed(false);
+      setRestoreRestartRequired(true);
+      closePopover();
+      setNotice('恢复任务已安全暂存。请关闭并重新启动应用以完成恢复。');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '准备工作区恢复失败。');
+    }
+  }
+
+  async function openDiagnostics() {
+    try {
+      setDiagnostics(await api<RuntimeDiagnostics>('/api/diagnostics'));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : '读取本机诊断失败。');
+    }
+  }
+
   async function saveTableName(tableId: string) {
     const table = tables.find((candidate) => candidate.id === tableId);
     if (!table || !table.name.trim()) return;
@@ -1183,18 +1226,32 @@ export function PrototypeV2() {
             </a>
           );
         })}
-        <div className="v2-prototype-badge">
-          本机工作区
-          <br />
-          <small>数据仅保存到此电脑</small>
+        <div className="v2-sidebar-bottom">
+          <button
+            className="v2-sidebar-settings"
+            onClick={(event) => setPopover({ kind: 'settings', anchor: event.currentTarget })}
+            type="button"
+          >
+            ⚙ 设置与备份
+          </button>
+          <div className="v2-local-badge">
+            本地工作区
+            <br />
+            <small>数据仅保存在本机，可随时备份</small>
+          </div>
         </div>
       </aside>
 
       <main className="v2-page" id="page-top">
         <div className="v2-topline">
           <span>我的项目 / 项目工作台</span>
-          <span>仅保存在此页面</span>
         </div>
+        {restoreRestartRequired && (
+          <div className="v2-restore-lock" role="alert">
+            <strong>恢复已安全准备</strong>
+            <span>请关闭并重新启动应用以完成恢复；当前工作区已切换为只读。</span>
+          </div>
+        )}
         <header className="v2-page-header">
           <div className="v2-page-icon">▦</div>
           <h1>项目工作台</h1>
@@ -1204,6 +1261,7 @@ export function PrototypeV2() {
         <div className="v2-page-actions">
           <button
             className="v2-button v2-button-quiet"
+            disabled={restoreRestartRequired}
             onClick={(event) => {
               setNewTableName('');
               setModuleComposer(undefined);
@@ -1215,6 +1273,7 @@ export function PrototypeV2() {
           </button>
           <button
             className="v2-button v2-button-quiet"
+            disabled={restoreRestartRequired}
             onClick={(event) => setPopover({ kind: 'export', anchor: event.currentTarget })}
             type="button"
           >
@@ -1993,6 +2052,7 @@ export function PrototypeV2() {
               <label>
                 报告周期
                 <input
+                  placeholder={currentWeekPlaceholder()}
                   value={exportSettings.period}
                   onChange={(event) =>
                     setExportSettings({ ...exportSettings, period: event.target.value })
@@ -2044,14 +2104,16 @@ export function PrototypeV2() {
                 >
                   展示版 Excel
                 </button>
-                <button
-                  disabled={isExporting}
-                  onClick={() => void createOutlookDraft()}
-                  type="button"
-                >
-                  Outlook 草稿
-                </button>
               </div>
+              <div className="v2-export-divider">Outlook（可选）</div>
+              <button
+                className="v2-export-fallback"
+                disabled={isExporting}
+                onClick={() => void createOutlookDraft()}
+                type="button"
+              >
+                Outlook 草稿
+              </button>
               <button
                 className="v2-export-fallback"
                 disabled={isExporting}
@@ -2060,6 +2122,134 @@ export function PrototypeV2() {
               >
                 下载 Outlook HTML 备用文件
               </button>
+            </div>
+          )}
+
+          {popover.kind === 'settings' && (
+            <div className="v2-popover-content v2-settings-popover">
+              <div className="v2-popover-title">
+                <span>⚙</span>
+                <strong>设置与备份</strong>
+              </div>
+              <div className="v2-settings-group">
+                <button onClick={() => void downloadBackup()} type="button">
+                  ⇩ 下载工作区备份
+                </button>
+                <span className="v2-settings-hint">
+                  完整备份所有表格、文字、图片，保存为 .pmdbackup
+                </span>
+                <button
+                  onClick={() => {
+                    setRestoreInspection(undefined);
+                    setRestoreReplacementConfirmed(false);
+                    restoreFileInputRef.current?.click();
+                  }}
+                  type="button"
+                >
+                  ⇧ 从备份恢复
+                </button>
+                <input
+                  accept=".pmdbackup,application/zip"
+                  aria-label="选择工作区备份文件"
+                  hidden
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) void inspectWorkspaceRestore(file);
+                  }}
+                  ref={restoreFileInputRef}
+                  type="file"
+                />
+                <span className="v2-settings-hint">恢复会替换整个工作区，重启后生效</span>
+                <button onClick={() => void openDiagnostics()} type="button">
+                  ⓘ 本机诊断
+                </button>
+              </div>
+              {restoreInspection && (
+                <div className="v2-restore-inspect">
+                  <strong>确认替换当前工作区</strong>
+                  <p>{restoreFileName}</p>
+                  <dl>
+                    <div>
+                      <dt>备份工作区</dt>
+                      <dd>{restoreInspection.manifest.workspace?.name ?? '空工作区'}</dd>
+                    </div>
+                    <div>
+                      <dt>创建时间</dt>
+                      <dd>
+                        {new Date(restoreInspection.manifest.createdAt).toLocaleString('zh-CN')}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>数据库大小</dt>
+                      <dd>
+                        {(restoreInspection.manifest.database.bytes / 1024 / 1024).toFixed(2)} MB
+                      </dd>
+                    </div>
+                  </dl>
+                  <p className="v2-restore-warning">
+                    恢复将在重启时完整替换当前工作区，确认前会自动创建一份当前备份；启动失败会自动回滚。
+                  </p>
+                  <label className="v2-check">
+                    <input
+                      checked={restoreReplacementConfirmed}
+                      onChange={(event) => setRestoreReplacementConfirmed(event.target.checked)}
+                      type="checkbox"
+                    />
+                    我理解当前工作区将被完整替换
+                  </label>
+                  <div className="v2-popover-actions">
+                    <button onClick={() => void cancelWorkspaceRestore()} type="button">
+                      取消
+                    </button>
+                    <button
+                      className="is-primary"
+                      disabled={!restoreReplacementConfirmed}
+                      onClick={() => void confirmWorkspaceRestore()}
+                      type="button"
+                    >
+                      确认并准备重启
+                    </button>
+                  </div>
+                </div>
+              )}
+              {diagnostics && (
+                <div className="v2-diagnostics">
+                  <strong>本机诊断</strong>
+                  <dl>
+                    <div>
+                      <dt>应用版本</dt>
+                      <dd>{diagnostics.application.version}</dd>
+                    </div>
+                    <div>
+                      <dt>本地地址</dt>
+                      <dd>http://{diagnostics.application.loopbackAddress}</dd>
+                    </div>
+                    <div>
+                      <dt>运行环境</dt>
+                      <dd>
+                        {diagnostics.application.platform} · {diagnostics.application.architecture}{' '}
+                        · Node {diagnostics.application.nodeVersion}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>数据库</dt>
+                      <dd>{diagnostics.storage.database.healthy ? '健康' : '需要检查'}</dd>
+                    </div>
+                    <div>
+                      <dt>迁移状态</dt>
+                      <dd>
+                        {diagnostics.storage.migration.appliedCount}/
+                        {diagnostics.storage.migration.totalCount} 已应用
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>数据目录</dt>
+                      <dd>{diagnostics.storage.dataDirectory}</dd>
+                    </div>
+                  </dl>
+                </div>
+              )}
             </div>
           )}
 
@@ -2075,7 +2265,7 @@ export function PrototypeV2() {
                     表格名称
                     <input
                       autoFocus
-                      placeholder="例如：关键事务跟踪"
+                      placeholder="例如：里程碑计划、关键事项跟踪"
                       value={newTableName}
                       onChange={(event) => setNewTableName(event.target.value)}
                       onKeyDown={(event) => {
@@ -2084,13 +2274,13 @@ export function PrototypeV2() {
                     />
                   </label>
                   <div className="v2-template-list">
-                    <button onClick={() => setNewTableName('关键事务跟踪')} type="button">
+                    <button onClick={() => setNewTableName('')} type="button">
                       <strong>空白表格</strong>
-                      <small>名称、状态和自动编号</small>
+                      <small>默认列：名称、状态、自动编号</small>
                     </button>
                     <button onClick={() => setNewTableName('里程碑计划')} type="button">
-                      <strong>计划模板</strong>
-                      <small>稍后仍可自由修改列</small>
+                      <strong>里程碑计划</strong>
+                      <small>预填名称，列仍可自由修改</small>
                     </button>
                   </div>
                   <div className="v2-popover-actions">
@@ -2254,14 +2444,14 @@ function ExportPreview({
               onClick={() => onModeChange('report')}
               type="button"
             >
-              邮件 / 报告
+              报告预览
             </button>
             <button
               className={mode === 'excel' ? 'is-active' : ''}
               onClick={() => onModeChange('excel')}
               type="button"
             >
-              Excel 自动排版
+              Excel 排版预览
             </button>
           </div>
           <button
@@ -2362,11 +2552,8 @@ function ExportPreview({
           <span>
             {mode === 'excel'
               ? '展示版：一个工作表，按 60 列网格自动合并。可编辑版仍为每张表一个工作表。'
-              : 'Outlook：使用静态表格排版，并保留相同的字段顺序和筛选结果。'}
+              : '报告：静态内容，与导出的文件一致，不含编辑控件。'}
           </span>
-          <button disabled type="button">
-            导出预览
-          </button>
         </div>
       </div>
     </div>,
