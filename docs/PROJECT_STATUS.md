@@ -7,7 +7,7 @@ Last updated: 2026-08-14
 - Phase: Product re-focus (“重返正轨”) on top of the accepted Phase 10 V2 baseline and P7-09 Windows installer delivery (ADR-0006). A full product health check was run against the latest source in an isolated seeded workspace (headless Chrome CDP walkthrough of the core journey), followed by a scope-cut and cleanup pass. The accepted V2 single-page workspace is the only production surface; the legacy form-style UI and the `/advanced` route were removed from the build.
 - Implementation: the V2 browser surface consumes only the strict polymorphic block API, persisting table/text/image module edits, image uploads, row/table duplication/archive, module ordering, blank-row creation, column properties, saved filters, and per-view layout. Excel (editable + presentation) is the only export surface — classic Outlook automation was removed from the product. Full regression, workbook visual inspection, macOS production verification, and the exact extracted Windows ZIP journey passed.
 - Repository: Git repository on `main` with the TypeScript workspace; `main` tracks `origin/main`.
-- GitHub: public repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`. Windows build run `31620428371` passed both the extracted-ZIP and per-user installer acceptance gates and uploaded one artifact containing the Setup EXE and portable ZIP. Public prerelease `windows-build-0.1.0-6` remains the previous portable-only durable release.
+- GitHub: public repository `l1zheng/project-manager-dashboard`; `main` tracks `origin/main`. Windows build run `31820685498` passed both the extracted-ZIP and per-user installer acceptance gates on the merged re-focus commit and uploaded artifact `ProjectManagerDashboard-0.1.0-win-x64`; release workflow run `31821006621` published public prerelease `windows-build-0.1.0-7` with the portable ZIP and per-user Setup EXE. Earlier run `31620428371` covered the installer delivery before the re-focus merge.
 - Target user: one person.
 - Target platform: Windows.
 - Deployment: local web application with SQLite, distributed primarily as a per-user Windows x64 Setup EXE with a portable ZIP alternative.
@@ -66,12 +66,11 @@ Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher t
 
 ## Active task
 
-Product re-focus is complete (rounds 1–4): health check, scope cut, classic Outlook removal, and interaction cleanup are all verified. A fresh Windows build carrying every fix is being produced for trial.
+Product re-focus is complete (rounds 1–4): health check, scope cut, classic Outlook removal, and interaction cleanup are all verified. The Windows build carrying every fix was produced and published as public prerelease `windows-build-0.1.0-7` (portable ZIP + per-user Setup EXE).
 
 ## Next tasks
 
-1. Produce and publish the updated Windows build (per-user Setup EXE plus portable ZIP) carrying the re-focus and Outlook-removal fixes.
-2. Trial the installer locally or from the new GitHub artifact, then decide whether to publish the unsigned test installer as a prerelease or first configure a trusted Authenticode certificate / approved organizational deployment route.
+1. Trial the new Setup EXE / portable ZIP from `windows-build-0.1.0-7`, then decide whether to publish the unsigned test installer more broadly or first configure a trusted Authenticode certificate / approved organizational deployment route.
 3. Decide remaining scope questions with the user: whether to (a) add the missing Notion-like field types (勾选/链接/单选/多选) to the property editor, (b) rename the product surface (“项目工具”/“项目工作台”) to a clearer kanban/report name.
 4. Rebuild and restart the user's local service so the live workspace sees the fixes.
 5. Collect product feedback against real weekly-report data without changing the accepted single-page interaction baseline prematurely.
