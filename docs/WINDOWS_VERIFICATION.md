@@ -1,8 +1,8 @@
 # Windows verification checklist
 
-Run this checklist on the Windows PC intended to build and use the first release. It validates both the source build and the self-contained portable artifact before Outlook integration is accepted.
+Run this checklist on the Windows PC intended to build and use the first release. It validates both the source build and the self-contained portable artifact.
 
-Status for 0.1.0: accepted on 2026-08-11. The target-PC acceptance matrix passed, and GitHub release run `31461229458` additionally extracted the final ZIP and passed CMD launch, packaged native SQLite, real Microsoft Edge interaction, mixed modules, saved filters, stop/restart persistence, Excel exports, Outlook HTML, and backup before publishing `windows-build-0.1.0-6`. Keep this document as the regression checklist for future releases.
+Status for 0.1.0: accepted on 2026-08-11. The target-PC acceptance matrix passed, and GitHub release run `31461229458` additionally extracted the final ZIP and passed CMD launch, packaged native SQLite, real Microsoft Edge interaction, mixed modules, saved filters, stop/restart persistence, Excel exports, and backup before publishing `windows-build-0.1.0-6`. Keep this document as the regression checklist for future releases.
 
 ## Prerequisites
 
@@ -63,7 +63,7 @@ Before declaring Windows support ready, record:
 - Output of all verification commands.
 - Any antivirus, endpoint-security, or corporate-policy warning.
 
-Outlook COM and final packaged-application verification are separate Phase 6 and Phase 7 checks.
+Final packaged-application verification is a Phase 7 check.
 
 ## Build the portable x64 artifact
 
@@ -96,7 +96,7 @@ Normal startup does not invoke PowerShell and does not traverse the package to c
 
 ## Offline functional and recovery matrix
 
-While still offline, verify database/view/dashboard editing, static preview, both Excel downloads, Outlook HTML download, and clipboard fallback. Reconnect only for the classic Outlook COM check if company policy requires it.
+While still offline, verify database/view/dashboard editing, static preview, and both Excel downloads.
 
 Create a workspace backup, change the workspace, restore the backup with explicit confirmation, and run `start-dashboard.cmd` again. The launcher must detect the pending restore, gracefully restart the authenticated backend, reproduce the backed-up workspace exactly, and preserve its pre-restore backup. Repeat with the documented injected restore failure to confirm automatic rollback.
 

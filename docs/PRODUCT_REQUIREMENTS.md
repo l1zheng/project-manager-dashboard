@@ -10,13 +10,12 @@ Its defining workflow is:
 2. Create tables such as Requirement Tracking, Key Matters, and Key Risks directly on that page, or add explanatory text and local images between them.
 3. Add or rename each table's business-specific columns from the table header and edit records inline.
 4. Filter each table independently without leaving the page.
-5. Export the current mixed page to Excel without manually rebuilding the layout; classic Outlook draft export remains an optional follow-up convenience.
+5. Export the current mixed page to Excel without manually rebuilding the layout.
 
 ## 2. User and environment
 
 - Primary user: one project manager/developer.
 - Primary OS: Windows.
-- Email client: Windows classic Outlook.
 - Deployment: local machine; no external SaaS dependency.
 - Primary language: Chinese; data and filenames must fully support Unicode.
 
@@ -28,15 +27,15 @@ Each database owns its schema. A requirement may have `需求名称`, while a ri
 
 ### 3.2 Separate source data from presentation
 
-Source records remain structured and filterable. Email and presentation Excel exports are static renderings optimized for reading.
+Source records remain structured and filterable. Presentation Excel and the report preview are static renderings optimized for reading.
 
 ### 3.3 A dashboard contains views, not raw database definitions
 
 The same database may appear several times with different filters, sorts, visible fields, and widths.
 
-### 3.4 Safe email workflow
+### 3.4 Excel is the only reporting handoff
 
-The application may create and display an Outlook draft. The user remains responsible for recipients, final review, and sending.
+The first release exports the mixed page to Excel in two modes (editable data workbook and presentation workbook). Classic Outlook draft automation was evaluated and explicitly removed from the product scope; the report can still be pasted into Outlook manually from the presentation workbook.
 
 ### 3.5 Hide implementation concepts from the primary workflow
 
@@ -168,33 +167,7 @@ Interactive browser controls must not appear in the rendered report.
 
 The primary workspace export defaults to every module on the page, including header-only empty tables. Text-module titles render at the same section-heading level as table titles. An image title renders at that level only when non-empty; an untitled image emits no placeholder heading. Text and image modules retain their page order in static report and presentation exports. Before any report or workbook request begins, pending inline saves must finish successfully so the exported values cannot lag behind the visible page.
 
-### FR-7 Outlook export (optional follow-up)
-
-The primary reporting handoff is Excel. The user may manually paste an exported workbook into Outlook, so classic Outlook automation must not block the usable dashboard-and-Excel workflow or its release acceptance.
-
-When the optional Windows classic Outlook integration is enabled:
-
-1. Render an Outlook-compatible HTML report using table layout and inline styles.
-2. Invoke the installed classic Outlook client locally.
-3. Create a new HTML `MailItem` draft.
-4. Set the subject and HTML body.
-5. Display the draft for user review.
-
-The application must not populate recipients unless the user explicitly configured a template, and it must never call Send automatically.
-
-Fallbacks:
-
-- Copy the rendered report to the clipboard as rich HTML and plain text.
-- Download the rendered `.html` file.
-
-Acceptance criteria:
-
-- Export opens a visible draft rather than sending mail.
-- Tables retain readable borders, widths, wrapping, headings, and status cues in classic Outlook.
-- Unsupported CSS and scripts are absent.
-- If Outlook automation is unavailable, the user receives a clear fallback action.
-
-### FR-8 Excel export
+### FR-7 Excel export
 
 Two modes are required.
 
@@ -253,6 +226,7 @@ Acceptance criteria:
 - Formula language
 - Automated workflows and reminders
 - Automatic email sending
+- Classic Outlook draft automation and email export
 - New Outlook and Outlook Web deep integration
 
 ## 8. Primary acceptance journey
@@ -264,4 +238,3 @@ Acceptance criteria:
 5. Reload and confirm both differently shaped tables remain together on the page.
 6. Preview the page as a static weekly report.
 7. Export both an editable workbook and a single-sheet presentation workbook.
-8. Optionally open the report as a formatted draft in classic Outlook on a Windows machine where that convenience integration has been accepted.

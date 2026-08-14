@@ -2,7 +2,6 @@ import Fastify from 'fastify';
 import { healthResponseSchema } from '@project-manager/domain';
 import { collectRuntimeDiagnostics } from './diagnostics.js';
 import type { Persistence } from './persistence/database.js';
-import { createDefaultMailDraftAdapter, type MailDraftAdapter } from './outlook/adapter.js';
 import { isWorkspaceRestorePending } from './persistence/restore.js';
 import { registerRuntimeControl } from './runtime-control.js';
 import { registerWebAssets } from './web-assets.js';
@@ -10,7 +9,6 @@ import { registerWorkspaceRoutes } from './workspace/routes.js';
 
 export interface BuildAppOptions {
   persistence?: Persistence;
-  mailDraftAdapter?: MailDraftAdapter;
   webDistDirectory?: string;
   loopbackAddress?: string;
   launchToken?: string;
@@ -19,20 +17,18 @@ export interface BuildAppOptions {
 
 export async function buildApp({
   persistence,
-  mailDraftAdapter,
   webDistDirectory,
   loopbackAddress,
   launchToken,
   shutdown
 }: BuildAppOptions = {}) {
   const app = Fastify({ logger: true });
-  const adapter = mailDraftAdapter ?? createDefaultMailDraftAdapter();
 
   if (persistence) {
     app.addHook('onClose', () => {
       persistence.close();
     });
-    registerWorkspaceRoutes(app, persistence, { mailDraftAdapter: adapter });
+    registerWorkspaceRoutes(app, persistence);
   }
 
   app.get('/api/health', async () => {
@@ -62,7 +58,7 @@ export async function buildApp({
 
   if (persistence) {
     app.get('/api/diagnostics', async () =>
-      collectRuntimeDiagnostics(persistence, { mailDraftAdapter: adapter, loopbackAddress })
+      collectRuntimeDiagnostics(persistence, { loopbackAddress })
     );
   }
 

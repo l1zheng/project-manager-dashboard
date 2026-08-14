@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApp } from '../app.js';
-import type { MailDraftAdapter } from '../outlook/adapter.js';
 import { openPersistence } from '../persistence/database.js';
 import { resolveDataPaths } from '../persistence/paths.js';
 
@@ -22,15 +21,7 @@ describe('workspace API', () => {
     const persistence = await openPersistence({
       dataPaths: resolveDataPaths({ environment: { PM_DATA_DIR: rootDirectory } })
     });
-    const createdDrafts: Array<{ subject: string; htmlFragment: string }> = [];
-    const mailDraftAdapter: MailDraftAdapter = {
-      probe: async () => ({ available: true }),
-      createDraft: async (input) => {
-        createdDrafts.push(input);
-        return { status: 'displayed' };
-      }
-    };
-    const app = await buildApp({ persistence, mailDraftAdapter });
+    const app = await buildApp({ persistence });
 
     try {
       const databaseResponse = await app.inject({
@@ -287,42 +278,6 @@ describe('workspace API', () => {
       );
       expect(presentationWorkbookResponse.headers['content-disposition']).toContain('attachment');
       expect(presentationWorkbookResponse.rawPayload.subarray(0, 2).toString()).toBe('PK');
-
-      const outlookAvailabilityResponse = await app.inject({
-        method: 'GET',
-        url: '/api/integrations/outlook'
-      });
-      expect(outlookAvailabilityResponse.statusCode).toBe(200);
-      expect(outlookAvailabilityResponse.json()).toEqual({ available: true });
-
-      const outlookHtmlResponse = await app.inject({
-        method: 'GET',
-        url: `/api/dashboards/${dashboard.id}/export/outlook.html?includeCompleted=false`
-      });
-      expect(outlookHtmlResponse.statusCode).toBe(200);
-      expect(outlookHtmlResponse.headers['content-type']).toContain('text/html');
-      expect(outlookHtmlResponse.headers['content-disposition']).toContain('attachment');
-      expect(outlookHtmlResponse.body).toContain('支持统一认证');
-      expect(outlookHtmlResponse.body).not.toContain('已关闭需求');
-
-      const missingActionResponse = await app.inject({
-        method: 'POST',
-        url: `/api/dashboards/${dashboard.id}/export/outlook-draft`
-      });
-      expect(missingActionResponse.statusCode).toBe(403);
-      expect(createdDrafts).toHaveLength(0);
-
-      const draftResponse = await app.inject({
-        method: 'POST',
-        url: `/api/dashboards/${dashboard.id}/export/outlook-draft?includeCompleted=false`,
-        headers: { 'x-project-manager-action': 'create-outlook-draft' }
-      });
-      expect(draftResponse.statusCode).toBe(200);
-      expect(draftResponse.json()).toEqual({ status: 'displayed' });
-      expect(createdDrafts).toHaveLength(1);
-      expect(createdDrafts[0]?.subject).toBe('项目周报');
-      expect(createdDrafts[0]?.htmlFragment).toContain('支持统一认证');
-      expect(createdDrafts[0]?.htmlFragment).not.toContain('已关闭需求');
 
       const restoreInspectionResponse = await app.inject({
         method: 'POST',

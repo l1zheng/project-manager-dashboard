@@ -14,17 +14,14 @@ Browser on Windows
 Local Node.js application
     ├─ SQLite workspace database
     ├─ HTML report renderer
-    ├─ Excel export engine
-    └─ Windows Outlook bridge
-            ↕ Outlook Object Model / COM
-        Classic Outlook draft window
+    └─ Excel export engine
 ```
 
 Reasons:
 
 - The user wants a browser-based dashboard.
 - Single-user local storage avoids account, network, and permission complexity.
-- A local backend can access the filesystem and invoke the installed classic Outlook client.
+- A local backend can access the filesystem for backup/restore and local data management.
 - The same domain and export code can later be wrapped as a desktop application if packaging requires it.
 
 The server must listen on `127.0.0.1`, not all interfaces, unless LAN access is explicitly added later.
@@ -42,7 +39,6 @@ The server must listen on `127.0.0.1`, not all interfaces, unless LAN access is 
 | Storage | SQLite + stable Drizzle ORM + `better-sqlite3` | Local, portable, migration-friendly; avoids release-candidate persistence dependencies. |
 | Excel | ExcelJS | Supports styles, widths, merges, print settings, and `.xlsx`. |
 | Tests | Vitest + Playwright | Unit tests for domain/export logic and browser journey tests. |
-| Outlook bridge | PowerShell/COM adapter invoked by backend | Works with Windows classic Outlook without Microsoft Graph consent. |
 
 Exact package versions will be selected during Phase 0 and locked in the package manager lockfile.
 
@@ -159,7 +155,7 @@ HTML and Excel adapters consume this model. Neither adapter queries the database
 
 Table report blocks are assembled only from the dashboard's evaluated view payloads: saved visible-field order, widths, filtered/sorted rows, title override, description, and export-inclusion flag. Text blocks carry escaped plain text; image blocks carry validated internal asset metadata and bytes. Adapters receive no database IDs or filesystem paths and must not re-evaluate filters. Every generated text value is escaped by the rendering adapter.
 
-The browser preview and presentation Excel preserve the mixed dashboard order. The editable data workbook intentionally emits only table-view worksheets. Presentation Excel embeds decoded image bytes rather than links. Classic Outlook materializes only validated internal image assets into its unique request directory, attaches them with server-generated content IDs, and deletes the directory after the bridge returns. The bridge does not accept client-authored paths or general attachments.
+The browser preview and presentation Excel preserve the mixed dashboard order. The editable data workbook intentionally emits only table-view worksheets. Presentation Excel embeds decoded image bytes rather than links.
 
 For the Notion-style primary canvas, a section without an explicit block title uses the database's mutable business name, never the internal default view name. Browser report actions default to including empty sections and pass through an export gate that waits for the per-record inline-save queues; a failed save blocks export instead of producing a stale workbook.
 
@@ -167,43 +163,18 @@ Automatic sequence values come from record metadata rather than dynamic values. 
 
 Completion is explicit metadata, never inferred from mutable labels such as `closed` or `已完成`. A database may have at most one active status field whose field configuration contains `completion.completedOptionIds`. The referenced values are stable option IDs; renaming either the field or an option does not change completion behavior. A database without this configuration has no completed records. When a report sets `includeCompleted` to false, the canonical report builder removes matching rows after the saved view has been evaluated, including when the completion status field is hidden from that view. The option defaults to true so existing reports do not silently lose rows.
 
-### 6.2 Outlook HTML
+### 6.2 Report HTML
 
-Classic Outlook has stricter rendering behavior than modern browsers. The email adapter therefore uses:
+The canonical report model also renders to a static, self-contained HTML document for the in-app report preview. The renderer uses:
 
-- Nested/table-based layout where necessary
-- Inline styles
+- Semantic table layout with inline styles
 - Explicit pixel widths for major columns
 - Conservative fonts and colors
 - No JavaScript
 - No external stylesheets
-- No flexbox or CSS grid
 - Escaped plain user content
 
-Outlook automation is isolated behind an interface:
-
-```ts
-interface MailDraftAdapter {
-  probe(): Promise<{ available: boolean; reason?: string }>;
-  createDraft(input: {
-    subject: string;
-    htmlFragment: string;
-    inlineImages?: Array<{
-      contentId: string;
-      mimeType: 'image/png' | 'image/jpeg' | 'image/gif';
-      content: Uint8Array;
-    }>;
-  }): Promise<{ status: 'displayed' }>;
-}
-```
-
-The Windows implementation invokes a committed, narrowly scoped PowerShell script using a fixed executable, `shell: false`, and a temporary UTF-8 JSON request. User content never appears in a command string or command-line argument. The Node adapter accepts only bounded, signature-matching PNG/JPEG/GIF bytes already resolved from internal media assets, writes them beside the request under generated filenames, and provides only those server paths to PowerShell. The script revalidates that every path remains within the request directory, adds the files as hidden CID attachments, creates a classic Outlook `MailItem`, calls `Display(false)` so Outlook initializes the compose editor and configured signature, then inserts the escaped report fragment immediately after the existing opening `<body>` tag. It never accepts recipients or calls `Save` or `Send`.
-
-The Microsoft Outlook Object Model supports creating an item through `Application.CreateItem`, setting the HTML body, and displaying the item. This is the compatibility basis for the first-release integration.
-
-The full process, signature, timeout, error-mapping, endpoint, fallback, and no-send decisions are recorded in [ADR-0003](decisions/0003-classic-outlook-draft-boundary.md).
-
-Classic Outlook remains an optional convenience integration. The core release acceptance path is the local dashboard plus editable and presentation Excel exports; a macOS development environment cannot validate the real Windows COM compose window, and that target-machine verification is deferred until the user chooses to prioritize it.
+Classic Outlook automation is explicitly out of scope; the reporting handoff is Excel only. (An earlier Outlook draft adapter and its PowerShell/COM bridge were removed from the codebase; see `docs/PROJECT_STATUS.md`.)
 
 ### 6.3 Excel layout engine
 
@@ -236,8 +207,6 @@ The implemented allocator uses 60 columns by default and returns one-based inclu
 - Escape all user content in report HTML.
 - Do not execute formulas or user-authored scripts.
 - Prefix potentially dangerous Excel values that begin with `=`, `+`, `-`, or `@` when exporting user text unless the field is explicitly a formula-capable type in a future release.
-- Outlook integration receives a bounded generated fragment and validated internal CID images through a unique temporary request directory; it must not execute arbitrary command text or accept client-authored HTML, recipients, arbitrary attachments, external paths, or script paths.
-- Never automate the final Send action.
 
 ## 8. Backup and portability
 
@@ -248,9 +217,9 @@ The implemented allocator uses 60 columns by default and returns one-based inclu
 - Keep the 10 newest automatic pre-migration backups and the 10 newest automatic pre-restore backups without deleting manual backups.
 - Keep path resolution behind a platform adapter so development can run on macOS while Windows remains the deployment target.
 
-The first Windows release is an architecture-specific portable directory containing the pinned official Node.js 24.19.0 runtime, an isolated hoisted production dependency tree, built browser/API assets, migrations, Outlook bridge, authenticated launcher control, and small release metadata. It is built on the matching Windows architecture so the packaged `better-sqlite3` binary is valid. The build rejects symbolic links/junctions after removing unneeded command shims, validates the official runtime archive digest once, loads the packaged native SQLite module, and writes `RELEASE-INFO.json` with the application/runtime/target metadata needed by the launcher. It does not generate or recalculate a per-file hash manifest. Mutable data remains outside the application directory. Electron and Node single-executable packaging are not used in the first release.
+The first Windows release is an architecture-specific portable directory containing the pinned official Node.js 24.19.0 runtime, an isolated hoisted production dependency tree, built browser/API assets, migrations, authenticated launcher control, and small release metadata. It is built on the matching Windows architecture so the packaged `better-sqlite3` binary is valid. The build rejects symbolic links/junctions after removing unneeded command shims, validates the official runtime archive digest once, loads the packaged native SQLite module, and writes `RELEASE-INFO.json` with the application/runtime/target metadata needed by the launcher. It does not generate or recalculate a per-file hash manifest. Mutable data remains outside the application directory. Electron and Node single-executable packaging are not used in the first release.
 
-The packaged CMD entrypoints invoke `launcher.mjs` through the bundled `node.exe`; normal startup and shutdown do not invoke PowerShell and therefore do not depend on PowerShell execution policy or script signatures. The launcher pins `127.0.0.1`, the configured non-privileged port, the built web directory, and `%LOCALAPPDATA%\ProjectManagerDashboard`. A random 256-bit token inherited only by the child process authenticates graceful local stop/restart requests. A second launch opens the already running instance; a pending restore or different packaged version first closes the authenticated old process and then starts the new one. The runtime-control route is not registered during ordinary development without a valid launch token. The optional classic Outlook adapter remains a separate PowerShell/COM integration and cannot block dashboard or Excel use.
+The packaged CMD entrypoints invoke `launcher.mjs` through the bundled `node.exe`; normal startup and shutdown do not invoke PowerShell and therefore do not depend on PowerShell execution policy or script signatures. The launcher pins `127.0.0.1`, the configured non-privileged port, the built web directory, and `%LOCALAPPDATA%\ProjectManagerDashboard`. A random 256-bit token inherited only by the child process authenticates graceful local stop/restart requests. A second launch opens the already running instance; a pending restore or different packaged version first closes the authenticated old process and then starts the new one. The runtime-control route is not registered during ordinary development without a valid launch token.
 
 The complete container, restore transaction, rollback, retention, packaging, and release-validation decisions are recorded in [ADR-0004](decisions/0004-backup-restore-and-windows-packaging.md).
 
@@ -260,8 +229,6 @@ The accepted V2 production-promotion contract, polymorphic-block migration, vali
 
 - Clean Windows execution of the portable runtime bundle and its pinned `better-sqlite3` native binary under Node.js 24 LTS.
 - Whether the accepted portable artifact needs a signed thin installer or console-free launcher for the target work computer's application policy.
-- The most reliable clipboard HTML implementation across supported Windows browsers.
-- Classic Outlook rendering of nested tables, Chinese fonts, long text, and status backgrounds.
 - Performance threshold at which filter evaluation should move from memory to SQLite JSON queries.
 
 These are prototype questions, not blockers for scaffolding the domain model.

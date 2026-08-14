@@ -223,10 +223,10 @@ export function isReportSection(block: ReportBlock): block is ReportSection {
 }
 
 export function renderReportHtml(model: ReportModel): string {
-  return renderOutlookDocument(model);
+  return renderReportDocument(model);
 }
 
-function renderOutlookDocument(model: ReportModel): string {
+function renderReportDocument(model: ReportModel): string {
   const cellPadding = model.density === 'compact' ? '5px 7px' : '9px 10px';
   const blocks = includedReportBlocks(model)
     .map((block) => {

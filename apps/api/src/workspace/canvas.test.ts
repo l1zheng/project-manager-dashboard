@@ -292,16 +292,6 @@ describe('workspace canvas API', () => {
         findWorkbookCellRow(reportSheet, '本周摘要')
       );
 
-      const outlookHtml = await app.inject({
-        method: 'GET',
-        url: `/api/dashboards/${first.json().dashboard.id}/export/outlook.html?includeEmptySections=true`
-      });
-      expect(outlookHtml.statusCode).toBe(200);
-      expect(outlookHtml.body).toContain('data:image/png;base64,');
-      expect(outlookHtml.body.indexOf('项目架构图')).toBeLessThan(
-        outlookHtml.body.indexOf('关键风险')
-      );
-
       const second = await app.inject({ method: 'POST', url: '/api/workspace/primary-dashboard' });
       expect(second.statusCode).toBe(200);
       expect(second.json().blocks).toHaveLength(4);

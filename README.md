@@ -1,6 +1,6 @@
 # Project Manager Dashboard
 
-A local-first, single-user project-management workspace with independent custom databases, multiple saved table views on one dashboard, and report-quality exports to Excel and Windows classic Outlook.
+A local-first, single-user project-management workspace with independent custom databases, multiple saved table views on one dashboard, and report-quality exports to Excel.
 
 ## Project documents
 
@@ -43,8 +43,8 @@ The release artifact must be built on matching Windows hardware because `better-
 powershell.exe -NoLogo -NoProfile -File .\release\build-windows-portable.ps1 -Architecture x64 -ApplicationVersion 0.1.0
 ```
 
-The resulting ZIP contains its own Node runtime, physical production dependencies, browser/API builds, migrations, optional Outlook bridge, compact release metadata, and a loopback-only Node launcher reached through thin CMD entrypoints. The target PC needs neither Node nor pnpm and can remain offline. The official Node archive is checked once while building; normal startup does not invoke a PowerShell launcher or recalculate a per-file hash manifest. Version 0.1.0 passed the exact extracted-ZIP Windows x64 acceptance gate on 2026-08-11. See the [user guide](docs/USER_GUIDE.md) for normal use and the [Windows verification checklist](docs/WINDOWS_VERIFICATION.md) for release regression testing.
+The resulting ZIP contains its own Node runtime, physical production dependencies, browser/API builds, migrations, compact release metadata, and a loopback-only Node launcher reached through thin CMD entrypoints. The target PC needs neither Node nor pnpm and can remain offline. The official Node archive is checked once while building; normal startup does not invoke a PowerShell launcher or recalculate a per-file hash manifest. Version 0.1.0 passed the exact extracted-ZIP Windows x64 acceptance gate on 2026-08-11. See the [user guide](docs/USER_GUIDE.md) for normal use and the [Windows verification checklist](docs/WINDOWS_VERIFICATION.md) for release regression testing.
 
-The same portable ZIP can be built on GitHub Actions from the repository's `main` branch. Open the `Windows portable build` workflow and choose `Run workflow`; the completed ZIP is available from the workflow run's Artifacts section. The workflow uses the repository's pinned Node.js and pnpm versions, then extracts the real ZIP and requires packaged SQLite, CMD launch, Microsoft Edge interaction, stop/restart persistence, mixed modules, saved filters, Excel exports, Outlook HTML, and backup to pass before upload.
+The same portable ZIP can be built on GitHub Actions from the repository's `main` branch. Open the `Windows portable build` workflow and choose `Run workflow`; the completed ZIP is available from the workflow run's Artifacts section. The workflow uses the repository's pinned Node.js and pnpm versions, then extracts the real ZIP and requires packaged SQLite, CMD launch, Microsoft Edge interaction, stop/restart persistence, mixed modules, saved filters, Excel exports, and backup to pass before upload.
 
 For a durable download link, run the separate `Windows portable release` workflow. The accepted public prerelease is [windows-build-0.1.0-6](https://github.com/l1zheng/project-manager-dashboard/releases/tag/windows-build-0.1.0-6).

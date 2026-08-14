@@ -53,10 +53,6 @@ describe('health endpoint', () => {
     });
     const storageApp = await buildApp({
       persistence,
-      mailDraftAdapter: {
-        probe: async () => ({ available: false, reason: 'platform_unsupported' }),
-        createDraft: async () => ({ status: 'displayed' })
-      },
       loopbackAddress: '127.0.0.1:4300'
     });
 
@@ -71,8 +67,7 @@ describe('health endpoint', () => {
           database: { healthy: true },
           firstRun: true,
           migration: { pendingCount: 0 }
-        },
-        outlook: { available: false, reason: 'platform_unsupported' }
+        }
       });
       expect(response.body).not.toContain('records');
     } finally {

@@ -8,7 +8,7 @@ Last updated: 2026-08-14
 - Implementation: core chain verified working end to end — create table via module composer, add column, blank-row auto record creation, per-table filter, text and image modules, module drag reorder, export preview, editable Excel (one sheet per table, filtered rows, typed dates, no merges), presentation Excel (one 60-column sheet, mixed module order, embedded validated image), and persistence across reload. No console errors on the latest build.
 - Repository: Git repository on `main` with the TypeScript workspace; `main` tracks `origin/main`.
 - Target user: one person.
-- Target platform: Windows (portable packaging path retained); classic Outlook is an optional convenience and is de-emphasized in the UI.
+- Target platform: Windows (portable packaging path retained); Excel is the only export surface — classic Outlook automation has been removed from the product.
 - Deployment: local web application with SQLite.
 
 ## Round 1 fixes (2026-08-14)
@@ -37,6 +37,11 @@ Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher t
 
 Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher test, TypeScript builds, Vite production build, ESLint (web/api/domain/export), Prettier, the full real-browser acceptance journey, and both production-acceptance phases all passed against the latest build.
 
+## Round 4 changes (2026-08-14)
+
+- Removed classic Outlook from the product entirely at the user's direction: deleted the draft adapter (`apps/api/src/outlook/`), the PowerShell/COM bridge script, the `copy-outlook-script` build step, the Outlook HTML/download endpoints (`/api/integrations/outlook`, `export/outlook.html`, `export/outlook-draft`), the export package's Outlook renderer and its tests, the diagnostics `outlook` field, and every related test assertion. The generic report HTML renderer (`renderReportHtml`, used by the in-app report preview) was kept. ADR-0003 and all forward-looking documentation references were removed; Excel is now the only export surface.
+- Verification after removal: domain 15 tests, export 20 tests, API 36 tests, release launcher test, TypeScript builds, Vite production build, ESLint, Prettier, the full real-browser acceptance journey, and both production-acceptance phases all passed.
+
 ## Confirmed decisions
 
 - Independent custom databases retain their own schemas and terminology.
@@ -45,11 +50,10 @@ Verification: domain 15 tests, export 20 tests, API 36 tests, release launcher t
 - The routine page may mix table, text, and image modules in one ordered vertical canvas; users should not need a separate module-management surface.
 - Production images will use bounded validated bytes in local SQLite, referenced by stable asset IDs, so full-workspace backup remains self-contained.
 - View filters and layout drive all exports.
-- Outlook integration creates and displays a draft; it never sends.
-- Excel is the primary reporting handoff. Classic Outlook local automation is an optional convenience integration, with HTML fallback.
+- Excel is the only reporting handoff; classic Outlook automation was removed from the product on 2026-08-14 (see Round 4).
 - Excel provides both editable multi-sheet and presentation single-sheet modes.
 - Presentation Excel uses a fine base grid and calculated merged spans.
-- The Phase 0A reporting density and Outlook/Excel direction remain valid, but its separate database configuration workflow was rejected by real-use feedback on 2026-08-09 and is superseded by the Notion-style single-page workspace.
+- The Phase 0A reporting density and Excel direction remain valid, but its separate database configuration workflow was rejected by real-use feedback on 2026-08-09 and is superseded by the Notion-style single-page workspace.
 - Model use follows a three-tier routing agreement; the assistant proactively recommends switching before tasks that materially benefit from a different tier.
 - Persistence targets Node.js 24 LTS with stable Drizzle ORM and `better-sqlite3`; built-in `node:sqlite` is deferred until stable in both the target runtime and Drizzle adapter.
 - Record values use versioned JSON keyed by stable field ID; field, option, and view semantics use stable IDs so labels can change without rewriting data.
@@ -64,7 +68,7 @@ Product re-focus round 1 is complete: health check + scope cut + cleanup verifie
 
 ## Next tasks
 
-1. Decide remaining scope questions with the user: whether to (a) add the missing Notion-like field types (勾选/链接/单选/多选) to the property editor, (b) fully remove Outlook actions or keep them hidden, (c) rename the product surface (“项目工具”/“项目工作台”) to a clearer kanban/report name.
+1. Decide remaining scope questions with the user: whether to (a) add the missing Notion-like field types (勾选/链接/单选/多选) to the property editor, (b) rename the product surface (“项目工具”/“项目工作台”) to a clearer kanban/report name.
 2. Rebuild and restart the user's local service from the corrected source so the live workspace sees the round-1 fixes.
 3. Re-run the Windows portable build pipeline to publish an updated artifact carrying the fixes (the packaged app currently embeds the older UI).
 4. Collect feedback against the cleaned daily workflow before further interaction changes.
@@ -73,14 +77,12 @@ Product re-focus round 1 is complete: health check + scope cut + cleanup verifie
 
 | Item | Risk | Release result and future regression |
 | --- | --- | --- |
-| Classic Outlook HTML rendering | Browser-perfect CSS will not survive Outlook rendering. | Conservative table/inline-style output passed 0.1.0 target-PC acceptance; repeat for template changes. |
-| Outlook COM availability | Corporate policy may restrict PowerShell or automation. | Target-PC automation passed; rich-copy and HTML fallbacks remain required for other policy environments. |
 | Excel merged layout | Rounding or extreme field counts may create unusable spans. | Pure layout/workbook tests and target desktop Excel passed; repeat for allocator changes. |
 | Dynamic filters | JSON-backed records may become slow at higher volumes. | Benchmark representative data before optimizing into SQLite JSON queries. |
 | Backup restore | Malformed archives or interrupted replacement could destroy the live workspace. | ADR-0004 validation, injected rollback, offline restore, and upgrade journeys passed; retain manual backups before updates. |
 | Packaging | Corporate Windows policy may reject an unsigned portable launcher. | The canonical portable bundle passed the target environment; add signing only if another policy environment requires it. |
 | Native SQLite driver | `better-sqlite3` must ship the correct binary on the target Windows/Node version. | Final Windows x64 artifact loaded and queried packaged SQLite without a compiler toolchain. |
-| Mixed-module export | Embedded images behave differently in Excel and classic Outlook, and must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes. Generated Outlook CIDs are implemented and isolated, but target-Windows rendering is deferred because Outlook is not the current primary handoff. |
+| Mixed-module export | Embedded images must not become arbitrary attachment paths. | Production browser/Excel promotion passed with validated SQLite assets and embedded workbook bytes. |
 
 ## Verification log
 

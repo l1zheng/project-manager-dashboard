@@ -4,11 +4,11 @@
 
 Status: round 1 complete — health check, scope cut, and cleanup; see `docs/PROJECT_STATUS.md`.
 
-The user re-confirmed the product goal is a Notion-style single-page workspace (tables/text/images, drag layout, unified Excel export) on Windows. The legacy form-style UI and `/advanced` route were removed from the production build; Outlook is de-emphasized as optional; backup/restore moved into a quiet sidebar popover. Remaining decisions: optional extra field types, Outlook removal depth, and product naming.
+The user re-confirmed the product goal is a Notion-style single-page workspace (tables/text/images, drag layout, unified Excel export) on Windows. The legacy form-style UI and `/advanced` route were removed from the production build; classic Outlook automation was removed from the product entirely (Excel is the only export surface); backup/restore moved into a quiet sidebar popover. Remaining decisions: optional extra field types and product naming.
 
 ## Delivery strategy
 
-Build a vertical slice early: create two different databases, place them on one dashboard, export the result, and verify it in real Excel and classic Outlook. Avoid completing a large generic database editor before validating the report workflow.
+Build a vertical slice early: create two different databases, place them on one dashboard, export the result, and verify it in real Excel. Avoid completing a large generic database editor before validating the report workflow.
 
 ## Phase 0A — Interactive product prototype
 
@@ -20,14 +20,14 @@ Tasks:
 - Demonstrate multiple independently shaped database views on one dashboard.
 - Demonstrate per-block filtering, sorting, collapsing, and export inclusion.
 - Demonstrate database creation and field configuration without persistence.
-- Demonstrate static Outlook report preview and Excel presentation-layout preview.
+- Demonstrate static report preview and Excel presentation-layout preview.
 - Review the prototype with the user and record requested changes.
 
 Exit criteria:
 
 - The user confirms the dashboard information architecture and density.
 - The user confirms the database/view configuration workflow.
-- The user confirms the intended Outlook and Excel presentation direction.
+- The user confirms the intended report and Excel presentation direction.
 - Any rejected interaction is documented before production implementation begins.
 
 ## Phase 0 — Repository and engineering foundation
@@ -147,25 +147,9 @@ Exit criteria:
 - Presentation workbook combines differently shaped modules on one sheet.
 - Excel opens both files without repair warnings.
 
-## Phase 6 — Classic Outlook draft integration (optional follow-up)
+## Phase 6 — Classic Outlook draft integration (removed)
 
-Status: implementation complete; future Windows classic Outlook acceptance is optional and does not block the dashboard-and-Excel release path.
-
-Tasks:
-
-- Finalize the local process, signature preservation, no-send, and fallback contract. Completed in P6-01.
-- Finalize conservative Outlook-compatible HTML templates. Completed in P6-02 with escaped table/inline-style HTML, text fallback, and single-line subjects.
-- Implement rich-HTML clipboard fallback. Completed in P6-02 with browser `text/html` plus `text/plain` clipboard data after a direct user gesture.
-- Implement the Windows PowerShell/COM draft adapter. Completed in P6-02 with a packaged PowerShell bridge, JSON request file, timeout, and no-send script scan.
-- Detect Outlook integration availability and show actionable fallback errors. Completed in P6-02; macOS returns a safe platform-unsupported response with HTML/clipboard fallback.
-- Verify preservation of the user's existing Outlook signature policy. Completed during P7-07 acceptance on 2026-08-09.
-- Test classic Outlook with Chinese text, long content, multiple tables, and status colors. Completed during P7-07 acceptance on 2026-08-09.
-
-Exit criteria:
-
-- One action opens a visible classic Outlook draft with subject and formatted body.
-- No code path sends the message.
-- Clipboard/HTML fallback works when Outlook automation is unavailable.
+Status: implemented in an earlier release, then **removed from the product scope on 2026-08-14** at the user's direction. The reporting handoff is Excel only. All Outlook code — the draft adapter, the PowerShell/COM bridge, the Outlook HTML/download endpoints, and the related tests — was deleted; the generic report HTML renderer (used by the in-app report preview) was kept. See `docs/PROJECT_STATUS.md` for the removal record.
 
 ## Phase 7 — Backup, packaging, and release hardening
 
@@ -196,7 +180,6 @@ Exit criteria:
 - Calendar, board, and timeline views
 - Dashboard multi-column layout
 - Recurring reminders
-- Additional Outlook variants
 - Multi-user and LAN deployment
 
 ## Phase 9 — V2 interaction-shell validation
@@ -227,7 +210,7 @@ Tasks:
 - Apply explicit all-side borders to every populated business table cell and merged presentation span, matching Excel's “所有框线” expectation while retaining the accepted color hierarchy. Completed after hands-on review.
 - Match Excel's manual “所有框线” command exactly by rendering those table borders as uniform black thin lines rather than theme-colored or gray lines. Completed after direct comparison with Excel.
 - Keep table-module descriptions strictly opt-in in presentation exports: no example copy, database-description fallback, or empty subtitle row. Completed after export review.
-- On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, presentation-Excel image embedding, and a reviewed Outlook CID-image extension. Moved to Phase 10.
+- On promotion, add polymorphic dashboard-block persistence, bounded SQLite media assets, mixed canonical report blocks, and presentation-Excel image embedding. Moved to Phase 10.
 - Obtain hands-on user acceptance before reconnecting the shell to SQLite. Completed.
 
 Exit criteria:
@@ -238,7 +221,7 @@ Exit criteria:
 
 ## Phase 10 — Accepted V2 production integration
 
-Status: completed for the prioritized dashboard-and-Excel workflow — macOS production promotion and Excel verification passed; Windows classic Outlook CID rendering is a deferred optional acceptance.
+Status: completed for the dashboard-and-Excel workflow — macOS production promotion and Excel verification passed. (Classic Outlook CID rendering was later removed from the product scope.)
 
 Tasks:
 
@@ -246,7 +229,7 @@ Tasks:
 - Add bounded, signature-validated SQLite media assets and transactional image-block creation/replacement. Foundation completed for PNG/JPEG/GIF raw-body upload, replacement, metadata projection, and same-origin content reads; WebP is deferred until deterministic workbook conversion exists.
 - Extend saved-view configuration with field-level export alignment and title-emphasis metadata while parsing old configurations unchanged. Completed with default-empty backward compatibility and stable-field validation.
 - Evolve the canonical report into ordered table/text/image blocks; retain a table-only projection for editable Excel. Completed.
-- Extend presentation Excel with embedded validated images and extend Outlook with server-generated CID attachments without relaxing the no-send boundary. Completed in code; classic Outlook CID rendering is deferred as an optional Windows-only follow-up.
+- Extend presentation Excel with embedded validated images. Completed; the Outlook CID attachment extension was removed with the Outlook scope cut.
 - Extract/reuse the accepted V2 components in the production workspace and connect them to the SQLite APIs. Completed: `/` uses the accepted V2 surface and the strict polymorphic block response. Debug data is disposable during this promotion, so the UI does not contain a pre-migration service-response compatibility branch.
 - Implement atomic module reorder, blank-row creation, view-specific column resize/reorder, and the accepted duplicate/archive actions. Completed in the production UI and API, with browser and API regression coverage.
 - Repeat the complete V2 checklist against SQLite data and visually inspect the mixed presentation workbook. Completed on macOS against the normal application-data workspace.
@@ -256,7 +239,7 @@ Exit criteria:
 - The production `/` route matches the accepted `/prototype-v2` interaction and visible hierarchy.
 - Existing user tables and records survive migration without renamed IDs or rewritten values.
 - Mixed modules and their order survive restart and appear identically in preview and presentation export.
-- Editable Excel remains table-only; presentation Excel preserves the mixed report order. Outlook preserves it when that optional integration is used.
+- Editable Excel remains table-only; presentation Excel preserves the mixed report order.
 - The temporary prototype route can be removed only after the production checklist passes.
 
 ## Phase 8 — Notion-style workspace correction
@@ -273,7 +256,7 @@ Tasks:
 - Automatically create missing default views and place every active database on the primary dashboard.
 - Create new tables directly on the page without a manual saved-view/dashboard step.
 - Edit table names, column names, cells, new rows, and new columns in place.
-- Keep filtering per table and place report/Excel/Outlook actions in one compact page toolbar.
+- Keep filtering per table and place report/Excel actions in one compact page toolbar.
 - Retain the existing database/view/dashboard model behind the interaction projection.
 - Add API coverage for idempotent multi-database workspace assembly and database renaming.
 
@@ -289,5 +272,5 @@ Exit criteria:
 2. `M1 — Structured data`: Phases 0–2.
 3. `M2 — Usable dashboard`: Phase 3.
 4. `M3 — Report pipeline`: Phases 4–5.
-5. `M4 — Outlook workflow`: Phase 6.
+5. `M4 — Outlook workflow`: Phase 6 (later removed from scope).
 6. `M5 — Personal release`: Phase 7.

@@ -303,12 +303,6 @@ async function verifyState(scenario, label) {
     `acceptance-${label}-presentation.xlsx`,
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   );
-  const outlook = await download(
-    `/api/dashboards/${scenario.dashboardId}/export/outlook.html?includeEmptySections=true`,
-    `acceptance-${label}-outlook.html`,
-    'text/html'
-  );
-  assert.ok(outlook.toString('utf8').includes('data:image/png;base64,'));
   await download('/api/workspace/backup', `acceptance-${label}.pmdbackup`, 'application/zip');
 }
 

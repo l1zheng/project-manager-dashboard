@@ -4,17 +4,9 @@ import {
   buildEditableWorkbook,
   buildPresentationWorkbook,
   buildReportModel,
-  renderOutlookReport,
-  renderReportHtml,
-  type ReportModel
+  renderReportHtml
 } from '@project-manager/export';
 import type { Persistence } from '../persistence/database.js';
-import {
-  createDefaultMailDraftAdapter,
-  OutlookDraftError,
-  type MailDraftAdapter,
-  type MailDraftInlineImage
-} from '../outlook/adapter.js';
 import { createWorkspaceBackup } from '../persistence/backups.js';
 import {
   confirmWorkspaceRestore,
@@ -65,13 +57,8 @@ const reportPreviewQuerySchema = z.object({
     .optional()
 });
 
-export function registerWorkspaceRoutes(
-  app: FastifyInstance,
-  persistence: Persistence,
-  options: { mailDraftAdapter?: MailDraftAdapter } = {}
-): void {
+export function registerWorkspaceRoutes(app: FastifyInstance, persistence: Persistence): void {
   const service = new WorkspaceService(persistence);
-  const mailDraftAdapter = options.mailDraftAdapter ?? createDefaultMailDraftAdapter();
 
   app.addContentTypeParser(
     'application/vnd.project-manager.workspace-backup',
@@ -193,52 +180,6 @@ export function registerWorkspaceRoutes(
       )
       .type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
       .send(Buffer.from(workbook));
-  });
-  app.get('/api/integrations/outlook', async () => mailDraftAdapter.probe());
-  app.get('/api/dashboards/:dashboardId/export/outlook.html', async (request, reply) => {
-    const model = reportModelForRequest(service, request);
-    const images = resolveReportImages(model, service);
-    const report = renderOutlookReport(model, {
-      imageSource: (block) => {
-        const image = block.asset ? images.get(block.asset.id) : undefined;
-        return image
-          ? `data:${image.mimeType};base64,${image.content.toString('base64')}`
-          : undefined;
-      }
-    });
-    return reply
-      .header(
-        'content-disposition',
-        `attachment; filename*=UTF-8''${encodeURIComponent(`${safeExportFilename(report.subject)}-Outlook报告.html`)}`
-      )
-      .header(
-        'content-security-policy',
-        "default-src 'none'; style-src 'unsafe-inline'; img-src data:"
-      )
-      .type('text/html; charset=utf-8')
-      .send(report.htmlDocument);
-  });
-  app.post('/api/dashboards/:dashboardId/export/outlook-draft', async (request, reply) => {
-    if (request.headers['x-project-manager-action'] !== 'create-outlook-draft') {
-      return reply.code(403).send({
-        error: 'action_confirmation_required',
-        message: '创建 Outlook 草稿需要来自本应用的明确操作。'
-      });
-    }
-    const model = reportModelForRequest(service, request);
-    const images = resolveReportImages(model, service);
-    const report = renderOutlookReport(model, {
-      imageSource: (block) => (block.asset ? `cid:${contentIdForAsset(block.asset.id)}` : undefined)
-    });
-    return mailDraftAdapter.createDraft({
-      subject: report.subject,
-      htmlFragment: report.htmlFragment,
-      inlineImages: [...images.entries()].map(([assetId, image]) => ({
-        contentId: contentIdForAsset(assetId),
-        mimeType: image.mimeType,
-        content: image.content
-      }))
-    });
   });
   app.patch('/api/dashboards/:dashboardId', async (request) =>
     service.updateDashboard(dashboardParamsSchema.parse(request.params).dashboardId, request.body)
@@ -384,14 +325,6 @@ export function registerWorkspaceRoutes(
     if (error instanceof FieldValuesRequireClearError) {
       return reply.code(409).send({ error: 'field_values_require_clear', message: error.message });
     }
-    if (error instanceof OutlookDraftError) {
-      const statusCode = error.code === 'platform_unsupported' ? 501 : 503;
-      return reply.code(statusCode).send({
-        error: error.code,
-        message: error.message,
-        fallbacks: ['clipboard', 'html_download']
-      });
-    }
     if (error instanceof RestoreValidationError) {
       return reply.code(400).send({ error: error.code, message: error.message });
     }
@@ -441,48 +374,9 @@ function safeExportFilename(title: string): string {
   );
 }
 
-function resolveReportImages(
-  model: ReportModel,
-  service: WorkspaceService
-): Map<string, { content: Buffer; mimeType: MailDraftInlineImage['mimeType'] }> {
-  const assets = new Map<string, { content: Buffer; mimeType: MailDraftInlineImage['mimeType'] }>();
-  for (const block of model.blocks ?? []) {
-    if (block.kind !== 'image' || !block.includeInExport || !block.asset) continue;
-    if (assets.has(block.asset.id)) continue;
-    const asset = service.getMediaAssetContent(block.asset.id);
-    assets.set(block.asset.id, {
-      content: asset.content,
-      mimeType: toInlineImageMimeType(asset.mimeType)
-    });
-  }
-  const totalBytes = [...assets.values()].reduce((total, image) => total + image.content.length, 0);
-  if (assets.size > 20 || totalBytes > 30 * 1024 * 1024) {
-    throw new ImageAssetValidationError(
-      'image_too_large',
-      '导出的图片总量超过安全限制，请减少图片数量或压缩图片。'
-    );
-  }
-  return assets;
-}
-
-function toInlineImageMimeType(mimeType: string): MailDraftInlineImage['mimeType'] {
-  if (mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/gif') {
-    return mimeType;
-  }
-  throw new ImageAssetValidationError(
-    'image_type_unsupported',
-    '该图片格式无法用于 Excel 或 Outlook 导出。'
-  );
-}
-
-function contentIdForAsset(assetId: string): string {
-  return `pm-${assetId.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 100)}@local`;
-}
-
 function isWorkspaceMutation(method: string, url: string): boolean {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return false;
   const pathname = url.split('?', 1)[0] ?? url;
-  if (pathname.endsWith('/export/outlook-draft')) return false;
   if (method === 'DELETE' && pathname.startsWith('/api/workspace/restore/')) return false;
   return true;
 }

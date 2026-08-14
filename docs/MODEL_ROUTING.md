@@ -14,7 +14,7 @@ Use for work where a wrong decision would propagate broadly or be expensive to r
 
 - Product architecture and major architecture changes.
 - Data model design, migrations, backup/recovery strategy, and compatibility decisions.
-- Security boundaries, input sanitization, local-process execution, and Outlook automation safety.
+- Security boundaries, input sanitization, and local-process execution safety.
 - Excel layout algorithms and difficult cross-format rendering decisions.
 - Ambiguous requirements that change product scope.
 - Difficult root-cause analysis after normal debugging has failed.
@@ -50,7 +50,7 @@ Use for mechanical, repetitive, or tightly specified work:
 - Dependency metadata and configuration changes with exact instructions.
 - Running established checks and reporting results.
 
-Do not use Tier S for schema design, security-sensitive code, destructive migrations, Outlook COM execution, Excel formula protection, or unresolved debugging.
+Do not use Tier S for schema design, security-sensitive code, destructive migrations, Excel formula protection, or unresolved debugging.
 
 ## Routing process
 
@@ -96,6 +96,5 @@ Rules:
 | Implement Excel base-grid span allocation and edge cases | Tier H |
 | Connect the tested layout result to ExcelJS | Tier M |
 | Add more workbook fixtures following the established format | Tier S |
-| Design Outlook COM security boundary | Tier H |
 | Implement the approved PowerShell adapter and tests | Tier M |
 | Adjust approved email colors and spacing | Tier S |

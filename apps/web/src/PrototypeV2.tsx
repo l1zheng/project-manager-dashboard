@@ -125,7 +125,6 @@ type RuntimeDiagnostics = {
     latestAutomaticBackup?: { kind: string; createdAt: string; bytes: number };
     availableBytes?: number;
   };
-  outlook: { available: boolean; reason?: string };
 };
 
 type DestructiveConfirmation = 'column' | 'table' | 'row' | 'content';
