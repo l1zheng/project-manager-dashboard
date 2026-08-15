@@ -1063,8 +1063,11 @@ export function PrototypeV2() {
       });
       await refreshWorkspace();
       // Notion-style: open the property editor for the new column so the
-      // user can rename or change its type immediately.
+      // user can rename or change its type immediately. Only do this when
+      // the user has not opened another popover in the meantime; a blind
+      // timer would otherwise hijack the filter or module-composer menu.
       window.setTimeout(() => {
+        if (document.querySelector('.v2-anchored-popover')) return;
         const header = document.querySelector(
           `th[data-v2-column-id="${CSS.escape(field.id)}"] .v2-column-header`
         ) as HTMLElement | null;
