@@ -186,6 +186,11 @@ async function deleteContentModule(label) {
 }
 
 async function clickButton(text) {
+  // Wait for the button to exist before clicking so a freshly opened
+  // popover (e.g. the module composer) has rendered on slower runners.
+  await waitFor(
+    `[...document.querySelectorAll('button')].some((candidate) => candidate.textContent.replace(/\\s+/g, ' ').trim().includes(${JSON.stringify(text)}))`
+  );
   await evaluate(`(() => {
     const expected = ${JSON.stringify(text)};
     const button = [...document.querySelectorAll('button')].find((candidate) =>
