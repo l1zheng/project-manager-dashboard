@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { closeSync, mkdirSync, openSync } from 'node:fs';
-import { readFile, rename, writeFile } from 'node:fs/promises';
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -137,9 +137,18 @@ async function writeLauncherState(paths, state) {
   await rename(temporaryPath, paths.statePath);
 }
 
+async function clearLauncherState(paths) {
+  try {
+    await rm(paths.statePath, { force: true });
+  } catch {
+    // Best-effort cleanup; a stale state file is diagnosed on the next run.
+  }
+}
+
 async function stopDashboard(paths, { allowAlreadyStopped = false } = {}) {
   const health = await getDashboardHealth(paths);
   if (!health) {
+    await clearLauncherState(paths);
     if (allowAlreadyStopped) {
       console.log('Project Manager Dashboard is not running.');
       return;
@@ -157,11 +166,24 @@ async function stopDashboard(paths, { allowAlreadyStopped = false } = {}) {
     headers: { 'x-project-manager-launch-token': state.launchToken },
     signal: AbortSignal.timeout(5_000)
   });
-  if (!response.ok)
-    throw new Error(`The local service rejected the stop request (${response.status}).`);
+  if (!response.ok) {
+    const port = new URL(paths.baseUrl).port;
+    const processHint = Number.isSafeInteger(state.processId)
+      ? ` Close it manually: in Task Manager end the process with PID ${state.processId}, or run "taskkill /F /PID ${state.processId}".`
+      : ' Close the service occupying the port manually and try again.';
+    if (response.status === 404) {
+      throw new Error(
+        `Port ${port} is used by an older or unmanaged dashboard service that does not support the authenticated stop (HTTP 404).${processHint} Then run start-dashboard.cmd again.`
+      );
+    }
+    throw new Error(
+      `The local service rejected the authenticated stop request (HTTP ${response.status}).${processHint}`
+    );
+  }
   for (let attempt = 0; attempt < 40; attempt += 1) {
     await delay(250);
     if (!(await getDashboardHealth(paths))) {
+      await clearLauncherState(paths);
       console.log('Project Manager Dashboard stopped.');
       return;
     }

@@ -46,6 +46,9 @@ test('portable release uses bundled Node without packaged PowerShell or per-file
   assert.match(launcher, /LOCALAPPDATA/);
   assert.match(launcher, /project-manager-api/);
   assert.match(launcher, /unmanaged or older dashboard service/);
+  assert.match(launcher, /taskkill \/F \/PID/);
+  assert.match(launcher, /does not support the authenticated stop \(HTTP 404\)/);
+  assert.match(launcher, /clearLauncherState/);
   assert.match(launcher, /PM_LAUNCHER_NO_BROWSER/);
   assert.match(launcher, /PM_LAUNCH_TOKEN/);
   assert.doesNotMatch(launcher, /0\.0\.0\.0|createHash|Get-FileHash/);
